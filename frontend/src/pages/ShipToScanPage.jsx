@@ -115,13 +115,14 @@ const ShipToScanPage = () => {
                 <address className="not-italic text-[#B0C4BF] space-y-1">
                   <p>Ship-to-Scan Department</p>
                   <p>Attn: Digital Archives Team</p>
-                  <p className="text-gold font-medium mt-2">Contact us for shipping address</p>
+                  <p className="text-gold font-medium mt-2">1111 Conrad Sauer Dr</p>
+                  <p className="text-gold font-medium">Houston, TX 77043</p>
                 </address>
                 
                 <div className="mt-6 pt-6 border-t border-[rgba(212,175,55,0.2)] space-y-3">
                   <p className="text-sm text-[#B0C4BF] flex items-center gap-2">
                     <Mail className="w-4 h-4 text-gold" />
-                    archives@dar-us-salam.com
+                    sales@dar-us-salam.com
                   </p>
                 </div>
               </div>
@@ -205,7 +206,7 @@ const ShipToScanPage = () => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Questions? Contact us at archives@dar-us-salam.com
+                Questions? Contact us at sales@dar-us-salam.com
               </li>
             </ul>
           </div>

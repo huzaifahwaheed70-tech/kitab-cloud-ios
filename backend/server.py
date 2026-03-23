@@ -111,6 +111,7 @@ class UserResponse(BaseModel):
     name: str
     picture: Optional[str] = None
     subscription_tier: int = 0
+    is_admin: bool = False
     created_at: str
 
 class BookCreate(BaseModel):
