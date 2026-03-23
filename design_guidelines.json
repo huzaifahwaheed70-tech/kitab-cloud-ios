@@ -1,0 +1,167 @@
+{
+  "theme_and_concept": {
+    "archetype": "Jewel & Luxury",
+    "vibe": "Prestigious, cinematic, moody, wealthy, traditional yet modern",
+    "theme_preference": "Dark theme primary (Deep greens and gold), simulating an exclusive old-money library or archive."
+  },
+  "typography": {
+    "strategy": "Old Money Tech - Classic Serif Headings + Clean Sans Body",
+    "fonts": {
+      "headings": {
+        "family": "Cormorant Garamond",
+        "weights": [400, 600, 700],
+        "usage": "Hero titles, Section headers, Book Titles. MUST use tracking-tight for sizes > 32px."
+      },
+      "body": {
+        "family": "Outfit",
+        "weights": [300, 400, 500, 600],
+        "usage": "Paragraphs, UI elements, metadata, buttons."
+      },
+      "mono": {
+        "family": "JetBrains Mono",
+        "weights": [400],
+        "usage": "Darussalam Codes (e.g. C21, E20), Tier labels, specific UI metadata."
+      }
+    },
+    "typesetting_rules": {
+      "headlines": "Use tight letter spacing (tracking-tight or tracking-tighter).",
+      "overlines": "MUST be uppercase, tiny, wide spacing (tracking-[0.2em]).",
+      "line_height": "Tight (leading-none) for headers, Loose (leading-relaxed) for body.",
+      "text_alignment": "Headings center-aligned only for Hero. Left-align paragraphs, inputs, and standard content."
+    }
+  },
+  "colors": {
+    "primary": {
+      "base": "#004D40",
+      "darker": "#00332A",
+      "lighter": "#006655",
+      "usage": "Brand core, main backgrounds, solid large surfaces."
+    },
+    "accent": {
+      "gold": "#D4AF37",
+      "gold_light": "#E9C85C",
+      "gold_muted": "#A68621",
+      "usage": "CTAs, Tier 5 highlights, active states, premium borders."
+    },
+    "neutral": {
+      "background": "#02120F",
+      "surface": "#05201A",
+      "surface_elevated": "#082E26",
+      "text_primary": "#FDFBF7",
+      "text_secondary": "#B0C4BF",
+      "border": "rgba(212, 175, 55, 0.2)"
+    },
+    "tiers": {
+      "tier_1": "#B0C4BF",
+      "tier_2": "#7DA198",
+      "tier_3": "#E0A96D",
+      "tier_4": "#D4AF37",
+      "tier_5": "#FFD700"
+    },
+    "rules": {
+      "contrast": "Ensure minimum 4.5:1 contrast ratio. Use text-shadow over images.",
+      "gradients": "NO generic flat gradients. Use subtle radial glows for gold accents behind premium books.",
+      "forbidden_colors": ["#7351B7", "teal blue", "#1B93A4"]
+    }
+  },
+  "visual_enhancers": {
+    "surface_strategy": {
+      "navigation": "The 'Crystal' Variant (Glassmorphism): bg-[#02120F]/70, backdrop-blur-xl, backdrop-saturate-150, border-b border-[#D4AF37]/20.",
+      "cards": "Neumorphism tactile variant, bg-[#05201A], sharp 1px border-[#D4AF37]/20, hover lift (-translate-y-1) and shadow-lg shadow-[#D4AF37]/10."
+    },
+    "textures": "Use subtle grain/noise overlays to make the dark green feel like velvet or premium leather, not flat digital pixels.",
+    "borders": "Use gold-tinted semi-transparent borders (border-[#D4AF37]/20) for definition.",
+    "icons": {
+      "library": "@phosphor-icons/react",
+      "style": "Duotone weight for marketing pages, Regular for dashboard. Gold or Cream colored."
+    }
+  },
+  "layouts": {
+    "spacing_system": "Generous Spacing: p-6, p-8, p-12, p-16, p-24, p-32. Containers with borders MUST have p-6 or p-8 internal padding.",
+    "home_grid": {
+      "pattern": "Netflix-style horizontal scrolling bento rows.",
+      "implementation": "Section title (Tier/Category) left-aligned. Horizontal flex container with snap-x snap-mandatory, gap-6, hide scrollbar. Items are min-w-[200px] md:min-w-[240px]."
+    },
+    "dashboard_grid": {
+      "pattern": "High Density Grid for Admin Panel.",
+      "implementation": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4, gap-6. Direct children only. Use h-full on children."
+    }
+  },
+  "components": {
+    "button": "Pill-shaped or rounded-sm with sharp hover interactions. Gold CTAs MUST have hover state explicitly defined (e.g. hover:bg-[#E9C85C] hover:text-[#02120F]).",
+    "cards": "Use customized Shadcn UI cards without the generic Vercel look. Override borders to be dark/gold-tinted.",
+    "pdf_viewer": "Full-width embedded viewer. Background #02120F. Controls in a glassmorphic floating toolbar.",
+    "form_inputs": "Shadcn components heavily customized. bg-[#082E26] border-[#D4AF37]/20 text-[#FDFBF7] focus:ring-1 focus:ring-[#D4AF37] rounded-sm.",
+    "toast": "Use Sonner, positioned bottom-right, styled dark with gold borders."
+  },
+  "motion": {
+    "hover": "Smooth transform (-translate-y-1, scale-105 for book covers) with transition-transform 0.3s ease.",
+    "entrance": "Staggered fade-up for book grids. Do NOT use 'transition: all'. Use specific properties.",
+    "reduced_motion": "Respect prefers-reduced-motion media query for accessibility."
+  },
+  "accessibility": {
+    "data_testid": "ALL interactive elements MUST include data-testid (e.g., data-testid='read-now-button', data-testid='book-search-input').",
+    "focus_states": "Focus states must have higher contrast, e.g., focus:ring-2 focus:ring-[#D4AF37] focus:outline-none.",
+    "contrast": "Adhere to APCA contrast requirements. Gold on dark green usually passes, check cream on gold."
+  },
+  "media": {
+    "image_constraints": "Mobile Hero images max-h-[80vh] md:max-h-none. Books covers must maintain consistent aspect ratio (usually 2:3).",
+    "image_urls": [
+      {
+        "category": "Hero / Backgrounds",
+        "description": "Premium library with dark wooden shelves and warm lighting.",
+        "url": "https://images.unsplash.com/photo-1505664063603-28e48ca204eb?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "placement": "Landing Page Hero Background (with heavy dark green overlay)"
+      },
+      {
+        "category": "Hero / Backgrounds",
+        "description": "Cozy inviting library scene for community feel.",
+        "url": "https://images.pexels.com/photos/1907784/pexels-photo-1907784.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "placement": "About Us or Ship-to-Scan portal header background"
+      },
+      {
+        "category": "Book Covers / Placeholders",
+        "description": "Ornate gold floral pattern on dark leather book cover.",
+        "url": "https://images.unsplash.com/photo-1755541608494-5c02cf56e1f4?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "placement": "Placeholder for Tier 4/5 books or Volume categories."
+      },
+      {
+        "category": "Book Covers / Placeholders",
+        "description": "Vintage leather-bound books.",
+        "url": "https://images.pexels.com/photos/8391472/pexels-photo-8391472.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "placement": "Bookshelf placeholders or generic book list images."
+      }
+    ]
+  },
+  "libraries_and_packages": {
+    "icons": "yarn add @phosphor-icons/react",
+    "animation": "yarn add framer-motion",
+    "scrolling": "yarn add @studio-freight/react-lenis",
+    "carousel": "Use native CSS snap-x for best performance on mobile, or 'embla-carousel-react' (built into Shadcn)."
+  },
+  "instructions_to_main_agent": [
+    "Install custom fonts 'Cormorant Garamond' and 'Outfit' via Google Fonts in index.html or global CSS.",
+    "DO NOT build HTML native select or date pickers. ALWAYS use Shadcn.",
+    "Override default Shadcn styles in tailwind.config.js to map 'primary' to gold, 'background' to dark green/black.",
+    "Ensure 'Book Tier' permission checks happen visually (locks on covers) and logically (disabling the Read Now button).",
+    "The 15-book bookshelf limit for Tier 1 must be visually communicated (e.g. '12/15 Books Saved' progress bar).",
+    "For 'Ship-to-Scan' portal, use an exclusive luxury design. Only accessible if user_tier == 5.",
+    "For Book Covers in the Netflix grid, use aspect-[2/3] and object-cover to prevent layout shifts.",
+    "Use standard named exports for components, default exports for pages."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: 'transition: all'. Always add transitions for specific interactive elements excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add '.App { text-align: center; }' in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "All interactive and key informational elements MUST include a data-testid attribute to facilitate robust automated testing.",
+    "Use sonner for toasts, located in /app/src/components/ui/sonner.tsx."
+  ]
+}
