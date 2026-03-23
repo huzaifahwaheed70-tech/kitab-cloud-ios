@@ -1,0 +1,47 @@
+{
+  "short_name": "Kitab Cloud",
+  "name": "Dar-Us-Salam Kitab Cloud",
+  "description": "Your Digital Islamic Library - The First Islamic Bookstore in the World to offer Scan-on-Demand digital library services",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#02120F",
+  "background_color": "#02120F",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["books", "education", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "My Bookshelf",
+      "short_name": "Bookshelf",
+      "description": "View your saved books",
+      "url": "/bookshelf",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Request a Scan",
+      "short_name": "Request",
+      "description": "Request a book to be digitized",
+      "url": "/request-scan",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    }
+  ]
+}
