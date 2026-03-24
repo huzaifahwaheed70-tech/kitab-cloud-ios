@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
-  BookOpen, Users, Send, ArrowLeft, Plus, Upload, Edit, Trash2, 
-  Search, ChevronDown, X, Save
+  BookOpen, Users, Send, ArrowLeft, Plus, Edit, Trash2, 
+  Search, X, Save
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -113,32 +113,17 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleUploadCover = async (bookId, file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-      await axios.post(`${API}/books/${bookId}/upload-cover`, formData, {
-        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
-        withCredentials: true
-      });
-      toast.success('Cover uploaded!');
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to upload cover');
-    }
-  };
-
   const handleUploadPdf = async (bookId, file) => {
     const formData = new FormData();
     formData.append('file', file);
     
     try {
+      toast.info('Uploading PDF... This may take a moment.');
       await axios.post(`${API}/books/${bookId}/upload-pdf`, formData, {
         headers: { ...headers, 'Content-Type': 'multipart/form-data' },
         withCredentials: true
       });
-      toast.success('PDF uploaded!');
+      toast.success('PDF uploaded! Cover generated from first page.');
       fetchData();
     } catch (error) {
       toast.error('Failed to upload PDF');
@@ -415,11 +400,12 @@ const AdminDashboard = () => {
                       <span className={`tier-badge tier-${book.tier_level} text-xs`}>T{book.tier_level}</span>
                     </div>
                     <h3 className="text-[#FDFBF7] font-medium truncate">{book.title}</h3>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-[#B0C4BF]">
-                      {book.cover_url && <span className="text-green-500">✓ Cover</span>}
-                      {book.pdf_url && <span className="text-green-500">✓ PDF</span>}
-                      {!book.cover_url && <span className="text-yellow-500">No cover</span>}
-                      {!book.pdf_url && <span className="text-yellow-500">No PDF</span>}
+                    <div className="flex items-center gap-2 mt-2 text-xs">
+                      {book.pdf_url ? (
+                        <span className="text-green-500">✓ PDF Uploaded</span>
+                      ) : (
+                        <span className="text-yellow-500">No PDF yet</span>
+                      )}
                     </div>
                   </div>
                   
@@ -427,23 +413,12 @@ const AdminDashboard = () => {
                     <label className="cursor-pointer">
                       <input
                         type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => e.target.files?.[0] && handleUploadCover(book.book_id, e.target.files[0])}
-                      />
-                      <div className="p-2 hover:bg-[#082E26] rounded-sm text-[#B0C4BF] hover:text-gold" title="Upload Cover">
-                        <Upload className="w-5 h-5" />
-                      </div>
-                    </label>
-                    <label className="cursor-pointer">
-                      <input
-                        type="file"
                         accept="application/pdf"
                         className="hidden"
                         onChange={(e) => e.target.files?.[0] && handleUploadPdf(book.book_id, e.target.files[0])}
                       />
-                      <div className="p-2 hover:bg-[#082E26] rounded-sm text-[#B0C4BF] hover:text-gold" title="Upload PDF">
-                        <BookOpen className="w-5 h-5" />
+                      <div className="px-3 py-2 bg-gold/10 hover:bg-gold/20 rounded-sm text-gold text-sm font-medium border border-gold/30 cursor-pointer">
+                        {book.pdf_url ? 'Replace PDF' : 'Upload PDF'}
                       </div>
                     </label>
                     <Button variant="ghost" size="icon" onClick={() => openEditBook(book)} className="text-[#B0C4BF] hover:text-gold">

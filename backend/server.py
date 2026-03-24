@@ -423,26 +423,6 @@ async def delete_book(book_id: str, user: dict = Depends(get_admin_user)):
     return {"message": "Book deleted"}
 
 
-@api_router.post("/books/{book_id}/upload-cover")
-async def upload_cover(book_id: str, file: UploadFile = File(...), user: dict = Depends(get_admin_user)):
-    book = await db.books.find_one({"book_id": book_id})
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    path = f"{APP_NAME}/covers/{book_id}.{ext}"
-    data = await file.read()
-    
-    result = put_object(path, data, file.content_type or "image/jpeg")
-    
-    await db.books.update_one(
-        {"book_id": book_id},
-        {"$set": {"cover_url": result["path"]}}
-    )
-    
-    return {"cover_url": result["path"]}
-
-
 @api_router.post("/books/{book_id}/upload-pdf")
 async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = Depends(get_admin_user)):
     book = await db.books.find_one({"book_id": book_id})
@@ -454,12 +434,40 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
     
     result = put_object(path, data, "application/pdf")
     
+    # Generate thumbnail from first page of PDF
+    cover_path = None
+    try:
+        import fitz  # PyMuPDF
+        from io import BytesIO
+        
+        pdf_doc = fitz.open(stream=data, filetype="pdf")
+        if pdf_doc.page_count > 0:
+            page = pdf_doc[0]
+            # Render at 2x resolution for better quality
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
+            
+            # Upload thumbnail
+            thumb_path = f"{APP_NAME}/covers/{book_id}.png"
+            thumb_result = put_object(thumb_path, img_data, "image/png")
+            cover_path = thumb_result["path"]
+            logger.info(f"Generated thumbnail for book {book_id}")
+        pdf_doc.close()
+    except Exception as e:
+        logger.warning(f"Failed to generate thumbnail: {e}")
+    
+    # Update book with PDF URL and cover (if generated)
+    update_data = {"pdf_url": result["path"]}
+    if cover_path:
+        update_data["cover_url"] = cover_path
+    
     await db.books.update_one(
         {"book_id": book_id},
-        {"$set": {"pdf_url": result["path"]}}
+        {"$set": update_data}
     )
     
-    return {"pdf_url": result["path"]}
+    return {"pdf_url": result["path"], "cover_url": cover_path}
 
 
 @api_router.get("/files/{path:path}")

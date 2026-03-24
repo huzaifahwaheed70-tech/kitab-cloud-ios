@@ -280,9 +280,6 @@ const BookDetailPage = () => {
                   {book.title}
                 </h1>
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="px-3 py-1 bg-surface rounded-sm text-[#B0C4BF] text-sm">
-                    {book.category}
-                  </span>
                   <span className={`tier-badge tier-${book.tier_level}`}>
                     Tier {book.tier_level}
                   </span>
@@ -349,10 +346,6 @@ const BookDetailPage = () => {
 
               {/* Book Info */}
               <div className="grid grid-cols-2 gap-6 pt-8 border-t border-[rgba(212,175,55,0.2)]">
-                <div>
-                  <p className="text-[#B0C4BF] text-sm mb-1">Category</p>
-                  <p className="text-[#FDFBF7] font-medium">{book.category}</p>
-                </div>
                 <div>
                   <p className="text-[#B0C4BF] text-sm mb-1">Access Level</p>
                   <p className="text-[#FDFBF7] font-medium">Tier {book.tier_level}+</p>
