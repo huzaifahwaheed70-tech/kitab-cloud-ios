@@ -32,6 +32,11 @@ const BookDetailPage = () => {
   const [searchText, setSearchText] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
+  const [pdfDocument, setPdfDocument] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [pageSaved, setPageSaved] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
@@ -142,16 +147,24 @@ const BookDetailPage = () => {
     }
   };
 
-  const saveReadingProgress = useCallback(async (page) => {
+  const saveReadingProgress = useCallback(async (page, showToast = false) => {
     if (!token) return;
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(`${API}/reading-progress/${bookId}`, 
-        { page },
+      await axios.post(`${API}/reading-progress/${bookId}?page=${page}`, 
+        {},
         { headers, withCredentials: true }
       );
+      if (showToast) {
+        setPageSaved(true);
+        toast.success(`Page ${page} saved!`);
+        setTimeout(() => setPageSaved(false), 2000);
+      }
     } catch (error) {
       console.error('Error saving progress:', error);
+      if (showToast) {
+        toast.error('Failed to save progress');
+      }
     }
   }, [token, bookId]);
 
@@ -227,6 +240,69 @@ const BookDetailPage = () => {
     setNumPages(numPages);
   };
 
+  // Store PDF document reference for text search
+  const onDocumentLoadSuccessWithDoc = (pdf) => {
+    setNumPages(pdf.numPages);
+    setPdfDocument(pdf);
+  };
+
+  // In-book search function
+  const searchInBook = async () => {
+    if (!pdfDocument || !searchText.trim() || !canSearch) return;
+    
+    setIsSearching(true);
+    setSearchResults([]);
+    const results = [];
+    const searchTerm = searchText.toLowerCase();
+    
+    try {
+      for (let i = 1; i <= pdfDocument.numPages; i++) {
+        const page = await pdfDocument.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ').toLowerCase();
+        
+        if (pageText.includes(searchTerm)) {
+          results.push({
+            page: i,
+            preview: pageText.substring(
+              Math.max(0, pageText.indexOf(searchTerm) - 30),
+              pageText.indexOf(searchTerm) + searchTerm.length + 30
+            )
+          });
+        }
+      }
+      
+      setSearchResults(results);
+      setCurrentSearchIndex(0);
+      
+      if (results.length > 0) {
+        setPageNumber(results[0].page);
+        toast.success(`Found ${results.length} result${results.length > 1 ? 's' : ''}`);
+      } else {
+        toast.info('No results found');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Search failed');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const goToNextResult = () => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    setCurrentSearchIndex(nextIndex);
+    setPageNumber(searchResults[nextIndex].page);
+  };
+
+  const goToPrevResult = () => {
+    if (searchResults.length === 0) return;
+    const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    setCurrentSearchIndex(prevIndex);
+    setPageNumber(searchResults[prevIndex].page);
+  };
+
   const handlePageChange = (newPage) => {
     setPageNumber(newPage);
     saveReadingProgress(newPage);
@@ -253,94 +329,149 @@ const BookDetailPage = () => {
       {/* PDF Reader Modal - with copy protection */}
       {showReader && pdfUrl && (
         <div 
-          className="fixed inset-0 z-50 bg-[#02120F]"
+          className="fixed inset-0 z-50 bg-[#02120F] flex flex-col"
           style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           onContextMenu={(e) => e.preventDefault()}
           onCopy={(e) => e.preventDefault()}
         >
           {/* Reader Header */}
-          <div className="glass sticky top-0 z-10 border-b border-[rgba(212,175,55,0.2)]">
-            <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 md:gap-4">
+          <div className="glass border-b border-[rgba(212,175,55,0.2)] flex-shrink-0">
+            <div className="max-w-7xl mx-auto px-3 py-2 md:px-4 md:py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    saveReadingProgress(pageNumber);
+                    saveReadingProgress(pageNumber, true);
                     setShowReader(false);
                   }}
-                  className="text-[#FDFBF7] hover:bg-[#082E26]"
+                  className="text-[#FDFBF7] hover:bg-[#082E26] h-8 w-8"
                   data-testid="close-reader-btn"
                 >
                   <X className="w-5 h-5" />
                 </Button>
-                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[120px] md:max-w-none">
+                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[100px] md:max-w-[300px]">
                   {book.title}
                 </h1>
               </div>
               
-              <div className="flex items-center gap-1 md:gap-2">
-                {/* In-book search for Tier 3+ */}
-                {canSearch && (
-                  <div className="relative hidden md:block">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowSearch(!showSearch)}
-                      className="text-[#B0C4BF] hover:text-gold"
-                      data-testid="toggle-search-btn"
-                    >
-                      <Search className="w-5 h-5" />
-                    </Button>
-                    {showSearch && (
-                      <div className="absolute right-0 top-full mt-2 w-64 bg-surface border border-[rgba(212,175,55,0.2)] rounded-sm p-2">
-                        <Input
-                          type="text"
-                          placeholder="Search in book..."
-                          value={searchText}
-                          onChange={(e) => setSearchText(e.target.value)}
-                          className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] text-sm"
-                          data-testid="in-book-search"
-                        />
-                        <p className="text-xs text-[#B0C4BF] mt-1">Press Enter to search</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+              <div className="flex items-center gap-1">
+                {/* Save Page Button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => saveReadingProgress(pageNumber, true)}
+                  className={`h-8 w-8 ${pageSaved ? 'text-gold' : 'text-[#B0C4BF] hover:text-gold'}`}
+                  data-testid="save-page-btn"
+                >
+                  <Bookmark className={`w-4 h-4 ${pageSaved ? 'fill-gold' : ''}`} />
+                </Button>
                 
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8 md:h-10 md:w-10"
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8"
                   data-testid="zoom-out-btn"
                 >
-                  <ZoomOut className="w-4 h-4 md:w-5 md:h-5" />
+                  <ZoomOut className="w-4 h-4" />
                 </Button>
-                <span className="text-[#B0C4BF] text-xs md:text-sm min-w-[40px] md:min-w-[50px] text-center">
+                <span className="text-[#B0C4BF] text-xs min-w-[35px] text-center hidden md:inline">
                   {Math.round(scale * 100)}%
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setScale(s => Math.min(2, s + 0.25))}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8 md:h-10 md:w-10"
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8"
                   data-testid="zoom-in-btn"
                 >
-                  <ZoomIn className="w-4 h-4 md:w-5 md:h-5" />
+                  <ZoomIn className="w-4 h-4" />
                 </Button>
+                
+                {/* Search Toggle for Mobile */}
+                {canSearch && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowSearch(!showSearch)}
+                    className={`h-8 w-8 ${showSearch ? 'text-gold' : 'text-[#B0C4BF] hover:text-gold'}`}
+                    data-testid="toggle-search-btn"
+                  >
+                    <Search className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
 
+          {/* In-book Search Bar - Always visible when toggled (Tier 3+) */}
+          {canSearch && showSearch && (
+            <div className="glass border-b border-[rgba(212,175,55,0.2)] px-3 py-2 flex-shrink-0">
+              <div className="max-w-xl mx-auto flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="text"
+                    placeholder="Search in book..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && searchInBook()}
+                    className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] text-sm pr-10"
+                    data-testid="in-book-search"
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={searchInBook}
+                  disabled={isSearching || !searchText.trim()}
+                  className="bg-gold text-[#02120F] hover:bg-[#E9C85C] h-9 px-3"
+                  data-testid="search-btn"
+                >
+                  Search
+                </Button>
+              </div>
+              
+              {/* Search Results Navigation */}
+              {searchResults.length > 0 && (
+                <div className="max-w-xl mx-auto mt-2 flex items-center justify-between text-sm">
+                  <span className="text-[#B0C4BF]">
+                    Result {currentSearchIndex + 1} of {searchResults.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={goToPrevResult}
+                      className="text-[#B0C4BF] hover:text-[#FDFBF7] h-7 px-2"
+                    >
+                      <ChevronLeft className="w-4 h-4" /> Prev
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={goToNextResult}
+                      className="text-[#B0C4BF] hover:text-[#FDFBF7] h-7 px-2"
+                    >
+                      Next <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* PDF Content - copy protected */}
           <div 
-            className="h-[calc(100vh-140px)] md:h-[calc(100vh-120px)] overflow-auto pdf-container pb-16 md:pb-0"
+            className="flex-1 overflow-auto pdf-container"
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           >
             <Document
               file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadSuccess={onDocumentLoadSuccessWithDoc}
               loading={
                 <div className="flex items-center justify-center py-20">
                   <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
@@ -357,22 +488,21 @@ const BookDetailPage = () => {
           </div>
 
           {/* Reader Footer with navigation - positioned above Emergent badge */}
-          <div className="glass fixed bottom-12 md:bottom-0 left-0 right-0 border-t border-[rgba(212,175,55,0.2)] z-20">
-            <div className="max-w-7xl mx-auto px-4 py-2 md:py-3 flex items-center justify-center gap-4 md:gap-8">
+          <div className="glass border-t border-[rgba(212,175,55,0.2)] flex-shrink-0 mb-12 md:mb-0">
+            <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-6">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
                 disabled={pageNumber <= 1}
-                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10 md:h-12 md:w-12"
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-12 w-12"
                 data-testid="prev-page-btn"
               >
-                <ChevronLeft className="w-7 h-7 md:w-8 md:h-8" />
+                <ChevronLeft className="w-8 h-8" />
               </Button>
               
-              <div className="flex items-center gap-2">
-                <Bookmark className="w-4 h-4 text-gold hidden md:block" />
-                <span className="text-[#FDFBF7] font-mono text-sm md:text-base">
+              <div className="flex items-center gap-3 min-w-[100px] justify-center">
+                <span className="text-[#FDFBF7] font-mono text-base">
                   {pageNumber} / {numPages || '?'}
                 </span>
               </div>
@@ -382,10 +512,10 @@ const BookDetailPage = () => {
                 size="icon"
                 onClick={() => handlePageChange(Math.min(numPages || pageNumber, pageNumber + 1))}
                 disabled={pageNumber >= (numPages || 1)}
-                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10 md:h-12 md:w-12"
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-12 w-12"
                 data-testid="next-page-btn"
               >
-                <ChevronRight className="w-7 h-7 md:w-8 md:h-8" />
+                <ChevronRight className="w-8 h-8" />
               </Button>
             </div>
           </div>
