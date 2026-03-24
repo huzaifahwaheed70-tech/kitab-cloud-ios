@@ -261,7 +261,7 @@ const BookDetailPage = () => {
           {/* Reader Header */}
           <div className="glass sticky top-0 z-10 border-b border-[rgba(212,175,55,0.2)]">
             <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -274,15 +274,15 @@ const BookDetailPage = () => {
                 >
                   <X className="w-5 h-5" />
                 </Button>
-                <h1 className="font-serif text-lg text-[#FDFBF7] truncate max-w-[200px] md:max-w-none">
+                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[120px] md:max-w-none">
                   {book.title}
                 </h1>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 md:gap-2">
                 {/* In-book search for Tier 3+ */}
                 {canSearch && (
-                  <div className="relative">
+                  <div className="relative hidden md:block">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -312,22 +312,22 @@ const BookDetailPage = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7]"
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8 md:h-10 md:w-10"
                   data-testid="zoom-out-btn"
                 >
-                  <ZoomOut className="w-5 h-5" />
+                  <ZoomOut className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
-                <span className="text-[#B0C4BF] text-sm min-w-[50px] text-center">
+                <span className="text-[#B0C4BF] text-xs md:text-sm min-w-[40px] md:min-w-[50px] text-center">
                   {Math.round(scale * 100)}%
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setScale(s => Math.min(2, s + 0.25))}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7]"
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8 md:h-10 md:w-10"
                   data-testid="zoom-in-btn"
                 >
-                  <ZoomIn className="w-5 h-5" />
+                  <ZoomIn className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
               </div>
             </div>
@@ -335,7 +335,7 @@ const BookDetailPage = () => {
 
           {/* PDF Content - copy protected */}
           <div 
-            className="h-[calc(100vh-120px)] overflow-auto pdf-container"
+            className="h-[calc(100vh-140px)] md:h-[calc(100vh-120px)] overflow-auto pdf-container pb-16 md:pb-0"
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           >
             <Document
@@ -356,41 +356,37 @@ const BookDetailPage = () => {
             </Document>
           </div>
 
-          {/* Reader Footer with bookmark */}
-          <div className="glass fixed bottom-0 left-0 right-0 border-t border-[rgba(212,175,55,0.2)]">
-            <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bookmark className="w-4 h-4 text-gold" />
-                <span className="text-xs text-[#B0C4BF]">Page saved</span>
-              </div>
+          {/* Reader Footer with navigation - positioned above Emergent badge */}
+          <div className="glass fixed bottom-12 md:bottom-0 left-0 right-0 border-t border-[rgba(212,175,55,0.2)] z-20">
+            <div className="max-w-7xl mx-auto px-4 py-2 md:py-3 flex items-center justify-center gap-4 md:gap-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
+                disabled={pageNumber <= 1}
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10 md:h-12 md:w-12"
+                data-testid="prev-page-btn"
+              >
+                <ChevronLeft className="w-7 h-7 md:w-8 md:h-8" />
+              </Button>
               
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
-                  disabled={pageNumber <= 1}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30"
-                  data-testid="prev-page-btn"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </Button>
-                <span className="text-[#FDFBF7] font-mono text-sm">
+              <div className="flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-gold hidden md:block" />
+                <span className="text-[#FDFBF7] font-mono text-sm md:text-base">
                   {pageNumber} / {numPages || '?'}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handlePageChange(Math.min(numPages || pageNumber, pageNumber + 1))}
-                  disabled={pageNumber >= (numPages || 1)}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30"
-                  data-testid="next-page-btn"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </Button>
               </div>
               
-              <div className="w-20"></div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handlePageChange(Math.min(numPages || pageNumber, pageNumber + 1))}
+                disabled={pageNumber >= (numPages || 1)}
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10 md:h-12 md:w-12"
+                data-testid="next-page-btn"
+              >
+                <ChevronRight className="w-7 h-7 md:w-8 md:h-8" />
+              </Button>
             </div>
           </div>
         </div>
