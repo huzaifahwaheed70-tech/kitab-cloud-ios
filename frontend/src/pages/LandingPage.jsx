@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../App';
-import { BookOpen, Shield, Sparkles, Users, ArrowRight, Package, Star } from 'lucide-react';
+import { BookOpen, Shield, Sparkles, ArrowRight, ShoppingCart, BookMarked } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 const LandingPage = () => {
@@ -15,27 +15,27 @@ const LandingPage = () => {
     },
     {
       icon: <Shield className="w-8 h-8" />,
-      title: "Tiered Access",
-      description: "Choose from 5 membership levels to access different collections based on your needs."
+      title: "Monthly Reading Plans",
+      description: "Choose from 4 subscription tiers. Select your books each month based on your plan."
+    },
+    {
+      icon: <ShoppingCart className="w-8 h-8" />,
+      title: "Buy Individual PDFs",
+      description: "Don't want a subscription? Purchase individual book PDFs to own forever."
     },
     {
       icon: <Sparkles className="w-8 h-8" />,
-      title: "Scan-on-Demand",
-      description: "Request any book from our store to be professionally digitized for you."
-    },
-    {
-      icon: <Package className="w-8 h-8" />,
-      title: "Ship-to-Scan",
-      description: "Premium and Unlimited members can ship physical books for professional archiving."
+      title: "Advanced Search (Tier 3+)",
+      description: "Search within books to find exact text passages. Available for Advanced and Premium members."
     }
   ];
 
   const tiers = [
-    { tier: 1, name: "Basic", price: 25, features: ["Tier 1 Books", "15 Book Limit", "Basic Support"] },
-    { tier: 2, name: "Standard", price: 35, features: ["Tier 1-2 Books", "35 Book Limit", "Email Support"] },
-    { tier: 3, name: "Advanced", price: 50, features: ["Tier 1-3 Books", "60 Book Limit", "Chat Support"] },
-    { tier: 4, name: "Premium", price: 60, features: ["Tier 1-4 Books", "75 Book Limit", "Ship-to-Scan"] },
-    { tier: 5, name: "Unlimited", price: 75, features: ["All Books", "Unlimited Access", "Ship-to-Scan"], featured: true },
+    { tier: 0, name: "Pay Per Book", price: 0, features: ["Buy individual PDFs", "Own forever", "No monthly fee"], perBook: true },
+    { tier: 1, name: "Basic", price: 20, features: ["10 books/month", "Standard library", "Email support"] },
+    { tier: 2, name: "Standard", price: 40, features: ["20 books/month", "Standard library", "Email support"] },
+    { tier: 3, name: "Advanced", price: 60, features: ["30 books/month", "Volume books access", "In-book search"] },
+    { tier: 4, name: "Premium", price: 80, features: ["Unlimited books", "All books including advanced", "In-book search"], featured: true },
   ];
 
   return (
@@ -95,8 +95,12 @@ const LandingPage = () => {
               Your Digital<br />
               <span className="text-gradient-gold">Islamic Library</span>
             </h1>
-            <p className="text-xl text-[#B0C4BF] mb-10 max-w-xl leading-relaxed animate-fade-in-up animate-delay-200">
-              Access a curated collection of authentic Islamic literature, professionally digitized for our global community.
+            <p className="text-xl text-[#B0C4BF] mb-4 max-w-xl leading-relaxed animate-fade-in-up animate-delay-200">
+              Access a curated collection of authentic Islamic literature. Subscribe monthly or buy individual PDFs.
+            </p>
+            <p className="text-lg text-gold mb-10 animate-fade-in-up animate-delay-200">
+              <ShoppingCart className="w-5 h-5 inline mr-2" />
+              Buy PDFs individually without a subscription!
             </p>
             <div className="flex flex-wrap gap-4 animate-fade-in-up animate-delay-300">
               <Link to={user ? "/library" : "/register"}>
@@ -110,19 +114,6 @@ const LandingPage = () => {
                 </Button>
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* World's First Banner */}
-      <section className="py-8 bg-gold/10 border-y border-gold/30">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-center gap-3 text-center">
-            <Star className="w-6 h-6 text-gold" />
-            <p className="text-[#FDFBF7] text-lg md:text-xl font-serif">
-              The <span className="text-gold font-semibold">First Islamic Bookstore in the World</span> to offer Scan-on-Demand digital library services
-            </p>
-            <Star className="w-6 h-6 text-gold" />
           </div>
         </div>
       </section>
@@ -155,8 +146,35 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Tier Info */}
+      <section className="py-16 bg-dark">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="glass-card rounded-sm p-8 border-gold/30">
+            <h3 className="font-serif text-2xl text-[#FDFBF7] mb-6 text-center">What's Included in Each Tier</h3>
+            <div className="grid md:grid-cols-2 gap-6 text-[#B0C4BF]">
+              <div>
+                <h4 className="text-gold font-medium mb-2">Volume Books (Tier 3+)</h4>
+                <p className="text-sm">Multi-volume collections and comprehensive Islamic texts are only available for Advanced and Premium subscribers.</p>
+              </div>
+              <div>
+                <h4 className="text-gold font-medium mb-2">Advanced Books (Tier 4 only)</h4>
+                <p className="text-sm">Highly advanced Islamic scholarly works are exclusively available to Premium subscribers.</p>
+              </div>
+              <div>
+                <h4 className="text-gold font-medium mb-2">In-Book Search (Tier 3+)</h4>
+                <p className="text-sm">Search within any book to find specific text passages. Available for Advanced and Premium tiers.</p>
+              </div>
+              <div>
+                <h4 className="text-gold font-medium mb-2">Bookmarks & Progress</h4>
+                <p className="text-sm">All subscribers can bookmark pages and track reading progress across all their books.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Preview */}
-      <section className="py-24 bg-dark relative">
+      <section className="py-24 bg-surface relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Tiers</p>
@@ -164,7 +182,7 @@ const LandingPage = () => {
               Choose Your Access Level
             </h2>
             <p className="text-[#B0C4BF] max-w-2xl mx-auto">
-              From essential texts to our complete archive, find the perfect plan for your learning journey.
+              From buying individual PDFs to unlimited access, find the perfect plan for your learning journey.
             </p>
           </div>
           
@@ -180,13 +198,21 @@ const LandingPage = () => {
                 data-testid={`tier-${tier.tier}-card`}
               >
                 {tier.featured && (
-                  <div className="text-xs font-mono text-gold uppercase tracking-wider mb-2">Most Popular</div>
+                  <div className="text-xs font-mono text-gold uppercase tracking-wider mb-2">Best Value</div>
                 )}
-                <div className={`tier-badge tier-${tier.tier} inline-block mb-3`}>Tier {tier.tier}</div>
+                <div className={`tier-badge tier-${tier.tier} inline-block mb-3`}>
+                  {tier.tier === 0 ? 'No Sub' : `Tier ${tier.tier}`}
+                </div>
                 <h3 className="font-serif text-2xl font-semibold text-[#FDFBF7] mb-2">{tier.name}</h3>
                 <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-3xl font-bold text-gold">${tier.price}</span>
-                  <span className="text-[#B0C4BF]">/mo</span>
+                  {tier.perBook ? (
+                    <span className="text-lg text-gold">Pay per book</span>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-gold">${tier.price}</span>
+                      <span className="text-[#B0C4BF]">/mo</span>
+                    </>
+                  )}
                 </div>
                 <ul className="space-y-2 text-sm">
                   {tier.features.map((feature, idx) => (
@@ -210,35 +236,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 bg-surface relative overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-20"
-          style={{ 
-            backgroundImage: 'url(https://images.pexels.com/photos/1907784/pexels-photo-1907784.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940)',
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#004D40]/90 to-[#004D40]/70" />
-        
-        <div className="relative max-w-4xl mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-2 bg-gold/10 border border-gold/30 rounded-full px-4 py-2 mb-8">
-            <Users className="w-4 h-4 text-gold" />
-            <span className="text-gold text-sm font-medium">Join Our Global Community</span>
-          </div>
-          <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#FDFBF7] tracking-tight mb-6">
-            Start Your Learning Journey Today
-          </h2>
-          <p className="text-xl text-[#B0C4BF] mb-10 max-w-2xl mx-auto">
-            Get instant access to our growing collection of Islamic literature. New books added weekly.
-          </p>
-          <Link to={user ? "/library" : "/register"}>
-            <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold text-lg px-10 py-6" data-testid="final-cta-btn">
-              Get Started Free <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="bg-dark border-t border-[rgba(212,175,55,0.2)] py-12">
         <div className="max-w-7xl mx-auto px-6">
@@ -251,6 +248,9 @@ const LandingPage = () => {
             </div>
             <p className="text-[#B0C4BF] text-sm">
               © {new Date().getFullYear()} Dar-Us-Salam Publications. All rights reserved.
+            </p>
+            <p className="text-[#B0C4BF] text-sm">
+              Support: sales@dar-us-salam.com
             </p>
           </div>
         </div>

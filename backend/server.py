@@ -38,11 +38,11 @@ storage_key = None
 
 # Subscription Tiers
 SUBSCRIPTION_TIERS = {
-    1: {"name": "Basic", "price": 25.00, "book_limit": 15},
-    2: {"name": "Standard", "price": 35.00, "book_limit": 35},
-    3: {"name": "Advanced", "price": 50.00, "book_limit": 60},
-    4: {"name": "Premium", "price": 60.00, "book_limit": 75},
-    5: {"name": "Unlimited", "price": 75.00, "book_limit": None},
+    0: {"name": "Pay Per Book", "price": 0, "book_limit": 0},
+    1: {"name": "Basic", "price": 20.00, "book_limit": 10},
+    2: {"name": "Standard", "price": 40.00, "book_limit": 20},
+    3: {"name": "Advanced", "price": 60.00, "book_limit": 30},
+    4: {"name": "Premium", "price": 80.00, "book_limit": None},
 }
 
 # Create the main app
@@ -117,9 +117,12 @@ class UserResponse(BaseModel):
 class BookCreate(BaseModel):
     title: str
     darussalam_code: str
-    tier_level: int = Field(ge=1, le=5)
+    tier_level: int = Field(ge=1, le=4)
+    is_volume: bool = False  # Volume books only for Tier 3+
+    is_advanced: bool = False  # Highly advanced books only for Tier 4
     description: Optional[str] = None
-    price: Optional[float] = None
+    original_price: Optional[float] = None  # Original book price
+    pdf_price: Optional[float] = None  # Price to buy PDF
 
 class BookResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -127,30 +130,17 @@ class BookResponse(BaseModel):
     title: str
     darussalam_code: str
     tier_level: int
+    is_volume: bool = False
+    is_advanced: bool = False
     description: Optional[str] = None
     cover_url: Optional[str] = None
     pdf_url: Optional[str] = None
-    price: Optional[float] = None
-    created_at: str
-
-class ScanRequestCreate(BaseModel):
-    book_title: Optional[str] = None
-    darussalam_code: Optional[str] = None
-    notes: Optional[str] = None
-
-class ScanRequestResponse(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    request_id: str
-    user_id: str
-    user_email: str
-    book_title: Optional[str] = None
-    darussalam_code: Optional[str] = None
-    notes: Optional[str] = None
-    status: str
+    original_price: Optional[float] = None
+    pdf_price: Optional[float] = None
     created_at: str
 
 class PaymentCreate(BaseModel):
-    tier: int = Field(ge=1, le=5)
+    tier: int = Field(ge=1, le=4)
     origin_url: str
 
 
@@ -470,6 +460,20 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
     return {"pdf_url": result["path"], "cover_url": cover_path}
 
 
+# Public access for cover images (no auth required)
+@api_router.get("/covers/{path:path}")
+async def get_cover_image(path: str):
+    """Get cover images without authentication"""
+    try:
+        full_path = f"darussalam-kitab/covers/{path}"
+        data, content_type = get_object(full_path)
+        return Response(content=data, media_type=content_type)
+    except Exception as e:
+        logger.error(f"Cover fetch error: {e}")
+        raise HTTPException(status_code=404, detail="Cover not found")
+
+
+# Protected access for PDFs and other files (requires auth)
 @api_router.get("/files/{path:path}")
 async def get_file(path: str, user: dict = Depends(get_current_user)):
     try:
@@ -480,21 +484,31 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="File not found")
 
 
-# Bookshelf Routes
+# Bookshelf Routes - Monthly selection system
 @api_router.get("/bookshelf")
 async def get_bookshelf(user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    bookshelf = await db.bookshelves.find_one({"user_id": user_id}, {"_id": 0})
+    user_tier = user.get("subscription_tier", 0)
+    
+    # Get current month's bookshelf
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    bookshelf = await db.bookshelves.find_one(
+        {"user_id": user_id, "month": current_month}, 
+        {"_id": 0}
+    )
+    
+    # Tier limits: 1=10, 2=20, 3=30, 4=unlimited
+    tier_limits = {0: 0, 1: 10, 2: 20, 3: 30, 4: None}
+    limit = tier_limits.get(user_tier, 0)
     
     if not bookshelf:
-        return {"books": [], "count": 0, "limit": 15 if user.get("subscription_tier", 0) == 1 else None}
+        return {"books": [], "count": 0, "limit": limit, "month": current_month}
     
     # Get full book details
     book_ids = bookshelf.get("book_ids", [])
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
     
-    limit = 15 if user.get("subscription_tier", 0) == 1 else None
-    return {"books": books, "count": len(books), "limit": limit}
+    return {"books": books, "count": len(books), "limit": limit, "month": current_month}
 
 
 @api_router.post("/bookshelf/{book_id}")
@@ -502,18 +516,33 @@ async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user))
     user_id = user["user_id"]
     user_tier = user.get("subscription_tier", 0)
     
-    # Check book exists and user has access
+    if user_tier == 0:
+        raise HTTPException(status_code=403, detail="Subscribe to add books to your monthly reading list")
+    
+    # Check book exists
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book["tier_level"] > user_tier:
-        raise HTTPException(status_code=403, detail="You don't have access to this book")
     
-    bookshelf = await db.bookshelves.find_one({"user_id": user_id})
+    # Check volume/advanced restrictions
+    if book.get("is_volume") and user_tier < 3:
+        raise HTTPException(status_code=403, detail="Volume books require Tier 3 or higher")
+    if book.get("is_advanced") and user_tier < 4:
+        raise HTTPException(status_code=403, detail="Advanced books require Tier 4 (Premium)")
+    
+    # Get current month
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    
+    bookshelf = await db.bookshelves.find_one({"user_id": user_id, "month": current_month})
+    
+    # Tier limits
+    tier_limits = {1: 10, 2: 20, 3: 30, 4: None}
+    limit = tier_limits.get(user_tier)
     
     if not bookshelf:
         await db.bookshelves.insert_one({
             "user_id": user_id,
+            "month": current_month,
             "book_ids": [book_id],
             "created_at": datetime.now(timezone.utc).isoformat()
         })
@@ -521,82 +550,190 @@ async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user))
         book_ids = bookshelf.get("book_ids", [])
         
         if book_id in book_ids:
-            raise HTTPException(status_code=400, detail="Book already in bookshelf")
+            raise HTTPException(status_code=400, detail="Book already in this month's reading list")
         
-        # Check tier limits: Tier 1=15, Tier 2=35, Tier 3=60, Tier 4=75, Tier 5=unlimited
-        tier_limits = {1: 15, 2: 35, 3: 60, 4: 75, 5: None}
-        limit = tier_limits.get(user_tier)
         if limit and len(book_ids) >= limit:
-            raise HTTPException(status_code=400, detail=f"Bookshelf limit reached ({limit} books). Upgrade to add more.")
+            raise HTTPException(status_code=400, detail=f"Monthly limit reached ({limit} books). Upgrade for more or wait until next month.")
         
         await db.bookshelves.update_one(
-            {"user_id": user_id},
+            {"user_id": user_id, "month": current_month},
             {"$push": {"book_ids": book_id}}
         )
     
-    return {"message": "Book added to bookshelf"}
+    return {"message": "Book added to this month's reading list"}
 
 
 @api_router.delete("/bookshelf/{book_id}")
 async def remove_from_bookshelf(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
     
     result = await db.bookshelves.update_one(
-        {"user_id": user_id},
+        {"user_id": user_id, "month": current_month},
         {"$pull": {"book_ids": book_id}}
     )
     
     if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Book not in bookshelf")
+        raise HTTPException(status_code=404, detail="Book not in this month's reading list")
     
-    return {"message": "Book removed from bookshelf"}
+    return {"message": "Book removed from reading list"}
 
 
-# Scan Requests Routes
-@api_router.post("/scan-requests", response_model=ScanRequestResponse)
-async def create_scan_request(req: ScanRequestCreate, user: dict = Depends(get_current_user)):
-    if not req.book_title and not req.darussalam_code:
-        raise HTTPException(status_code=400, detail="Please provide book title or code")
+# Reading Progress & Favorites
+@api_router.post("/reading-progress/{book_id}")
+async def save_reading_progress(book_id: str, page: int, user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
     
-    request_id = f"scan_{uuid.uuid4().hex[:12]}"
-    request_doc = {
-        "request_id": request_id,
-        "user_id": user["user_id"],
-        "user_email": user["email"],
-        "book_title": req.book_title,
-        "darussalam_code": req.darussalam_code,
-        "notes": req.notes,
-        "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.scan_requests.insert_one(request_doc)
-    return ScanRequestResponse(**request_doc)
-
-
-@api_router.get("/scan-requests")
-async def get_my_scan_requests(user: dict = Depends(get_current_user)):
-    requests = await db.scan_requests.find(
-        {"user_id": user["user_id"]},
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
-    return requests
-
-
-@api_router.get("/admin/scan-requests")
-async def get_all_scan_requests(user: dict = Depends(get_admin_user)):
-    requests = await db.scan_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return requests
-
-
-@api_router.put("/admin/scan-requests/{request_id}")
-async def update_scan_request(request_id: str, status: str, user: dict = Depends(get_admin_user)):
-    result = await db.scan_requests.update_one(
-        {"request_id": request_id},
-        {"$set": {"status": status}}
+    await db.reading_progress.update_one(
+        {"user_id": user_id, "book_id": book_id},
+        {
+            "$set": {
+                "page": page,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$setOnInsert": {
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+        },
+        upsert=True
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Request not found")
-    return {"message": "Status updated"}
+    
+    return {"message": "Progress saved", "page": page}
+
+
+@api_router.get("/reading-progress/{book_id}")
+async def get_reading_progress(book_id: str, user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    
+    progress = await db.reading_progress.find_one(
+        {"user_id": user_id, "book_id": book_id},
+        {"_id": 0}
+    )
+    
+    return {"page": progress.get("page", 1) if progress else 1}
+
+
+@api_router.get("/continue-reading")
+async def get_continue_reading(user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    
+    # Get recent reading progress
+    progress_list = await db.reading_progress.find(
+        {"user_id": user_id}
+    ).sort("updated_at", -1).limit(5).to_list(5)
+    
+    if not progress_list:
+        return {"books": []}
+    
+    book_ids = [p["book_id"] for p in progress_list]
+    books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(10)
+    
+    # Add page info to books
+    books_with_progress = []
+    for book in books:
+        progress = next((p for p in progress_list if p["book_id"] == book["book_id"]), None)
+        if progress:
+            book["current_page"] = progress.get("page", 1)
+            books_with_progress.append(book)
+    
+    return {"books": books_with_progress}
+
+
+@api_router.post("/favorites/{book_id}")
+async def add_to_favorites(book_id: str, user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    
+    # Check book exists
+    book = await db.books.find_one({"book_id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    await db.favorites.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"book_ids": book_id}},
+        upsert=True
+    )
+    
+    return {"message": "Added to favorites"}
+
+
+@api_router.delete("/favorites/{book_id}")
+async def remove_from_favorites(book_id: str, user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    
+    await db.favorites.update_one(
+        {"user_id": user_id},
+        {"$pull": {"book_ids": book_id}}
+    )
+    
+    return {"message": "Removed from favorites"}
+
+
+@api_router.get("/favorites")
+async def get_favorites(user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    
+    favorites = await db.favorites.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not favorites:
+        return {"books": []}
+    
+    book_ids = favorites.get("book_ids", [])
+    books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
+    
+    return {"books": books}
+
+
+# PDF Purchase for Tier 0 users
+@api_router.post("/purchase-pdf/{book_id}")
+async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_current_user)):
+    book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    if not book.get("pdf_price"):
+        raise HTTPException(status_code=400, detail="This book is not available for individual purchase")
+    
+    # Create Stripe checkout for single PDF
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    webhook_url = f"{str(request.base_url)}api/webhook/stripe"
+    
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+    
+    origin_url = request.headers.get("origin", "")
+    success_url = f"{origin_url}/book/{book_id}?purchased=true"
+    cancel_url = f"{origin_url}/book/{book_id}"
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=float(book["pdf_price"]),
+        currency="usd",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "user_id": user["user_id"],
+            "book_id": book_id,
+            "type": "pdf_purchase"
+        }
+    )
+    
+    session = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    return {"url": session.url, "session_id": session.session_id}
+
+
+@api_router.get("/purchased-books")
+async def get_purchased_books(user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    
+    purchases = await db.pdf_purchases.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+    
+    if not purchases:
+        return {"books": []}
+    
+    book_ids = [p["book_id"] for p in purchases]
+    books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
+    
+    return {"books": books}
 
 
 # Payment Routes
@@ -752,17 +889,17 @@ async def toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends(get_a
 async def get_admin_stats(user: dict = Depends(get_admin_user)):
     total_users = await db.users.count_documents({})
     total_books = await db.books.count_documents({})
-    pending_scans = await db.scan_requests.count_documents({"status": "pending"})
+    total_purchases = await db.pdf_purchases.count_documents({})
     
     tier_stats = {}
-    for tier in range(0, 6):
+    for tier in range(0, 5):
         count = await db.users.count_documents({"subscription_tier": tier})
         tier_stats[str(tier)] = count
     
     return {
         "total_users": total_users,
         "total_books": total_books,
-        "pending_scans": pending_scans,
+        "total_purchases": total_purchases,
         "tier_distribution": tier_stats
     }
 

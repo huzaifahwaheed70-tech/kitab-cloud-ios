@@ -13,14 +13,28 @@ const PricingPage = () => {
 
   const tiers = [
     { 
+      tier: 0, 
+      name: "Pay Per Book", 
+      price: 0, 
+      features: [
+        "Buy individual PDFs",
+        "Own books forever",
+        "No monthly commitment",
+        "Access anytime",
+        "Email support"
+      ],
+      color: "tier-0",
+      perBook: true
+    },
+    { 
       tier: 1, 
       name: "Basic", 
-      price: 25, 
+      price: 20, 
       features: [
-        "Access to Tier 1 books",
-        "15 books in your bookshelf",
-        "In-app PDF reader",
-        "Request book scans",
+        "10 books per month",
+        "Standard library access",
+        "Bookmarks & progress tracking",
+        "Favorites list",
         "Email support"
       ],
       color: "tier-1"
@@ -28,59 +42,52 @@ const PricingPage = () => {
     { 
       tier: 2, 
       name: "Standard", 
-      price: 35, 
+      price: 40, 
       features: [
-        "Access to Tier 1-2 books",
-        "35 books in your bookshelf",
-        "In-app PDF reader",
-        "Request book scans",
-        "Priority email support"
+        "20 books per month",
+        "Standard library access",
+        "Bookmarks & progress tracking",
+        "Favorites list",
+        "Email support"
       ],
       color: "tier-2"
     },
     { 
       tier: 3, 
       name: "Advanced", 
-      price: 50, 
+      price: 60, 
       features: [
-        "Access to Tier 1-3 books",
-        "60 books in your bookshelf",
-        "In-app PDF reader",
-        "Priority scan requests",
-        "Chat support"
+        "30 books per month",
+        "Volume books included",
+        "In-book text search",
+        "Bookmarks & progress tracking",
+        "Email support"
       ],
       color: "tier-3"
     },
     { 
       tier: 4, 
       name: "Premium", 
-      price: 60, 
+      price: 80, 
       features: [
-        "Access to Tier 1-4 books",
-        "75 books in your bookshelf",
-        "Ship-to-Scan access",
-        "Fast-track scan requests",
-        "Phone support"
+        "Unlimited books",
+        "All books including advanced",
+        "Volume books included",
+        "In-book text search",
+        "Email support"
       ],
-      color: "tier-4"
-    },
-    { 
-      tier: 5, 
-      name: "Unlimited", 
-      price: 75, 
-      features: [
-        "Access to ALL books",
-        "Unlimited bookshelf",
-        "Ship-to-Scan access",
-        "Priority everything",
-        "Dedicated support"
-      ],
-      color: "tier-5",
+      color: "tier-4",
       featured: true
     }
   ];
 
   const handleSubscribe = async (tier) => {
+    if (tier === 0) {
+      // Tier 0 is pay-per-book, redirect to library
+      navigate(user ? '/library' : '/register');
+      return;
+    }
+
     if (!user) {
       navigate('/register');
       return;
@@ -154,7 +161,7 @@ const PricingPage = () => {
             Choose Your Access Level
           </h1>
           <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">
-            From essential texts to our complete archive, find the perfect plan for your learning journey.
+            Subscribe monthly to read books, or buy individual PDFs without a subscription.
           </p>
           
           {userTier > 0 && (
@@ -185,12 +192,12 @@ const PricingPage = () => {
                 <div className="p-6">
                   {tier.featured && (
                     <div className="text-xs font-mono text-gold uppercase tracking-wider mb-2 text-center">
-                      Most Popular
+                      Best Value
                     </div>
                   )}
                   
                   <div className={`tier-badge ${tier.color} inline-block mb-3`}>
-                    Tier {tier.tier}
+                    {tier.tier === 0 ? 'No Sub' : `Tier ${tier.tier}`}
                   </div>
                   
                   <h3 className="font-serif text-2xl font-semibold text-[#FDFBF7] mb-2">
@@ -198,8 +205,14 @@ const PricingPage = () => {
                   </h3>
                   
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-bold text-gold">${tier.price}</span>
-                    <span className="text-[#B0C4BF]">/mo</span>
+                    {tier.perBook ? (
+                      <span className="text-lg text-gold">Pay per book</span>
+                    ) : (
+                      <>
+                        <span className="text-4xl font-bold text-gold">${tier.price}</span>
+                        <span className="text-[#B0C4BF]">/mo</span>
+                      </>
+                    )}
                   </div>
                   
                   <ul className="space-y-3 mb-6">
@@ -213,9 +226,9 @@ const PricingPage = () => {
                   
                   <Button
                     onClick={() => handleSubscribe(tier.tier)}
-                    disabled={loading === tier.tier || userTier >= tier.tier}
+                    disabled={loading === tier.tier || (tier.tier !== 0 && userTier >= tier.tier)}
                     className={`w-full ${
-                      tier.featured || userTier < tier.tier
+                      tier.featured || tier.tier === 0 || userTier < tier.tier
                         ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' 
                         : 'bg-surface text-[#B0C4BF]'
                     } font-semibold`}
@@ -223,6 +236,8 @@ const PricingPage = () => {
                   >
                     {loading === tier.tier ? (
                       'Processing...'
+                    ) : tier.tier === 0 ? (
+                      'Browse Books'
                     ) : userTier === tier.tier ? (
                       'Current Plan'
                     ) : userTier > tier.tier ? (
@@ -249,33 +264,34 @@ const PricingPage = () => {
           
           <div className="space-y-6">
             <div className="glass-card rounded-sm p-6">
-              <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">Can I upgrade my plan later?</h3>
+              <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">How does the monthly book limit work?</h3>
               <p className="text-[#B0C4BF]">
-                Yes! You can upgrade your plan at any time. Your new tier access will be available immediately.
+                Each month you can add books to your reading list up to your tier's limit. At the start of the next 
+                billing cycle, you can select new books. Your reading progress and bookmarks are always saved.
               </p>
             </div>
             
             <div className="glass-card rounded-sm p-6">
-              <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">What is the Ship-to-Scan feature?</h3>
+              <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">Can I buy PDFs without subscribing?</h3>
               <p className="text-[#B0C4BF]">
-                Premium and Unlimited members can ship their personal Islamic books to our store. We'll professionally 
-                digitize them and add them to your personal library.
+                Yes! With Tier 0 (Pay Per Book), you can purchase individual PDFs and own them forever without 
+                any monthly subscription.
               </p>
             </div>
             
             <div className="glass-card rounded-sm p-6">
-              <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">What are the bookshelf limits?</h3>
+              <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">What are Volume and Advanced books?</h3>
               <p className="text-[#B0C4BF]">
-                Basic has 15 books, Standard has 35, Advanced has 60, Premium has 75, and Unlimited has 
-                no limits. Upgrade anytime to expand your collection.
+                Volume books are multi-volume collections only available for Tier 3+. Advanced books are highly 
+                specialized scholarly works exclusively for Tier 4 (Premium) members.
               </p>
             </div>
             
             <div className="glass-card rounded-sm p-6">
               <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">How do I cancel my subscription?</h3>
               <p className="text-[#B0C4BF]">
-                You can cancel anytime from your account settings. Your access will continue until the end 
-                of your billing period.
+                Contact us at sales@dar-us-salam.com to cancel. Your access continues until the end of your 
+                billing period.
               </p>
             </div>
           </div>

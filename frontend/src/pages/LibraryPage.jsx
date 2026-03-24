@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
-  BookOpen, Search, Grid, List, Lock, BookMarked, Send, 
-  Package, LogOut, Menu, X, ChevronRight, User, Settings
+  BookOpen, Search, Grid, List, Lock, BookMarked, Heart,
+  LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,6 +21,7 @@ const LibraryPage = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
+  const [continueReading, setContinueReading] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');
@@ -28,6 +29,7 @@ const LibraryPage = () => {
 
   useEffect(() => {
     fetchBooks();
+    fetchContinueReading();
   }, [searchQuery]);
 
   const fetchBooks = async () => {
@@ -35,26 +37,27 @@ const LibraryPage = () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
 
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.get(`${API}/books?${params}`, { 
-        headers,
-        withCredentials: true 
-      });
+      const response = await axios.get(`${API}/books/all?${params}`);
       setBooks(response.data);
     } catch (error) {
       console.error('Error fetching books:', error);
-      // If user has no subscription, try all books preview
-      try {
-        const params = new URLSearchParams();
-        if (searchQuery) params.append('search', searchQuery);
-        
-        const response = await axios.get(`${API}/books/all?${params}`);
-        setBooks(response.data.map(book => ({ ...book, locked: true })));
-      } catch (err) {
-        toast.error('Failed to load books');
-      }
+      toast.error('Failed to load books');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchContinueReading = async () => {
+    if (!token) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API}/continue-reading`, { 
+        headers,
+        withCredentials: true 
+      });
+      setContinueReading(response.data.books || []);
+    } catch (error) {
+      console.error('Error fetching continue reading:', error);
     }
   };
 
@@ -64,7 +67,8 @@ const LibraryPage = () => {
   };
 
   const userTier = user?.subscription_tier || 0;
-  const tierNames = ['Free', 'Basic', 'Standard', 'Advanced', 'Premium', 'Unlimited'];
+  const tierNames = ['Pay Per Book', 'Basic', 'Standard', 'Advanced', 'Premium'];
+  const tierLimits = {0: 0, 1: 10, 2: 20, 3: 30, 4: 'Unlimited'};
 
   return (
     <div className="min-h-screen bg-dark">
@@ -79,13 +83,13 @@ const LibraryPage = () => {
               <span className="font-serif text-xl font-semibold text-[#FDFBF7] hidden sm:block">Kitab Cloud</span>
             </Link>
 
-            {/* Search Bar */}
+            {/* Search Bar - Search by Title */}
             <div className="flex-1 max-w-md mx-4 hidden md:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
                 <Input
                   type="text"
-                  placeholder="Search by code (e.g., C21, E20)..."
+                  placeholder="Search by book title..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] focus:ring-1 focus:ring-gold"
@@ -99,23 +103,15 @@ const LibraryPage = () => {
               <Link to="/bookshelf">
                 <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]" data-testid="nav-bookshelf">
                   <BookMarked className="w-5 h-5 mr-2" />
-                  Bookshelf
+                  My Books
                 </Button>
               </Link>
-              <Link to="/request-scan">
-                <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]" data-testid="nav-request-scan">
-                  <Send className="w-5 h-5 mr-2" />
-                  Request Scan
+              <Link to="/favorites">
+                <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]" data-testid="nav-favorites">
+                  <Heart className="w-5 h-5 mr-2" />
+                  Favorites
                 </Button>
               </Link>
-              {userTier >= 4 && (
-                <Link to="/ship-to-scan">
-                  <Button variant="ghost" className="text-gold hover:text-[#E9C85C] hover:bg-gold/10" data-testid="nav-ship-to-scan">
-                    <Package className="w-5 h-5 mr-2" />
-                    Ship-to-Scan
-                  </Button>
-                </Link>
-              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -135,10 +131,10 @@ const LibraryPage = () => {
                     <p className="font-medium">{user?.name}</p>
                     <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
                     <div className={`tier-badge tier-${userTier} mt-2`}>
-                      Tier {userTier} • {tierNames[userTier]}
+                      {tierNames[userTier]} • {tierLimits[userTier]} books/mo
                     </div>
                   </div>
-                  {userTier < 5 && (
+                  {userTier < 4 && (
                     <DropdownMenuItem asChild className="cursor-pointer hover:bg-gold/10 text-gold">
                       <Link to="/pricing" data-testid="upgrade-link">
                         <ChevronRight className="w-4 h-4 mr-2" />
@@ -180,7 +176,7 @@ const LibraryPage = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
               <Input
                 type="text"
-                placeholder="Search by code..."
+                placeholder="Search by title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] focus:ring-1 focus:ring-gold"
@@ -198,24 +194,18 @@ const LibraryPage = () => {
                 <p className="font-medium text-[#FDFBF7]">{user?.name}</p>
                 <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
                 <div className={`tier-badge tier-${userTier} mt-2 inline-block`}>
-                  Tier {userTier} • {tierNames[userTier]}
+                  {tierNames[userTier]}
                 </div>
               </div>
               <Link to="/bookshelf" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
                 <BookMarked className="w-5 h-5" />
-                My Bookshelf
+                My Books
               </Link>
-              <Link to="/request-scan" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
-                <Send className="w-5 h-5" />
-                Request a Scan
+              <Link to="/favorites" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
+                <Heart className="w-5 h-5" />
+                Favorites
               </Link>
-              {userTier >= 4 && (
-                <Link to="/ship-to-scan" className="flex items-center gap-3 py-2 text-gold" onClick={() => setMobileMenuOpen(false)}>
-                  <Package className="w-5 h-5" />
-                  Ship-to-Scan Portal
-                </Link>
-              )}
-              {userTier < 5 && (
+              {userTier < 4 && (
                 <Link to="/pricing" className="flex items-center gap-3 py-2 text-gold" onClick={() => setMobileMenuOpen(false)}>
                   <ChevronRight className="w-5 h-5" />
                   Upgrade Plan
@@ -238,9 +228,67 @@ const LibraryPage = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+        {/* Continue Reading Section */}
+        {continueReading.length > 0 && (
+          <section className="mb-12">
+            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6 flex items-center gap-2">
+              <PlayCircle className="w-6 h-6 text-gold" />
+              Continue Reading
+            </h2>
+            <div className="flex gap-6 overflow-x-auto pb-4 hide-scrollbar">
+              {continueReading.map((book) => (
+                <Link 
+                  key={book.book_id}
+                  to={`/book/${book.book_id}`}
+                  className="flex-shrink-0 w-40"
+                  data-testid={`continue-${book.book_id}`}
+                >
+                  <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-gold/50 book-card-hover">
+                    {book.cover_url ? (
+                      <img 
+                        src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
+                        alt={book.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
+                        <BookOpen className="w-10 h-10 text-gold/30" />
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#02120F] to-transparent p-2">
+                      <p className="text-xs text-gold">Page {book.current_page}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm text-[#FDFBF7] line-clamp-1">{book.title}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Subscription Banner for Tier 0 Users */}
+        {userTier === 0 && (
+          <div className="mb-8 p-6 rounded-sm bg-gradient-to-r from-gold/20 to-gold/5 border border-gold/30">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-serif text-xl text-[#FDFBF7] mb-1">Subscribe for Monthly Reading</h3>
+                <p className="text-[#B0C4BF]">Get access to read multiple books each month, or buy individual PDFs below.</p>
+              </div>
+              <Link to="/pricing">
+                <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-banner-btn">
+                  View Plans
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* View Toggle */}
         <div className="flex items-center justify-between mb-8">
-          <h2 className="font-serif text-2xl text-[#FDFBF7]">Library</h2>
+          <h2 className="font-serif text-2xl text-[#FDFBF7]">
+            All Books
+            {searchQuery && <span className="text-gold ml-2">"{searchQuery}"</span>}
+          </h2>
           
           <div className="hidden sm:flex items-center gap-2">
             <Button
@@ -264,23 +312,6 @@ const LibraryPage = () => {
           </div>
         </div>
 
-        {/* Subscription Banner for Free Users */}
-        {userTier === 0 && (
-          <div className="mb-8 p-6 rounded-sm bg-gradient-to-r from-gold/20 to-gold/5 border border-gold/30">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div>
-                <h3 className="font-serif text-xl text-[#FDFBF7] mb-1">Unlock the Full Library</h3>
-                <p className="text-[#B0C4BF]">Subscribe to access our complete collection of Islamic literature.</p>
-              </div>
-              <Link to="/pricing">
-                <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-banner-btn">
-                  View Plans
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
-
         {/* Loading State */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -295,14 +326,12 @@ const LibraryPage = () => {
             </p>
           </div>
         ) : viewMode === 'grid' ? (
-          // Grid view
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             {books.map((book) => (
-              <BookCard key={book.book_id} book={book} userTier={userTier} compact />
+              <BookCard key={book.book_id} book={book} userTier={userTier} />
             ))}
           </div>
         ) : (
-          // List view
           <div className="space-y-4">
             {books.map((book) => (
               <BookListItem key={book.book_id} book={book} userTier={userTier} />
@@ -314,19 +343,22 @@ const LibraryPage = () => {
   );
 };
 
-const BookCard = ({ book, userTier, compact = false }) => {
-  const isLocked = book.tier_level > userTier;
+const BookCard = ({ book, userTier }) => {
+  // Check access restrictions
+  const isVolumeLocked = book.is_volume && userTier < 3;
+  const isAdvancedLocked = book.is_advanced && userTier < 4;
+  const isLocked = isVolumeLocked || isAdvancedLocked;
   
   return (
     <Link 
-      to={isLocked ? '/pricing' : `/book/${book.book_id}`}
-      className={`group flex-shrink-0 ${compact ? 'w-full' : 'min-w-[180px] md:min-w-[200px]'} snap-start`}
+      to={`/book/${book.book_id}`}
+      className="group flex-shrink-0 w-full"
       data-testid={`book-card-${book.book_id}`}
     >
       <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover">
         {book.cover_url ? (
           <img 
-            src={`${process.env.REACT_APP_BACKEND_URL}/api/files/${book.cover_url}`}
+            src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
             alt={book.title}
             className="w-full h-full object-cover"
           />
@@ -336,9 +368,14 @@ const BookCard = ({ book, userTier, compact = false }) => {
           </div>
         )}
         
-        {/* Tier Badge */}
-        <div className={`absolute top-2 left-2 tier-badge tier-${book.tier_level}`}>
-          T{book.tier_level}
+        {/* Badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {book.is_volume && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/80 text-white rounded">VOLUME</span>
+          )}
+          {book.is_advanced && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-red-500/80 text-white rounded">ADVANCED</span>
+          )}
         </div>
         
         {/* Lock Overlay */}
@@ -346,8 +383,18 @@ const BookCard = ({ book, userTier, compact = false }) => {
           <div className="absolute inset-0 bg-[#02120F]/80 flex items-center justify-center">
             <div className="text-center">
               <Lock className="w-8 h-8 text-gold mx-auto mb-2" />
-              <span className="text-xs text-gold font-mono">TIER {book.tier_level}+</span>
+              <span className="text-xs text-gold font-mono">
+                {isAdvancedLocked ? 'TIER 4 ONLY' : 'TIER 3+'}
+              </span>
             </div>
+          </div>
+        )}
+
+        {/* Price badge */}
+        {book.pdf_price && (
+          <div className="absolute bottom-2 right-2 bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
+            <ShoppingCart className="w-3 h-3 inline mr-1" />
+            ${book.pdf_price}
           </div>
         )}
 
@@ -358,28 +405,32 @@ const BookCard = ({ book, userTier, compact = false }) => {
       </div>
       
       <div className="mt-3">
-        <p className="font-mono text-xs text-gold mb-1">{book.darussalam_code}</p>
         <h3 className="font-serif text-[#FDFBF7] line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
         </h3>
+        {book.original_price && (
+          <p className="text-xs text-[#B0C4BF] mt-1">Book: ${book.original_price}</p>
+        )}
       </div>
     </Link>
   );
 };
 
 const BookListItem = ({ book, userTier }) => {
-  const isLocked = book.tier_level > userTier;
+  const isVolumeLocked = book.is_volume && userTier < 3;
+  const isAdvancedLocked = book.is_advanced && userTier < 4;
+  const isLocked = isVolumeLocked || isAdvancedLocked;
   
   return (
     <Link 
-      to={isLocked ? '/pricing' : `/book/${book.book_id}`}
+      to={`/book/${book.book_id}`}
       className="flex gap-4 p-4 rounded-sm bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover"
       data-testid={`book-list-${book.book_id}`}
     >
       <div className="relative w-20 h-28 flex-shrink-0 rounded-sm overflow-hidden">
         {book.cover_url ? (
           <img 
-            src={`${process.env.REACT_APP_BACKEND_URL}/api/files/${book.cover_url}`}
+            src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
             alt={book.title}
             className="w-full h-full object-cover"
           />
@@ -398,15 +449,29 @@ const BookListItem = ({ book, userTier }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="font-mono text-xs text-gold mb-1">{book.darussalam_code}</p>
             <h3 className="font-serif text-lg text-[#FDFBF7]">{book.title}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              {book.is_volume && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/80 text-white rounded">VOLUME</span>
+              )}
+              {book.is_advanced && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-red-500/80 text-white rounded">ADVANCED</span>
+              )}
+            </div>
           </div>
-          <div className={`tier-badge tier-${book.tier_level} flex-shrink-0`}>
-            Tier {book.tier_level}
+          <div className="flex items-center gap-2">
+            {book.pdf_price && (
+              <span className="bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
+                ${book.pdf_price}
+              </span>
+            )}
           </div>
         </div>
         {book.description && (
           <p className="text-sm text-[#B0C4BF] mt-2 line-clamp-2">{book.description}</p>
+        )}
+        {book.original_price && (
+          <p className="text-xs text-[#B0C4BF] mt-2">Original book price: ${book.original_price}</p>
         )}
       </div>
     </Link>

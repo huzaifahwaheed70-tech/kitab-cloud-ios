@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
-  BookOpen, Users, Send, ArrowLeft, Plus, Edit, Trash2, 
-  Search, X, Save
+  BookOpen, Users, ArrowLeft, Plus, Edit, Trash2, 
+  Search, Save
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -33,7 +33,6 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [books, setBooks] = useState([]);
   const [users, setUsers] = useState([]);
-  const [scanRequests, setScanRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -44,8 +43,11 @@ const AdminDashboard = () => {
     title: '',
     darussalam_code: '',
     tier_level: 1,
+    is_volume: false,
+    is_advanced: false,
     description: '',
-    price: ''
+    original_price: '',
+    pdf_price: ''
   });
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -56,17 +58,15 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [statsRes, booksRes, usersRes, scansRes] = await Promise.all([
+      const [statsRes, booksRes, usersRes] = await Promise.all([
         axios.get(`${API}/admin/stats`, { headers, withCredentials: true }),
         axios.get(`${API}/books/all`, { withCredentials: true }),
-        axios.get(`${API}/admin/users`, { headers, withCredentials: true }),
-        axios.get(`${API}/admin/scan-requests`, { headers, withCredentials: true })
+        axios.get(`${API}/admin/users`, { headers, withCredentials: true })
       ]);
       
       setStats(statsRes.data);
       setBooks(booksRes.data);
       setUsers(usersRes.data);
-      setScanRequests(scansRes.data);
     } catch (error) {
       console.error('Error fetching admin data:', error);
       toast.error('Failed to load admin data');
@@ -79,9 +79,14 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
       const data = {
-        ...bookForm,
+        title: bookForm.title,
+        darussalam_code: bookForm.darussalam_code,
         tier_level: parseInt(bookForm.tier_level),
-        price: bookForm.price ? parseFloat(bookForm.price) : null
+        is_volume: bookForm.is_volume,
+        is_advanced: bookForm.is_advanced,
+        description: bookForm.description || null,
+        original_price: bookForm.original_price ? parseFloat(bookForm.original_price) : null,
+        pdf_price: bookForm.pdf_price ? parseFloat(bookForm.pdf_price) : null
       };
       
       if (editingBook) {
@@ -150,23 +155,16 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateScanStatus = async (requestId, status) => {
-    try {
-      await axios.put(`${API}/admin/scan-requests/${requestId}?status=${status}`, {}, { headers, withCredentials: true });
-      setScanRequests(prev => prev.map(r => r.request_id === requestId ? { ...r, status } : r));
-      toast.success('Status updated');
-    } catch (error) {
-      toast.error('Failed to update status');
-    }
-  };
-
   const resetBookForm = () => {
     setBookForm({
       title: '',
       darussalam_code: '',
       tier_level: 1,
+      is_volume: false,
+      is_advanced: false,
       description: '',
-      price: ''
+      original_price: '',
+      pdf_price: ''
     });
     setEditingBook(null);
   };
@@ -177,8 +175,11 @@ const AdminDashboard = () => {
       title: book.title,
       darussalam_code: book.darussalam_code,
       tier_level: book.tier_level,
+      is_volume: book.is_volume || false,
+      is_advanced: book.is_advanced || false,
       description: book.description || '',
-      price: book.price ? String(book.price) : ''
+      original_price: book.original_price ? String(book.original_price) : '',
+      pdf_price: book.pdf_price ? String(book.pdf_price) : ''
     });
     setShowBookModal(true);
   };
@@ -220,7 +221,7 @@ const AdminDashboard = () => {
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
             <div className="glass-card rounded-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center">
@@ -240,17 +241,6 @@ const AdminDashboard = () => {
                 <div>
                   <p className="text-2xl font-bold text-[#FDFBF7]">{stats.total_books}</p>
                   <p className="text-sm text-[#B0C4BF]">Total Books</p>
-                </div>
-              </div>
-            </div>
-            <div className="glass-card rounded-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center">
-                  <Send className="w-5 h-5 text-gold" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[#FDFBF7]">{stats.pending_scans}</p>
-                  <p className="text-sm text-[#B0C4BF]">Pending Scans</p>
                 </div>
               </div>
             </div>
@@ -276,9 +266,6 @@ const AdminDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-users">
               Users
-            </TabsTrigger>
-            <TabsTrigger value="scans" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-scans">
-              Scan Requests
             </TabsTrigger>
           </TabsList>
 
@@ -312,7 +299,7 @@ const AdminDashboard = () => {
                       {editingBook ? 'Edit Book' : 'Add New Book'}
                     </DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleCreateBook} className="space-y-4">
+                  <form onSubmit={handleCreateBook} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div>
                       <Label className="text-[#FDFBF7]">Title</Label>
                       <Input
@@ -341,12 +328,39 @@ const AdminDashboard = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
-                          {[1, 2, 3, 4, 5].map(t => (
-                            <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">Tier {t} - ${t === 1 ? '25' : t === 2 ? '35' : t === 3 ? '50' : t === 4 ? '60' : '75'}+ members</SelectItem>
+                          {[1, 2, 3, 4].map(t => (
+                            <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">
+                              Tier {t} - {t === 1 ? 'Basic ($20)' : t === 2 ? 'Standard ($40)' : t === 3 ? 'Advanced ($60)' : 'Premium ($80)'}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
+                    
+                    {/* Book Type Flags */}
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={bookForm.is_volume}
+                          onChange={(e) => setBookForm(p => ({ ...p, is_volume: e.target.checked }))}
+                          className="w-4 h-4 accent-gold"
+                          data-testid="book-form-is-volume"
+                        />
+                        <span className="text-[#FDFBF7] text-sm">Volume Book (Tier 3+)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={bookForm.is_advanced}
+                          onChange={(e) => setBookForm(p => ({ ...p, is_advanced: e.target.checked }))}
+                          className="w-4 h-4 accent-gold"
+                          data-testid="book-form-is-advanced"
+                        />
+                        <span className="text-[#FDFBF7] text-sm">Advanced (Tier 4 Only)</span>
+                      </label>
+                    </div>
+                    
                     <div>
                       <Label className="text-[#FDFBF7]">Description (optional)</Label>
                       <Textarea
@@ -356,18 +370,34 @@ const AdminDashboard = () => {
                         data-testid="book-form-description"
                       />
                     </div>
-                    <div>
-                      <Label className="text-[#FDFBF7]">Price for PDF purchase (optional)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={bookForm.price}
-                        onChange={(e) => setBookForm(p => ({ ...p, price: e.target.value }))}
-                        className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
-                        placeholder="Leave empty if not for sale"
-                        data-testid="book-form-price"
-                      />
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-[#FDFBF7]">Original Book Price ($)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={bookForm.original_price}
+                          onChange={(e) => setBookForm(p => ({ ...p, original_price: e.target.value }))}
+                          className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+                          placeholder="Physical book price"
+                          data-testid="book-form-original-price"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[#FDFBF7]">PDF Price ($)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={bookForm.pdf_price}
+                          onChange={(e) => setBookForm(p => ({ ...p, pdf_price: e.target.value }))}
+                          className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+                          placeholder="For Tier 0 purchase"
+                          data-testid="book-form-pdf-price"
+                        />
+                      </div>
                     </div>
+                    
                     <Button type="submit" className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]" data-testid="book-form-submit">
                       <Save className="w-5 h-5 mr-2" />
                       {editingBook ? 'Update Book' : 'Create Book'}
@@ -383,7 +413,7 @@ const AdminDashboard = () => {
                   <div className="w-16 h-24 rounded-sm overflow-hidden bg-[#082E26] flex-shrink-0">
                     {book.cover_url ? (
                       <img 
-                        src={`${process.env.REACT_APP_BACKEND_URL}/api/files/${book.cover_url}`}
+                        src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
                         alt={book.title}
                         className="w-full h-full object-cover"
                       />
@@ -494,63 +524,6 @@ const AdminDashboard = () => {
               {filteredUsers.length === 0 && (
                 <div className="text-center py-12 text-[#B0C4BF]">
                   No users found
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Scan Requests Tab */}
-          <TabsContent value="scans">
-            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">Scan Requests</h2>
-            
-            <div className="space-y-4">
-              {scanRequests.map((request) => (
-                <div key={request.request_id} className="glass-card rounded-sm p-4" data-testid={`admin-scan-${request.request_id}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm text-[#B0C4BF]">{request.user_email}</span>
-                        <span className="text-xs text-[#B0C4BF]">
-                          {new Date(request.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      {request.book_title && (
-                        <h3 className="text-[#FDFBF7] font-medium">{request.book_title}</h3>
-                      )}
-                      {request.darussalam_code && (
-                        <p className="font-mono text-gold text-sm">{request.darussalam_code}</p>
-                      )}
-                      {request.notes && (
-                        <p className="text-sm text-[#B0C4BF] mt-2">{request.notes}</p>
-                      )}
-                    </div>
-                    
-                    <Select 
-                      value={request.status} 
-                      onValueChange={(v) => handleUpdateScanStatus(request.request_id, v)}
-                    >
-                      <SelectTrigger className={`w-32 border-0 ${
-                        request.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
-                        request.status === 'in_progress' ? 'bg-blue-500/20 text-blue-500' :
-                        request.status === 'completed' ? 'bg-green-500/20 text-green-500' :
-                        'bg-red-500/20 text-red-500'
-                      }`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
-                        <SelectItem value="pending" className="text-yellow-500">Pending</SelectItem>
-                        <SelectItem value="in_progress" className="text-blue-500">In Progress</SelectItem>
-                        <SelectItem value="completed" className="text-green-500">Completed</SelectItem>
-                        <SelectItem value="rejected" className="text-red-500">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ))}
-              
-              {scanRequests.length === 0 && (
-                <div className="text-center py-12 text-[#B0C4BF]">
-                  No scan requests
                 </div>
               )}
             </div>

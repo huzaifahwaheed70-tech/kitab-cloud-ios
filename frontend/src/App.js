@@ -11,8 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import LibraryPage from './pages/LibraryPage';
 import BookDetailPage from './pages/BookDetailPage';
 import BookshelfPage from './pages/BookshelfPage';
-import RequestScanPage from './pages/RequestScanPage';
-import ShipToScanPage from './pages/ShipToScanPage';
+import FavoritesPage from './pages/FavoritesPage';
 import PricingPage from './pages/PricingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -236,15 +235,9 @@ const AppRouter = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/request-scan" element={
+      <Route path="/favorites" element={
         <ProtectedRoute>
-          <RequestScanPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/ship-to-scan" element={
-        <ProtectedRoute>
-          <ShipToScanPage />
+          <FavoritesPage />
         </ProtectedRoute>
       } />
       
