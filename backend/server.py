@@ -118,7 +118,6 @@ class BookCreate(BaseModel):
     title: str
     darussalam_code: str
     tier_level: int = Field(ge=1, le=5)
-    category: str  # Standard, Advanced, Volume
     description: Optional[str] = None
     price: Optional[float] = None
 
@@ -128,7 +127,6 @@ class BookResponse(BaseModel):
     title: str
     darussalam_code: str
     tier_level: int
-    category: str
     description: Optional[str] = None
     cover_url: Optional[str] = None
     pdf_url: Optional[str] = None
@@ -343,7 +341,6 @@ async def logout(request: Request, response: Response):
 async def get_books(
     user: dict = Depends(get_current_user),
     search: Optional[str] = None,
-    category: Optional[str] = None,
     tier: Optional[int] = None
 ):
     user_tier = user.get("subscription_tier", 0)
@@ -355,8 +352,6 @@ async def get_books(
             {"darussalam_code": {"$regex": search, "$options": "i"}},
             {"title": {"$regex": search, "$options": "i"}}
         ]
-    if category:
-        query["category"] = category
     if tier:
         query["tier_level"] = {"$lte": min(tier, user_tier)} if user_tier > 0 else {"$lte": 0}
     
@@ -366,8 +361,7 @@ async def get_books(
 
 @api_router.get("/books/all")
 async def get_all_books_preview(
-    search: Optional[str] = None,
-    category: Optional[str] = None
+    search: Optional[str] = None
 ):
     """Get all books for preview (without auth) - shows locked state"""
     query = {}
@@ -376,8 +370,6 @@ async def get_all_books_preview(
             {"darussalam_code": {"$regex": search, "$options": "i"}},
             {"title": {"$regex": search, "$options": "i"}}
         ]
-    if category:
-        query["category"] = category
     
     books = await db.books.find(query, {"_id": 0, "pdf_url": 0}).to_list(100)
     return books

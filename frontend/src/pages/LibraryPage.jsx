@@ -23,21 +23,17 @@ const LibraryPage = () => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const categories = ['all', 'Standard', 'Advanced', 'Volume'];
-
   useEffect(() => {
     fetchBooks();
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery]);
 
   const fetchBooks = async () => {
     try {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      if (selectedCategory !== 'all') params.append('category', selectedCategory);
 
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(`${API}/books?${params}`, { 
@@ -51,7 +47,6 @@ const LibraryPage = () => {
       try {
         const params = new URLSearchParams();
         if (searchQuery) params.append('search', searchQuery);
-        if (selectedCategory !== 'all') params.append('category', selectedCategory);
         
         const response = await axios.get(`${API}/books/all?${params}`);
         setBooks(response.data.map(book => ({ ...book, locked: true })));
@@ -70,14 +65,6 @@ const LibraryPage = () => {
 
   const userTier = user?.subscription_tier || 0;
   const tierNames = ['Free', 'Basic', 'Standard', 'Advanced', 'Premium', 'Unlimited'];
-
-  // Group books by category
-  const groupedBooks = books.reduce((acc, book) => {
-    const cat = book.category || 'Uncategorized';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(book);
-    return acc;
-  }, {});
 
   return (
     <div className="min-h-screen bg-dark">
@@ -251,24 +238,9 @@ const LibraryPage = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        {/* Category Filter */}
+        {/* View Toggle */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-            {categories.map((cat) => (
-              <Button
-                key={cat}
-                variant={selectedCategory === cat ? 'default' : 'ghost'}
-                onClick={() => setSelectedCategory(cat)}
-                className={selectedCategory === cat 
-                  ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' 
-                  : 'text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]'
-                }
-                data-testid={`category-${cat}`}
-              >
-                {cat === 'all' ? 'All Books' : cat}
-              </Button>
-            ))}
-          </div>
+          <h2 className="font-serif text-2xl text-[#FDFBF7]">Library</h2>
           
           <div className="hidden sm:flex items-center gap-2">
             <Button
@@ -321,20 +293,6 @@ const LibraryPage = () => {
             <p className="text-[#B0C4BF]">
               {searchQuery ? 'Try a different search term' : 'Books will appear here once added'}
             </p>
-          </div>
-        ) : selectedCategory === 'all' ? (
-          // Netflix-style rows by category
-          <div className="space-y-12">
-            {Object.entries(groupedBooks).map(([category, categoryBooks]) => (
-              <section key={category}>
-                <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">{category}</h2>
-                <div className="flex gap-6 overflow-x-auto pb-4 hide-scrollbar snap-x snap-mandatory">
-                  {categoryBooks.map((book) => (
-                    <BookCard key={book.book_id} book={book} userTier={userTier} />
-                  ))}
-                </div>
-              </section>
-            ))}
           </div>
         ) : viewMode === 'grid' ? (
           // Grid view
@@ -447,7 +405,6 @@ const BookListItem = ({ book, userTier }) => {
             Tier {book.tier_level}
           </div>
         </div>
-        <p className="text-sm text-[#B0C4BF] mt-1">{book.category}</p>
         {book.description && (
           <p className="text-sm text-[#B0C4BF] mt-2 line-clamp-2">{book.description}</p>
         )}

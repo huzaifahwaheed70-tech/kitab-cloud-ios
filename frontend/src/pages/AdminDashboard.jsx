@@ -44,7 +44,6 @@ const AdminDashboard = () => {
     title: '',
     darussalam_code: '',
     tier_level: 1,
-    category: 'Standard',
     description: '',
     price: ''
   });
@@ -181,7 +180,6 @@ const AdminDashboard = () => {
       title: '',
       darussalam_code: '',
       tier_level: 1,
-      category: 'Standard',
       description: '',
       price: ''
     });
@@ -194,7 +192,6 @@ const AdminDashboard = () => {
       title: book.title,
       darussalam_code: book.darussalam_code,
       tier_level: book.tier_level,
-      category: book.category,
       description: book.description || '',
       price: book.price ? String(book.price) : ''
     });
@@ -342,45 +339,31 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-[#FDFBF7]">Darussalam Code</Label>
+                      <Label className="text-[#FDFBF7]">Dar-Us-Salam Code</Label>
                       <Input
                         value={bookForm.darussalam_code}
                         onChange={(e) => setBookForm(p => ({ ...p, darussalam_code: e.target.value }))}
                         className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] font-mono"
+                        placeholder="e.g., C21, E20"
                         required
                         data-testid="book-form-code"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-[#FDFBF7]">Tier Level</Label>
-                        <Select value={String(bookForm.tier_level)} onValueChange={(v) => setBookForm(p => ({ ...p, tier_level: parseInt(v) }))}>
-                          <SelectTrigger className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]" data-testid="book-form-tier">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
-                            {[1, 2, 3, 4, 5].map(t => (
-                              <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">Tier {t}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-[#FDFBF7]">Category</Label>
-                        <Select value={bookForm.category} onValueChange={(v) => setBookForm(p => ({ ...p, category: v }))}>
-                          <SelectTrigger className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]" data-testid="book-form-category">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
-                            {['Standard', 'Advanced', 'Volume'].map(c => (
-                              <SelectItem key={c} value={c} className="text-[#FDFBF7]">{c}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div>
+                      <Label className="text-[#FDFBF7]">Tier Level (minimum tier to access)</Label>
+                      <Select value={String(bookForm.tier_level)} onValueChange={(v) => setBookForm(p => ({ ...p, tier_level: parseInt(v) }))}>
+                        <SelectTrigger className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]" data-testid="book-form-tier">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
+                          {[1, 2, 3, 4, 5].map(t => (
+                            <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">Tier {t} - ${t === 1 ? '25' : t === 2 ? '35' : t === 3 ? '50' : t === 4 ? '60' : '75'}+ members</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <Label className="text-[#FDFBF7]">Description</Label>
+                      <Label className="text-[#FDFBF7]">Description (optional)</Label>
                       <Textarea
                         value={bookForm.description}
                         onChange={(e) => setBookForm(p => ({ ...p, description: e.target.value }))}
@@ -389,13 +372,14 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-[#FDFBF7]">Price (for purchase, optional)</Label>
+                      <Label className="text-[#FDFBF7]">Price for PDF purchase (optional)</Label>
                       <Input
                         type="number"
                         step="0.01"
                         value={bookForm.price}
                         onChange={(e) => setBookForm(p => ({ ...p, price: e.target.value }))}
                         className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+                        placeholder="Leave empty if not for sale"
                         data-testid="book-form-price"
                       />
                     </div>
@@ -431,10 +415,11 @@ const AdminDashboard = () => {
                       <span className={`tier-badge tier-${book.tier_level} text-xs`}>T{book.tier_level}</span>
                     </div>
                     <h3 className="text-[#FDFBF7] font-medium truncate">{book.title}</h3>
-                    <p className="text-sm text-[#B0C4BF]">{book.category}</p>
                     <div className="flex items-center gap-2 mt-2 text-xs text-[#B0C4BF]">
                       {book.cover_url && <span className="text-green-500">✓ Cover</span>}
                       {book.pdf_url && <span className="text-green-500">✓ PDF</span>}
+                      {!book.cover_url && <span className="text-yellow-500">No cover</span>}
+                      {!book.pdf_url && <span className="text-yellow-500">No PDF</span>}
                     </div>
                   </div>
                   
