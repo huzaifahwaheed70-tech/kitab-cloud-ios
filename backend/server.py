@@ -192,7 +192,7 @@ async def get_current_user(request: Request, authorization: str = Header(None)):
             user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
             if user:
                 return user
-        except:
+        except Exception:
             pass
     
     raise HTTPException(status_code=401, detail="Not authenticated")
@@ -908,6 +908,186 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
 @api_router.get("/tiers")
 async def get_tiers():
     return SUBSCRIPTION_TIERS
+
+
+# ============== User Settings Endpoints ==============
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.get("/user/profile")
+async def get_user_profile(user: dict = Depends(get_current_user)):
+    """Get full user profile with subscription details"""
+    # Get user data including password_hash to check if user has password
+    full_user_data = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    
+    if not full_user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if user has a password (for email/password login)
+    has_password = bool(full_user_data.get("password_hash"))
+    
+    # Remove password_hash from response
+    user_data = {k: v for k, v in full_user_data.items() if k != "password_hash"}
+    
+    # Get subscription info
+    tier = user_data.get("subscription_tier", 0)
+    # Handle tiers > 4 as Premium (admin users may have tier 5+)
+    tier_key = min(tier, 4) if tier > 0 else 0
+    tier_info = SUBSCRIPTION_TIERS.get(tier_key, SUBSCRIPTION_TIERS[0])
+    
+    # Get latest payment for subscription date
+    latest_payment = await db.payment_transactions.find_one(
+        {"user_id": user["user_id"], "payment_status": "paid"},
+        sort=[("created_at", -1)]
+    )
+    
+    subscription_start = None
+    subscription_end = None
+    if latest_payment and tier > 0:
+        subscription_start = latest_payment.get("created_at")
+        # Calculate end date (30 days from start)
+        if subscription_start:
+            from datetime import datetime
+            start_dt = datetime.fromisoformat(subscription_start.replace('Z', '+00:00'))
+            end_dt = start_dt + timedelta(days=30)
+            subscription_end = end_dt.isoformat()
+    
+    # Check cancellation status
+    cancellation = await db.subscription_cancellations.find_one(
+        {"user_id": user["user_id"], "status": "pending"}
+    )
+    
+    return {
+        **user_data,
+        "has_password": has_password,
+        "tier_info": tier_info,
+        "subscription_start": subscription_start,
+        "subscription_end": subscription_end,
+        "cancellation_pending": cancellation is not None,
+        "cancellation_effective_date": cancellation.get("effective_date") if cancellation else None
+    }
+
+
+@api_router.put("/user/profile")
+async def update_user_profile(profile: UpdateProfileRequest, user: dict = Depends(get_current_user)):
+    """Update user profile (name, email)"""
+    update_data = {}
+    
+    if profile.name:
+        update_data["name"] = profile.name
+    
+    if profile.email and profile.email != user.get("email"):
+        # Check if email is already taken
+        existing = await db.users.find_one({"email": profile.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use")
+        update_data["email"] = profile.email
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No updates provided")
+    
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Profile updated successfully"}
+
+
+@api_router.put("/user/password")
+async def change_password(passwords: ChangePasswordRequest, user: dict = Depends(get_current_user)):
+    """Change user password"""
+    # Get full user data with password hash
+    user_data = await db.users.find_one({"user_id": user["user_id"]})
+    
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if user has a password (Google OAuth users may not)
+    if not user_data.get("password_hash"):
+        raise HTTPException(status_code=400, detail="Cannot change password for social login accounts")
+    
+    # Verify current password
+    if not bcrypt.checkpw(passwords.current_password.encode('utf-8'), user_data["password_hash"].encode('utf-8')):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Hash new password
+    new_hash = bcrypt.hashpw(passwords.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    return {"message": "Password changed successfully"}
+
+
+@api_router.post("/user/cancel-subscription")
+async def cancel_subscription(user: dict = Depends(get_current_user)):
+    """Cancel subscription at end of billing period"""
+    user_data = await db.users.find_one({"user_id": user["user_id"]})
+    
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    tier = user_data.get("subscription_tier", 0)
+    if tier == 0:
+        raise HTTPException(status_code=400, detail="No active subscription to cancel")
+    
+    # Check if already pending cancellation
+    existing = await db.subscription_cancellations.find_one(
+        {"user_id": user["user_id"], "status": "pending"}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Subscription cancellation already pending")
+    
+    # Get latest payment to determine end date
+    latest_payment = await db.payment_transactions.find_one(
+        {"user_id": user["user_id"], "payment_status": "paid"},
+        sort=[("created_at", -1)]
+    )
+    
+    # Calculate effective date (30 days from last payment or now if no payment found)
+    if latest_payment and latest_payment.get("created_at"):
+        start_dt = datetime.fromisoformat(latest_payment["created_at"].replace('Z', '+00:00'))
+        effective_date = (start_dt + timedelta(days=30)).isoformat()
+    else:
+        effective_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    
+    # Create cancellation record
+    cancellation_id = f"cancel_{uuid.uuid4().hex[:12]}"
+    await db.subscription_cancellations.insert_one({
+        "cancellation_id": cancellation_id,
+        "user_id": user["user_id"],
+        "previous_tier": tier,
+        "status": "pending",
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "effective_date": effective_date
+    })
+    
+    return {
+        "message": "Subscription will be cancelled at end of billing period",
+        "effective_date": effective_date
+    }
+
+
+@api_router.post("/user/reactivate-subscription")
+async def reactivate_subscription(user: dict = Depends(get_current_user)):
+    """Reactivate a pending cancellation"""
+    result = await db.subscription_cancellations.delete_one(
+        {"user_id": user["user_id"], "status": "pending"}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=400, detail="No pending cancellation found")
+    
+    return {"message": "Subscription reactivated"}
 
 
 # Include the router in the main app

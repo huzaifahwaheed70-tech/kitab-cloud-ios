@@ -142,10 +142,16 @@ const LibraryPage = () => {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
+                    <Link to="/settings" data-testid="settings-link">
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
                   {user?.is_admin && (
                     <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
                       <Link to="/admin" data-testid="admin-link">
-                        <Settings className="w-4 h-4 mr-2" />
+                        <User className="w-4 h-4 mr-2" />
                         Admin Dashboard
                       </Link>
                     </DropdownMenuItem>
@@ -211,9 +217,13 @@ const LibraryPage = () => {
                   Upgrade Plan
                 </Link>
               )}
+              <Link to="/settings" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
+                <Settings className="w-5 h-5" />
+                Settings
+              </Link>
               {user?.is_admin && (
                 <Link to="/admin" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
-                  <Settings className="w-5 h-5" />
+                  <User className="w-5 h-5" />
                   Admin Dashboard
                 </Link>
               )}
