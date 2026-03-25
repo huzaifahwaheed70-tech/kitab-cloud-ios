@@ -18,15 +18,16 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - Favorites and Continue Reading features
 - In-book search for Tier 3+
 - Admin dashboard for book management
-- Stripe payment integration
+- Stripe payment integration (LIVE)
 - Google OAuth + Email/Password authentication
+- User Settings page with subscription management
 
 ## What's Been Implemented (March 2026)
 
 ### Core Features
 - ✅ Full-stack app: React frontend + FastAPI backend + MongoDB
 - ✅ Authentication: Google OAuth + Email/Password JWT
-- ✅ Stripe payment integration for 5 subscription tiers (test mode)
+- ✅ Stripe payment integration (LIVE key active)
 - ✅ Emergent Object Storage for PDFs and book covers
 - ✅ Netflix-style library with tier-based access
 - ✅ PDF viewer with embedded reader + copy/paste protection
@@ -34,18 +35,29 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - ✅ Monthly bookshelf with tier-specific limits
 - ✅ Favorites system
 - ✅ Continue Reading section (reading progress tracking)
-- ✅ In-book search UI for Tier 3+ users
+- ✅ In-book text search for Tier 3+ (searches PDF text content)
+- ✅ Save page/bookmark functionality
 - ✅ Volume and Advanced book restrictions
 - ✅ Tier 0 - Individual PDF purchase option
 - ✅ Admin dashboard (books, users management)
 - ✅ PWA support with service worker
 
+### User Settings (NEW)
+- ✅ Profile tab: Edit name and email
+- ✅ Security tab: Change password (for email/password users)
+- ✅ Security tab: Google OAuth message (for OAuth users)
+- ✅ Subscription tab: View current plan, price, book limit
+- ✅ Cancel subscription (end of billing period)
+- ✅ Reactivate cancelled subscription
+- ✅ Settings accessible from user menu (desktop & mobile)
+
 ### Bug Fixes
 - ✅ Fixed book cover images not displaying (created public /api/covers/ endpoint)
-- ✅ Removed deprecated "Request a Scan" and "Ship-to-Scan" features
-- ✅ Updated admin dashboard with new book fields (is_volume, is_advanced, original_price, pdf_price)
+- ✅ Fixed mobile PDF reader navigation (controls above Emergent badge)
+- ✅ Fixed save page functionality (correct API parameter format)
+- ✅ Fixed password form not showing for email/password users
 
-## Subscription Tiers (Updated)
+## Subscription Tiers
 | Tier | Name | Price | Book Limit | Features |
 |------|------|-------|------------|----------|
 | 0 | Pay Per Book | - | - | Buy individual PDFs |
@@ -59,9 +71,9 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - **Frontend**: React
 - **Database**: MongoDB
 - **Authentication**: JWT + Google OAuth (Emergent-managed)
-- **Payments**: Stripe (test mode)
+- **Payments**: Stripe (LIVE)
 - **File Storage**: Emergent Object Storage
-- **PDF Processing**: PyMuPDF (cover generation)
+- **PDF Processing**: PyMuPDF (cover generation), react-pdf (viewing)
 
 ## Key API Endpoints
 - `/api/auth/*` - Authentication (register, login, logout, session)
@@ -73,6 +85,10 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - `/api/reading-progress/*` - Reading progress tracking
 - `/api/continue-reading` - Recent reading history
 - `/api/payments/*` - Stripe checkout and status
+- `/api/user/profile` - User profile management
+- `/api/user/password` - Password change
+- `/api/user/cancel-subscription` - Cancel subscription
+- `/api/user/reactivate-subscription` - Reactivate subscription
 - `/api/admin/*` - Admin dashboard operations
 
 ## Prioritized Backlog
@@ -81,17 +97,18 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - ✅ Fix cover images not displaying
 - ✅ Complete 4-tier subscription model
 - ✅ Remove scan request features
+- ✅ User settings page
+- ✅ Cancel subscription functionality
+- ✅ Live Stripe integration
 
 ### P1 (High Priority)
-- Live Stripe API key integration (deferred by user)
-- User account settings page
-- Cancel subscription functionality
+- Email notifications for subscription changes
+- Password reset via email
 
 ### P2 (Medium Priority)
-- Full in-book search implementation (backend text extraction)
-- Offline book reading via PWA
-- Email notifications
 - Book recommendations
+- Reading statistics dashboard
+- Email receipts for purchases
 
 ### P3 (Future)
 - Native iOS/Android apps (user interested after web complete)
@@ -99,10 +116,11 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - Social sharing features
 
 ## Testing
-- Backend: 17 API tests passing (pytest)
+- Backend: 30+ API tests passing (pytest)
 - Frontend: All features verified via browser automation
 - Test credentials: huzaifahwaheed70@gmail.com / admin123
 
 ## Notes
-- Stripe is using test key (sk_test_emergent) - no real payments
+- Stripe is using LIVE key - real payments are processed
+- Offline reading NOT implemented (user decision to protect content)
 - Support email: sales@dar-us-salam.com
