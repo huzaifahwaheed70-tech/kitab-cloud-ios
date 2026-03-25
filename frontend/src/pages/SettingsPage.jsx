@@ -20,9 +20,9 @@ import {
 } from '../components/ui/dialog';
 
 const SettingsPage = () => {
-  const { user, token, logout } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
   
@@ -41,14 +41,11 @@ const SettingsPage = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
-  useEffect(() => {
-    // Wait for user to be loaded from auth context
-    if (user && token) {
-      fetchProfile();
-    }
-  }, [user, token]);
-
   const fetchProfile = async () => {
+    if (!token) {
+      setProfileLoading(false);
+      return;
+    }
     try {
       const authHeaders = { Authorization: `Bearer ${token}` };
       const response = await axios.get(`${API}/user/profile`, { 
@@ -66,9 +63,23 @@ const SettingsPage = () => {
       }
       toast.error('Failed to load profile');
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Fetch profile when user/token are available
+    if (user && token) {
+      fetchProfile();
+    } else if (!authLoading && !user) {
+      // Auth check complete but no user - will be redirected by ProtectedRoute
+      setProfileLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token, authLoading]);
+
+  // Show loading while auth is checking or profile is loading
+  const loading = authLoading || profileLoading;
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   const handleUpdateProfile = async (e) => {
