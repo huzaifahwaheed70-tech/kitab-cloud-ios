@@ -36,8 +36,9 @@ workflows:
         script: |
           PBXPROJ=$(find . -name "project.pbxproj" -not -path "*/node_modules/*" | head -n 1)
           echo "Found pbxproj at: $PBXPROJ"
-          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
-          echo "Bundle ID updated"
+          /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
+          echo "Bundle ID updated to:"
+          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ"
 
       - name: CocoaPods and Build
         script: |
