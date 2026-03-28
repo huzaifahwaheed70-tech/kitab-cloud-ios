@@ -10,34 +10,34 @@ workflows:
         - appstore_credentials
     scripts:
       - name: Setup and Install
-        script: | 
-          # 1. Find the folder containing package.json and move into it
+        script: |
           TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$TARGET_DIR"
           echo "Working in directory: $PWD"
-          
-          # 2. Install everything
-          npm install
-          npm install @capacitor/cli @capacitor/core @capacitor/ios
+          yarn install
+
+      - name: Build React App
+        script: |
+          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
+          cd "$TARGET_DIR"
+          yarn build
+
       - name: Sync Capacitor
         script: |
           TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$TARGET_DIR"
-          
-          mkdir -p www
           npx cap add ios || true
           npx cap sync ios
+
       - name: CocoaPods and Build
         script: |
-          # Find where the Podfile is and install
           POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$POD_DIR"
           pod install
-          
-          # Find the workspace and build the app
           cd ..
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
           xcode-project build-ipa --workspace "$WORKSPACE" --scheme App
+
     artifacts:
       - "**/build/ios/ipa/*.ipa"
     publishing:
