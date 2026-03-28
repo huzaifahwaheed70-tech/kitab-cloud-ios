@@ -51,8 +51,8 @@ workflows:
             <string>Apple Distribution</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>host.emergent.kitab-cloud</key>
-              <string>KitabCloud AppStore</string>
+              <key>host.emergent.kitabcloud</key>
+              <string>KitabCloud AppStore2</string>
             </dict>
             <key>uploadBitcode</key>
             <false/>
