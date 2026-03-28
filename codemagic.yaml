@@ -27,4 +27,19 @@ workflows:
           TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$TARGET_DIR"
           npx cap add ios || true
-          npx cap syn
+          npx cap sync ios
+
+      - name: CocoaPods and Build
+        script: |
+          POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
+          cd "$POD_DIR"
+          pod install
+          cd ..
+          WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
+          xcode-project build-ipa --workspace "$WORKSPACE" --scheme App
+
+    artifacts:
+      - "**/build/ios/ipa/*.ipa"
+    publishing:
+      app_store_connect:
+        auth: integration
