@@ -3,6 +3,8 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m4
     max_build_duration: 60
+    integrations:
+      app_store_connect: appstore_credentials
     environment:
       groups:
         - appstore_credentials
@@ -13,7 +15,6 @@ workflows:
         script: npx cap sync ios
       - name: Build IPA
         script: |
-          # This command builds the app for Apple
           xcode-project build-ipa --workspace ios/*.xcworkspace --scheme KitabCloud
     artifacts:
       - build/ios/ipa/*.ipa
