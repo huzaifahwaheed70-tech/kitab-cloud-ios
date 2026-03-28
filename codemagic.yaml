@@ -9,31 +9,34 @@ workflows:
       groups:
         - appstore_credentials
     scripts:
-      - name: Install dependencies
+      - name: Setup and Install
         script: | 
-          # This command finds where package.json is and moves there
-          cd $(find . -name package.json -maxdepth 2 -not -path '*/.*' | xargs dirname)
+          # 1. Find the folder containing package.json and move into it
+          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
+          cd "$TARGET_DIR"
+          echo "Working in directory: $PWD"
+          
+          # 2. Install everything
           npm install
           npm install @capacitor/cli @capacitor/core @capacitor/ios
-      - name: Build web app
-        script: |
-          cd $(find . -name package.json -maxdepth 2 -not -path '*/.*' | xargs dirname)
-          mkdir -p www
-          npm run build || true
       - name: Sync Capacitor
         script: |
-          cd $(find . -name package.json -maxdepth 2 -not -path '*/.*' | xargs dirname)
+          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
+          cd "$TARGET_DIR"
+          
+          mkdir -p www
           npx cap add ios || true
           npx cap sync ios
-      - name: Install CocoaPods
+      - name: CocoaPods and Build
         script: |
-          # Finds the iOS folder and installs pods
-          cd $(find . -name Podfile -maxdepth 4 -not -path '*/.*' | xargs dirname)
+          # Find where the Podfile is and install
+          POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
+          cd "$POD_DIR"
           pod install
-      - name: Build IPA
-        script: |
-          # Finds the workspace and builds
-          WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
+          
+          # Find the workspace and build the app
+          cd ..
+          WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
           xcode-project build-ipa --workspace "$WORKSPACE" --scheme App
     artifacts:
       - "**/build/ios/ipa/*.ipa"
