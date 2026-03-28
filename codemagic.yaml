@@ -32,14 +32,13 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
-      - name: Update Bundle ID and Signing
+      - name: Update Bundle ID
         script: |
           PBXPROJ=$(find . -name "project.pbxproj" -not -path "*/node_modules/*" | head -n 1)
           echo "Found pbxproj at: $PBXPROJ"
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
-          /usr/bin/sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PBXPROJ"
-          echo "Settings updated:"
-          grep "PRODUCT_BUNDLE_IDENTIFIER\|CODE_SIGN_STYLE" "$PBXPROJ"
+          echo "Verifying bundle ID change:"
+          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ"
 
       - name: CocoaPods and Build
         script: |
@@ -51,42 +50,50 @@ workflows:
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
           echo "Using workspace: $WORKSPACE"
 
-          xcode-project build-ipa \
-            --workspace "$WORKSPACE" \
-            --scheme App \
-            --export-options-plist /Users/builder/export_options.plist
+          cat > /Users/builder/export_options.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>app-store</string>
+  <key>signingStyle</key>
+  <string>automatic</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>host.emergent.kitabcloud</key>
+    <string>KitabCloud AppStore2</string>
+  </dict>
+  <key>uploadBitcode</key>
+  <false/>
+  <key>uploadSymbols</key>
+  <true/>
+</dict>
+</plist>
+EOF
 
-          cat > /Users/builder/export_options.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>host.emergent.kitabcloud</key>
-              <string>KitabCloud AppStore2</string>
-            </dict>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
+          echo "Export options plist contents:"
+          cat /Users/builder/export_options.plist
 
-          xcode-project build-ipa \
-            --workspace "$WORKSPACE" \
-            --scheme App \
-            --export-options-plist /Users/builder/export_options.plist
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme App \
+            -archivePath /Users/builder/archive.xcarchive \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
+
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath /Users/builder/export \
+            -allowProvisioningUpdates
 
     artifacts:
-      - "**/build/ios/ipa/*.ipa"
+      - /Users/builder/export/*.ipa
     publishing:
       app_store_connect:
         auth: integration
