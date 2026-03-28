@@ -1,5 +1,5 @@
 {
-  "appId": "host.emergent.kitab-cloud",
+  "appId": "host.emergent.kitabcloud",
   "appName": "Kitab Cloud",
   "webDir": "build",
   "bundledWebRuntime": false,
