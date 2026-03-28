@@ -3,43 +3,38 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
-
     integrations:
       app_store_connect: appstore_credentials
-
     environment:
       groups:
         - appstore_credentials
-
     scripts:
       - name: Install dependencies
-        script: |
+        script: | 
           npm install
-
+          # This ensures 'npx cap' actually works
+          npm install @capacitor/cli @capacitor/core @capacitor/ios
       - name: Build web app
         script: |
-          # Only needed if you're using React/Vue/etc
+          # Create a dummy folder if your build hasn't run yet
+          mkdir -p www
           npm run build || true
-
       - name: Sync Capacitor
         script: |
+          # If the ios folder is missing, add it; otherwise, just sync
+          npx cap add ios || true
           npx cap sync ios
-
       - name: Install CocoaPods
         script: |
           cd ios/App
           pod install
-          cd ../..
-
       - name: Build IPA
         script: |
           xcode-project build-ipa \
             --workspace ios/App/App.xcworkspace \
             --scheme App
-
     artifacts:
       - build/ios/ipa/*.ipa
-
     publishing:
       app_store_connect:
         auth: integration
