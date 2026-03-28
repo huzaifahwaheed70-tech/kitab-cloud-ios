@@ -8,75 +8,36 @@ workflows:
     environment:
       groups:
         - appstore_credentials
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: host.emergent.kitabcloud
     scripts:
       - name: Setup and Install
-        script: |
+        script: | 
+          # 1. Find the folder containing package.json and move into it
           TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$TARGET_DIR"
           echo "Working in directory: $PWD"
-          yarn install
-
-      - name: Build React App
-        script: |
-          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
-          cd "$TARGET_DIR"
-          CI=false yarn build
-
+          
+          # 2. Install everything
+          npm install
+          npm install @capacitor/cli @capacitor/core @capacitor/ios
       - name: Sync Capacitor
         script: |
           TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$TARGET_DIR"
+          
+          mkdir -p www
           npx cap add ios || true
           npx cap sync ios
-
-      - name: Update Bundle ID
-        script: |
-          PBXPROJ=$(find . -name "project.pbxproj" -not -path "*/node_modules/*" | head -n 1)
-          echo "Found pbxproj at: $PBXPROJ"
-          /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
-          echo "Bundle ID updated to:"
-          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ"
-
       - name: CocoaPods and Build
         script: |
+          # Find where the Podfile is and install
           POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$POD_DIR"
           pod install
-
-          cat > /Users/builder/export_options.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>host.emergent.kitabcloud</key>
-              <string>KitabCloud AppStore2</string>
-            </dict>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
+          
+          # Find the workspace and build the app
           cd ..
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
-          xcode-project build-ipa \
-            --workspace "$WORKSPACE" \
-            --scheme App \
-            --export-options-plist /Users/builder/export_options.plist
-
+          xcode-project build-ipa --workspace "$WORKSPACE" --scheme App
     artifacts:
       - "**/build/ios/ipa/*.ipa"
     publishing:
