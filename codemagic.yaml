@@ -34,9 +34,31 @@ workflows:
           POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$POD_DIR"
           pod install
+
+          # Create export options plist
+          cat > /Users/builder/export_options.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
           cd ..
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
-          xcode-project build-ipa --workspace "$WORKSPACE" --scheme App
+          xcode-project build-ipa \
+            --workspace "$WORKSPACE" \
+            --scheme App \
+            --export-options-plist /Users/builder/export_options.plist
 
     artifacts:
       - "**/build/ios/ipa/*.ipa"
