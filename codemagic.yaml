@@ -32,6 +32,13 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
+      - name: Update Bundle ID
+        script: |
+          PBXPROJ=$(find . -name "project.pbxproj" -not -path "*/node_modules/*" | head -n 1)
+          echo "Found pbxproj at: $PBXPROJ"
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
+          echo "Bundle ID updated"
+
       - name: CocoaPods and Build
         script: |
           POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
