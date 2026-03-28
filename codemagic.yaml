@@ -1,0 +1,20 @@
+workflows:
+  ios-release:
+    name: Kitab Cloud iOS Build
+    instance_type: mac_mini_m4
+    max_build_duration: 60
+    environment:
+      groups:
+        - appstore_credentials
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build iOS
+        script: | 
+          echo "Starting Build for Dar-Us-Salam..."
+          npx cap sync ios
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
