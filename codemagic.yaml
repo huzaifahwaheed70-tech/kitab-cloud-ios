@@ -3,7 +3,6 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
-    working_directory: YOUR_FOLDER_NAME
     integrations:
       app_store_connect: appstore_credentials
     environment:
@@ -12,27 +11,32 @@ workflows:
     scripts:
       - name: Install dependencies
         script: | 
+          # This command finds where package.json is and moves there
+          cd $(find . -name package.json -maxdepth 2 -not -path '*/.*' | xargs dirname)
           npm install
           npm install @capacitor/cli @capacitor/core @capacitor/ios
       - name: Build web app
         script: |
+          cd $(find . -name package.json -maxdepth 2 -not -path '*/.*' | xargs dirname)
           mkdir -p www
           npm run build || true
       - name: Sync Capacitor
         script: |
+          cd $(find . -name package.json -maxdepth 2 -not -path '*/.*' | xargs dirname)
           npx cap add ios || true
           npx cap sync ios
       - name: Install CocoaPods
         script: |
-          cd ios/App
+          # Finds the iOS folder and installs pods
+          cd $(find . -name Podfile -maxdepth 4 -not -path '*/.*' | xargs dirname)
           pod install
       - name: Build IPA
         script: |
-          xcode-project build-ipa \
-            --workspace ios/App/App.xcworkspace \
-            --scheme App
+          # Finds the workspace and builds
+          WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
+          xcode-project build-ipa --workspace "$WORKSPACE" --scheme App
     artifacts:
-      - build/ios/ipa/*.ipa
+      - "**/build/ios/ipa/*.ipa"
     publishing:
       app_store_connect:
         auth: integration
