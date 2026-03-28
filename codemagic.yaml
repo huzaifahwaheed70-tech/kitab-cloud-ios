@@ -48,34 +48,9 @@ workflows:
           cd ..
 
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
+          PLIST=$(find . -name "export_options.plist" -not -path "*/node_modules/*" | head -n 1)
           echo "Using workspace: $WORKSPACE"
-
-          cat > /Users/builder/export_options.plist << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key>
-  <string>app-store</string>
-  <key>signingStyle</key>
-  <string>automatic</string>
-  <key>signingCertificate</key>
-  <string>Apple Distribution</string>
-  <key>provisioningProfiles</key>
-  <dict>
-    <key>host.emergent.kitabcloud</key>
-    <string>KitabCloud AppStore2</string>
-  </dict>
-  <key>uploadBitcode</key>
-  <false/>
-  <key>uploadSymbols</key>
-  <true/>
-</dict>
-</plist>
-EOF
-
-          echo "Export options plist contents:"
-          cat /Users/builder/export_options.plist
+          echo "Using plist: $PLIST"
 
           xcodebuild archive \
             -workspace "$WORKSPACE" \
@@ -88,7 +63,7 @@ EOF
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportOptionsPlist "$PLIST" \
             -exportPath /Users/builder/export \
             -allowProvisioningUpdates
 
