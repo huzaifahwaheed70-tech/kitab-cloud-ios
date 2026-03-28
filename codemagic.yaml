@@ -12,9 +12,11 @@ workflows:
       - name: Install dependencies
         script: | 
           npm install
-          npm install @capacitor/cli @capacitor/core
+          npm install @capacitor/cli @capacitor/core @capacitor/ios
       - name: Sync iOS Project
-        script: npx cap sync ios
+        script: |
+          npx cap add ios || true
+          npx cap sync ios
       - name: Build IPA
         script: |
           xcode-project build-ipa --workspace ios/App/App.xcworkspace --scheme App
