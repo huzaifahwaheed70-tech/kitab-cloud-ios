@@ -10,7 +10,9 @@ workflows:
         - appstore_credentials
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: | 
+          npm install
+          npm install @capacitor/cli @capacitor/core
       - name: Sync iOS Project
         script: npx cap sync ios
       - name: Build IPA
