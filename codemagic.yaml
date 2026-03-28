@@ -10,7 +10,7 @@ workflows:
         - appstore_credentials
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: host.emergent.kitab-cloud
+        bundle_identifier: host.emergent.kitabcloud
     scripts:
       - name: Setup and Install
         script: |
