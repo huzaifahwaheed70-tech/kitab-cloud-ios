@@ -48,10 +48,9 @@ workflows:
           cd ..
 
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
-          PLIST=$(find . -name "export_options.plist" | head -n 1)
           echo "Using workspace: $WORKSPACE"
-          echo "Using plist: $PLIST"
-          cat "$PLIST"
+          echo "Plist location:"
+          ls -la /Users/builder/clone/export_options.plist
 
           xcodebuild archive \
             -workspace "$WORKSPACE" \
@@ -64,7 +63,7 @@ workflows:
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist "$PLIST" \
+            -exportOptionsPlist /Users/builder/clone/export_options.plist \
             -exportPath /Users/builder/export \
             -allowProvisioningUpdates
 
