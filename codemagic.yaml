@@ -30,16 +30,44 @@ workflows:
           cd frontend
           npx cap sync ios
 
+      - name: Build iOS (Correct Way)
+        script: |
+          cd frontend/ios/App
+
+          pod install
+
+          # Create export options
+          cat > exportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+          # IMPORTANT: use xcworkspace
+          xcodebuild archive \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -archivePath $PWD/build/App.xcarchive \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
+            -allowProvisioningUpdates
+
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/App.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath $PWD/build
+
     artifacts:
-      - frontend/ios/App/build/ios/ipa/*.ipa
-      - build/ios/ipa/*.ipa
-      - /Users/builder/export/*.ipa
+      - frontend/ios/App/build/*.ipa
 
     publishing:
       app_store_connect:
         auth: integration
-
-    # 🔥 THIS IS THE KEY PART
-    xcode:
-      project: frontend/ios/App/App.xcworkspace
-      scheme: App
