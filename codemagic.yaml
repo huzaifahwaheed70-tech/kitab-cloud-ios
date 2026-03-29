@@ -46,12 +46,11 @@ workflows:
           cd "$POD_DIR"
           pod install
 
-          WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1 | xargs basename)
-          echo "Using workspace: $WORKSPACE"
           echo "Current directory: $PWD"
+          ls -la
 
           xcodebuild archive \
-            -workspace "$WORKSPACE" \
+            -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             CODE_SIGN_STYLE=Manual \
