@@ -17,5 +17,7 @@
   <false/>
   <key>uploadSymbols</key>
   <true/>
+  <key>stripSwiftSymbols</key>
+  <true/>
 </dict>
 </plist>
