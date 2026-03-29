@@ -47,17 +47,19 @@ workflows:
           pod install
 
           echo "Current directory: $PWD"
-          ls -la
 
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
+            -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
+            PODS_PODFILE_DIR_PATH=$PWD \
+            OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
