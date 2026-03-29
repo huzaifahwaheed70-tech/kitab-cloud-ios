@@ -49,23 +49,23 @@ workflows:
 
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
           echo "Using workspace: $WORKSPACE"
+          echo "CM_PROVISIONING_PROFILE: $CM_PROVISIONING_PROFILE"
+          echo "CM_CERTIFICATE: $CM_CERTIFICATE"
 
           xcodebuild archive \
             -workspace "$WORKSPACE" \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
-            -allowProvisioningUpdates \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="KitabCloud AppStore2" \
+            PROVISIONING_PROFILE="$CM_PROVISIONING_PROFILE" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
-            -exportPath /Users/builder/export \
-            -allowProvisioningUpdates
+            -exportPath /Users/builder/export
 
     artifacts:
       - /Users/builder/export/*.ipa
