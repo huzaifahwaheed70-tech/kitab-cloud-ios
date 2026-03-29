@@ -45,10 +45,10 @@ workflows:
           POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$POD_DIR"
           pod install
-          cd ..
 
-          WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
+          WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1 | xargs basename)
           echo "Using workspace: $WORKSPACE"
+          echo "Current directory: $PWD"
 
           xcodebuild archive \
             -workspace "$WORKSPACE" \
