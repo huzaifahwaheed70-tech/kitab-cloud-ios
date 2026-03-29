@@ -35,11 +35,11 @@ workflows:
           cd frontend/ios/App
           pod install
 
-          # Ensure bundle ID is correct
+          # Ensure bundle ID is correct in project file
           PBXPROJ="App.xcodeproj/project.pbxproj"
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
 
-          # Build archive with automatic signing
+          # Archive with automatic signing (allow Xcode to manage provisioning)
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -52,7 +52,7 @@ workflows:
             SKIP_INSTALL=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=NO
 
-          # Export IPA
+          # Export IPA using export_options.plist (automatic signing)
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
