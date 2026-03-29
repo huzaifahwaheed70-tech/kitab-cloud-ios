@@ -49,8 +49,6 @@ workflows:
 
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
           echo "Using workspace: $WORKSPACE"
-          echo "CM_PROVISIONING_PROFILE: $CM_PROVISIONING_PROFILE"
-          echo "CM_CERTIFICATE: $CM_CERTIFICATE"
 
           xcodebuild archive \
             -workspace "$WORKSPACE" \
@@ -58,7 +56,7 @@ workflows:
             -archivePath /Users/builder/archive.xcarchive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="$CM_PROVISIONING_PROFILE" \
+            PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
