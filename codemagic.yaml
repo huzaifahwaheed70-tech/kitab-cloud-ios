@@ -12,11 +12,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
-      # Option A: set APPLE_TEAM_ID here (recommended to store as a secret in Codemagic UI)
-      # Example: APPLE_TEAM_ID: "9A1B2C3D4E"
-      variables:
-        # Leave empty in repo; set this value in Codemagic UI as a secure env var
-        APPLE_TEAM_ID: ""
 
     scripts:
       - name: Setup and Install
@@ -39,7 +34,7 @@ workflows:
         script: |
           set -e
 
-          # Ensure APPLE_TEAM_ID is provided
+          # Ensure APPLE_TEAM_ID is provided via Codemagic environment variables (UI)
           if [ -z "$APPLE_TEAM_ID" ]; then
             echo "ERROR: APPLE_TEAM_ID is not set. Add your Apple Team ID as an environment variable in Codemagic."
             exit 1
@@ -54,11 +49,9 @@ workflows:
 
           # Ensure Xcode uses Automatic signing and set the development team in the project file
           /usr/bin/sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PBXPROJ"
-          # Add or replace DEVELOPMENT_TEAM entries
           if grep -q "DEVELOPMENT_TEAM" "$PBXPROJ"; then
             /usr/bin/sed -i.bak "s/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBXPROJ"
           else
-            # Insert DEVELOPMENT_TEAM after PRODUCT_BUNDLE_IDENTIFIER lines (best-effort)
             /usr/bin/awk -v team="$APPLE_TEAM_ID" '{
               print;
               if ($0 ~ /PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/) {
