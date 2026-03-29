@@ -32,9 +32,9 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
-      - name: Update Bundle ID
+      - name: Update Bundle ID and Fix Signing
         script: |
-          PBXPROJ=$(find . -name "project.pbxproj" -not -path "*/node_modules/*" | head -n 1)
+          PBXPROJ=$(find . -name "project.pbxproj" -not -path "*/node_modules/*" -not -path "*/Pods/*" | head -n 1)
           echo "Found pbxproj at: $PBXPROJ"
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
           echo "Verifying bundle ID change:"
@@ -45,6 +45,14 @@ workflows:
           POD_DIR=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
           cd "$POD_DIR"
           pod install
+
+          # Fix Pods project to use automatic signing
+          PODS_PBXPROJ="Pods/Pods.xcodeproj/project.pbxproj"
+          if [ -f "$PODS_PBXPROJ" ]; then
+            /usr/bin/sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PODS_PBXPROJ"
+            /usr/bin/sed -i.bak2 '/PROVISIONING_PROFILE_SPECIFIER/d' "$PODS_PBXPROJ"
+            echo "Fixed Pods signing"
+          fi
 
           echo "Current directory: $PWD"
 
@@ -57,9 +65,7 @@ workflows:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            PODS_PODFILE_DIR_PATH=$PWD \
-            OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
