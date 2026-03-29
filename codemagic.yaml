@@ -49,15 +49,15 @@ workflows:
 
           WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -n 1)
           echo "Using workspace: $WORKSPACE"
-          echo "Plist location:"
-          ls -la /Users/builder/clone/export_options.plist
 
           xcodebuild archive \
             -workspace "$WORKSPACE" \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="KitabCloud AppStore2" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
