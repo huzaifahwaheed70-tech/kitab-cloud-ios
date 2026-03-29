@@ -50,7 +50,23 @@ workflows:
 
           pod install
 
-          echo "Current directory: $PWD"
+          # Create export options plist (required for IPA export)
+          cat > /Users/builder/export_options.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>destination</key>
+              <string>export</string>
+          </dict>
+          </plist>
+          EOF
+
+          echo "Starting Xcode archive..."
 
           xcodebuild archive \
             -workspace App.xcworkspace \
@@ -59,7 +75,10 @@ workflows:
             -destination "generic/platform=iOS" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            CODE_SIGN_STYLE=Automatic
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates
+
+          echo "Exporting IPA..."
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
