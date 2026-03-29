@@ -12,6 +12,11 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
+      # Option A: set APPLE_TEAM_ID here (recommended to store as a secret in Codemagic UI)
+      # Example: APPLE_TEAM_ID: "9A1B2C3D4E"
+      variables:
+        # Leave empty in repo; set this value in Codemagic UI as a secure env var
+        APPLE_TEAM_ID: ""
 
     scripts:
       - name: Setup and Install
@@ -32,12 +37,35 @@ workflows:
 
       - name: Build iOS
         script: |
+          set -e
+
+          # Ensure APPLE_TEAM_ID is provided
+          if [ -z "$APPLE_TEAM_ID" ]; then
+            echo "ERROR: APPLE_TEAM_ID is not set. Add your Apple Team ID as an environment variable in Codemagic."
+            exit 1
+          fi
+
           cd frontend/ios/App
           pod install
 
           # Ensure bundle ID is correct in project file
           PBXPROJ="App.xcodeproj/project.pbxproj"
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
+
+          # Ensure Xcode uses Automatic signing and set the development team in the project file
+          /usr/bin/sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PBXPROJ"
+          # Add or replace DEVELOPMENT_TEAM entries
+          if grep -q "DEVELOPMENT_TEAM" "$PBXPROJ"; then
+            /usr/bin/sed -i.bak "s/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" "$PBXPROJ"
+          else
+            # Insert DEVELOPMENT_TEAM after PRODUCT_BUNDLE_IDENTIFIER lines (best-effort)
+            /usr/bin/awk -v team="$APPLE_TEAM_ID" '{
+              print;
+              if ($0 ~ /PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/) {
+                print "                DEVELOPMENT_TEAM = " team ";"
+              }
+            }' "$PBXPROJ" > "$PBXPROJ.tmp" && mv "$PBXPROJ.tmp" "$PBXPROJ"
+          fi
 
           # Archive with automatic signing (allow Xcode to manage provisioning)
           xcodebuild archive \
@@ -50,7 +78,8 @@ workflows:
             -skipPackagePluginValidation \
             EXCLUDED_ARCHS="" \
             SKIP_INSTALL=NO \
-            BUILD_LIBRARY_FOR_DISTRIBUTION=NO
+            BUILD_LIBRARY_FOR_DISTRIBUTION=NO \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
 
           # Export IPA using export_options.plist (automatic signing)
           xcodebuild -exportArchive \
