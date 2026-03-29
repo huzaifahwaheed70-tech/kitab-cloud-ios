@@ -17,26 +17,29 @@ workflows:
     scripts:
       - name: Setup and Install
         script: |
-          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
-          cd "$TARGET_DIR"
+          cd frontend
           yarn install
 
       - name: Build React App
         script: |
-          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
-          cd "$TARGET_DIR"
+          cd frontend
           CI=false yarn build
 
       - name: Sync Capacitor
         script: |
-          TARGET_DIR=$(find . -name "package.json" -not -path "*/node_modules/*" | head -n 1 | xargs dirname)
-          cd "$TARGET_DIR"
-          npx cap add ios || true
+          cd frontend
           npx cap sync ios
 
     artifacts:
+      - frontend/ios/App/build/ios/ipa/*.ipa
       - build/ios/ipa/*.ipa
+      - /Users/builder/export/*.ipa
 
     publishing:
       app_store_connect:
         auth: integration
+
+    # 🔥 THIS IS THE KEY PART
+    xcode:
+      project: frontend/ios/App/App.xcworkspace
+      scheme: App
