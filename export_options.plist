@@ -5,7 +5,6 @@
   <key>method</key>
   <string>app-store</string>
 
-  <!-- Let Xcode/Codemagic handle signing automatically -->
   <key>signingStyle</key>
   <string>automatic</string>
 
