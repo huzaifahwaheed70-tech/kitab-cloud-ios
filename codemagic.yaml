@@ -3,17 +3,14 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
-
     integrations:
       app_store_connect: appstore_credentials
-
     environment:
       groups:
         - appstore_credentials
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
-
     scripts:
       - name: Setup and Install
         script: |
@@ -25,7 +22,7 @@ workflows:
           cd frontend
           CI=false yarn build
 
-      - name: Setup Capacitor iOS
+      - name: Sync Capacitor
         script: |
           cd frontend
           npx cap add ios || true
@@ -34,40 +31,60 @@ workflows:
       - name: Build iOS
         script: |
           cd frontend/ios/App
-
           pod install
 
-          # Create export options
-          cat > exportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
-          </dict>
-          </plist>
-          EOF
+          # Fix Pods signing
+          PODS_PBXPROJ="Pods/Pods.xcodeproj/project.pbxproj"
+          /usr/bin/sed -i.bak 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
+          /usr/bin/sed -i.bak2 's/CODE_SIGN_IDENTITY = "iPhone Distribution";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
+          echo "CODE_SIGNING_ALLOWED = NO" >> "$PODS_PBXPROJ" || true
+
+          # Fix bundle ID
+          PBXPROJ="App.xcodeproj/project.pbxproj"
+          /usr/bin/sed -i.bak3 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
+
+          cat > /Users/builder/exportOptions.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>app-store</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>host.emergent.kitabcloud</key>
+    <string>Dar-Us-Salam Kitab Cloud</string>
+  </dict>
+  <key>uploadBitcode</key>
+  <false/>
+  <key>uploadSymbols</key>
+  <true/>
+</dict>
+</plist>
+EOF
 
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
-            -archivePath $PWD/build/App.xcarchive \
+            -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            -allowProvisioningUpdates
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
           xcodebuild -exportArchive \
-            -archivePath $PWD/build/App.xcarchive \
-            -exportOptionsPlist exportOptions.plist \
-            -exportPath $PWD/build
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportOptionsPlist /Users/builder/exportOptions.plist \
+            -exportPath /Users/builder/export
 
     artifacts:
-      - frontend/ios/App/build/*.ipa
-
+      - /Users/builder/export/*.ipa
     publishing:
       app_store_connect:
         auth: integration
