@@ -5,7 +5,9 @@
   <key>method</key>
   <string>app-store</string>
   <key>signingStyle</key>
-  <string>automatic</string>
+  <string>manual</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
   <key>provisioningProfiles</key>
   <dict>
     <key>host.emergent.kitabcloud</key>
