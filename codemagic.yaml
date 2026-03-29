@@ -25,12 +25,13 @@ workflows:
           cd frontend
           CI=false yarn build
 
-      - name: Sync Capacitor
+      - name: Setup Capacitor iOS
         script: |
           cd frontend
+          npx cap add ios || true
           npx cap sync ios
 
-      - name: Build iOS (Correct Way)
+      - name: Build iOS
         script: |
           cd frontend/ios/App
 
@@ -50,7 +51,6 @@ workflows:
           </plist>
           EOF
 
-          # IMPORTANT: use xcworkspace
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
