@@ -31,19 +31,7 @@ workflows:
       - name: Build iOS
         script: |
           cd frontend/ios/App
-
-          python3 -c "
-import re
-with open('Podfile', 'r') as f:
-    content = f.read()
-hook = '\npost_install do |installer|\n  installer.pods_project.targets.each do |target|\n    target.build_configurations.each do |config|\n      config.build_settings[\"CODE_SIGNING_ALLOWED\"] = \"NO\"\n      config.build_settings[\"CODE_SIGNING_REQUIRED\"] = \"NO\"\n      config.build_settings[\"CODE_SIGN_IDENTITY\"] = \"\"\n    end\n  end\nend'
-if 'post_install' not in content:
-    content = content + hook
-with open('Podfile', 'w') as f:
-    f.write(content)
-print('Podfile updated successfully')
-"
-
+          python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
           PBXPROJ="App.xcodeproj/project.pbxproj"
