@@ -4,17 +4,13 @@
 <dict>
   <key>method</key>
   <string>app-store</string>
+
   <key>signingStyle</key>
-  <string>manual</string>
-  <key>signingCertificate</key>
-  <string>Apple Distribution</string>
-  <key>provisioningProfiles</key>
-  <dict>
-    <key>host.emergent.kitabcloud</key>
-    <string>fee1525c-1c69-4b63-81f2-b6093a784242</string>
-  </dict>
+  <string>automatic</string>
+
   <key>uploadBitcode</key>
   <false/>
+
   <key>uploadSymbols</key>
   <true/>
 </dict>
