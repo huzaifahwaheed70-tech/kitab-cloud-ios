@@ -44,7 +44,7 @@ workflows:
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="fee1525c-1c69-4b63-81f2-b6093a784242" \
+            PROVISIONING_PROFILE="96ff2b16-1462-4542-92fd-148e97cd2c44" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
