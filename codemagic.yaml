@@ -37,9 +37,6 @@ workflows:
           PBXPROJ="App.xcodeproj/project.pbxproj"
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
 
-          echo "CM_PROVISIONING_PROFILE: $CM_PROVISIONING_PROFILE"
-          echo "CM_CERTIFICATE: $CM_CERTIFICATE"
-
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -47,7 +44,7 @@ workflows:
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="$CM_PROVISIONING_PROFILE" \
+            PROVISIONING_PROFILE="fee1525c-1c69-4b63-81f2-b6093a784242" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
