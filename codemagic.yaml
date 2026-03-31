@@ -55,7 +55,8 @@ workflows:
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
-            -exportPath /Users/builder/export
+            -exportPath /Users/builder/export \
+            -allowProvisioningUpdates
 
     artifacts:
       - /Users/builder/export/*.ipa
