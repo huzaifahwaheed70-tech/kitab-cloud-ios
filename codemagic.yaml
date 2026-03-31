@@ -35,10 +35,7 @@ workflows:
           pod install
 
           PBXPROJ="App.xcodeproj/project.pbxproj"
-          /usr/bin/sed -i.bak '/\/\* App \*\//,/};/{s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g}' "$PBXPROJ"
-
-          echo "Bundle IDs in pbxproj:"
-          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ"
+          /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
 
           xcodebuild archive \
             -workspace App.xcworkspace \
@@ -57,9 +54,11 @@ workflows:
           cd /Users/builder/export
           zip -r App.ipa Payload
           echo "IPA created successfully"
+          ls -la /Users/builder/export/
 
     artifacts:
       - /Users/builder/export/App.ipa
     publishing:
       app_store_connect:
         auth: integration
+
