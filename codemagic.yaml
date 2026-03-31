@@ -48,7 +48,8 @@ workflows:
             -destination "generic/platform=iOS" \
             -configuration Release \
             CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=$APPLE_TEAM_ID
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
+            -allowProvisioningUpdates
 
       - name: Export IPA
         script: |
