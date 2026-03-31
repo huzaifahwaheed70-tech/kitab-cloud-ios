@@ -46,15 +46,26 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
 
-          echo "Fixing framework bundle ID collisions..."
-          find /Users/builder/archive.xcarchive/Products/Applications/App.app/Frameworks -name "Info.plist" | while read plist; do
+          APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
+
+          find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
             FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
             echo "Setting bundle ID for $FRAMEWORK_NAME"
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
           done
 
+          find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read framework; do
+            codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
+              --keychain /Library/Keychains/System.keychain \
+              "$framework"
+          done
+
+          codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
+            --keychain /Library/Keychains/System.keychain \
+            "$APP_PATH"
+
           mkdir -p /Users/builder/export/Payload
-          cp -r /Users/builder/archive.xcarchive/Products/Applications/App.app /Users/builder/export/Payload/
+          cp -r "$APP_PATH" /Users/builder/export/Payload/
           cd /Users/builder/export
           zip -r App.ipa Payload
           echo "IPA created successfully"
