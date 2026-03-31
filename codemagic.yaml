@@ -49,19 +49,15 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
 
-          find /Users/builder/archive.xcarchive -name "*.framework" -type d | while read framework; do
-            codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
-              --keychain /Library/Keychains/System.keychain \
-              "$framework" 2>/dev/null || true
-          done
-
-          xcodebuild -exportArchive \
-            -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /Users/builder/clone/export_options.plist \
-            -exportPath /Users/builder/export
+          mkdir -p /Users/builder/export/Payload
+          cp -r /Users/builder/archive.xcarchive/Products/Applications/App.app /Users/builder/export/Payload/
+          cd /Users/builder/export
+          zip -r App.ipa Payload
+          echo "IPA created successfully"
+          ls -la /Users/builder/export/
 
     artifacts:
-      - /Users/builder/export/*.ipa
+      - /Users/builder/export/App.ipa
     publishing:
       app_store_connect:
         auth: integration
