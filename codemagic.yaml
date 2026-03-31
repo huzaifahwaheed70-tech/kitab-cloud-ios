@@ -49,12 +49,12 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
 
+          find /Users/builder/archive.xcarchive -name "*.framework" | xargs -I {} codesign --remove-signature {} 2>/dev/null || true
+
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
-            -exportPath /Users/builder/export \
-            -allowProvisioningUpdates \
-            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
+            -exportPath /Users/builder/export
 
     artifacts:
       - /Users/builder/export/*.ipa
