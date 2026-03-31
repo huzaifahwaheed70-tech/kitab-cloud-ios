@@ -34,9 +34,6 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          echo "Bundle IDs before build:"
-          grep "PRODUCT_BUNDLE_IDENTIFIER" App.xcodeproj/project.pbxproj
-
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -48,6 +45,13 @@ workflows:
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
+
+          echo "Fixing framework bundle ID collisions..."
+          find /Users/builder/archive.xcarchive/Products/Applications/App.app/Frameworks -name "Info.plist" | while read plist; do
+            FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
+            echo "Setting bundle ID for $FRAMEWORK_NAME"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
+          done
 
           mkdir -p /Users/builder/export/Payload
           cp -r /Users/builder/archive.xcarchive/Products/Applications/App.app /Users/builder/export/Payload/
