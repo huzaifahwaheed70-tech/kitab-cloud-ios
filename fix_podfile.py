@@ -1,4 +1,5 @@
 import sys
+import re
 
 podfile_path = sys.argv[1]
 
@@ -16,10 +17,15 @@ post_install do |installer|
   end
 end"""
 
-if 'post_install' not in content:
-    content = content + hook
+# Remove any existing post_install block
+content = re.sub(r'post_install do.*?^end', '', content, flags=re.DOTALL | re.MULTILINE)
+
+# Add our hook
+content = content + hook
 
 with open(podfile_path, 'w') as f:
     f.write(content)
 
 print('Podfile updated successfully')
+print('New Podfile contents:')
+print(content)
