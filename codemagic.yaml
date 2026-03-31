@@ -49,7 +49,11 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
 
-          find /Users/builder/archive.xcarchive -name "*.framework" | xargs -I {} codesign --remove-signature {} 2>/dev/null || true
+          find /Users/builder/archive.xcarchive -name "*.framework" -type d | while read framework; do
+            codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
+              --keychain /Library/Keychains/System.keychain \
+              "$framework" 2>/dev/null || true
+          done
 
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
