@@ -34,9 +34,6 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          echo "Looking for installed provisioning profiles:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "No profiles found"
-
           PBXPROJ="App.xcodeproj/project.pbxproj"
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
 
@@ -56,7 +53,8 @@ workflows:
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
             -exportPath /Users/builder/export \
-            -allowProvisioningUpdates
+            -allowProvisioningUpdates \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
 
     artifacts:
       - /Users/builder/export/*.ipa
