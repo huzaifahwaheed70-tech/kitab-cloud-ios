@@ -34,6 +34,9 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 2" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" App/Info.plist
+
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -60,8 +63,12 @@ workflows:
               "$framework"
           done
 
+          ENTITLEMENTS=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "*.xcent" | head -n 1)
+          echo "Found entitlements: $ENTITLEMENTS"
+
           codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
             --keychain /Library/Keychains/System.keychain \
+            --entitlements "$ENTITLEMENTS" \
             "$APP_PATH"
 
           mkdir -p /Users/builder/export/Payload
