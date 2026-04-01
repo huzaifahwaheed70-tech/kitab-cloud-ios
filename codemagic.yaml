@@ -34,8 +34,8 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 2" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 4" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.2" App/Info.plist
 
           xcodebuild archive \
             -workspace App.xcworkspace \
