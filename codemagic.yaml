@@ -26,7 +26,7 @@ workflows:
           npm install @capacitor/ios @capacitor/assets
           npx cap add ios || true
           
-          # This command looks for 'assets/icon.png'
+          # Ensure assets folder exists for the tool
           npx @capacitor/assets generate --ios
           
           npx cap sync ios
@@ -52,7 +52,7 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution"
 
-      - name: Export and Publish
+      - name: Export IPA
         script: |
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
@@ -65,9 +65,3 @@ workflows:
 
     artifacts:
       - /Users/builder/export/*.ipa
-    publishing:
-      app_store_connect:
-        auth_key: $APP_STORE_CONNECT_AUTH_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
