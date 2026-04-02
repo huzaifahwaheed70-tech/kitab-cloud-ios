@@ -16,7 +16,6 @@ workflows:
         script: |
           cd frontend
           yarn install
-          # Install asset tools to generate the icons in the cloud
           npm install @capacitor/assets @capacitor/cli
 
       - name: Build React App
@@ -26,22 +25,23 @@ workflows:
 
       - name: Fix Assets and Icons
         script: |
-          # 1. Ensure the assets folder exists at the root
+          # 1. Create the assets folder at the top level
           mkdir -p assets
           
-          # 2. Find your image and rename it to icon.png so the tool can find it
-          mv frontend/assets/IMG_3931.png assets/icon.png || mv assets/*.png assets/icon.png || true
+          # 2. This finds your image wherever it is and moves it to the right spot
+          find . -name "IMG_3931.png" -exec mv {} assets/icon.png \; || true
+          find . -name "icon.png" -exec mv {} assets/icon.png \; || true
+
+          # 3. Generate the icons (telling the tool where the iOS folder is)
+          npx @capacitor/assets generate --ios --ios-project frontend/ios/App
           
-          # 3. Generate all 20+ required Apple icon sizes
-          npx @capacitor/assets generate --ios
-          
-          # 4. Force the 'build' folder into the iOS app to fix the blank screen
+          # 4. Copy the web files
+          cd frontend
           npx cap copy ios
 
       - name: Sync Capacitor
         script: |
           cd frontend
-          npx cap add ios || true
           npx cap sync ios
 
       - name: Build iOS
@@ -50,8 +50,7 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          # Version is 1.0.3, but Build is 5 to satisfy Apple's duplicate error
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 5" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
 
           xcodebuild archive \
@@ -68,7 +67,6 @@ workflows:
 
           APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
 
-          # Sign frameworks and the main app
           find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
             FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
@@ -96,4 +94,3 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        
