@@ -1,5 +1,5 @@
 workflows:
-  ios-workflow:
+  ios-release:
     name: Kitab Cloud iOS Build
     max_build_duration: 120
     instance_type: mac_mini_m1
@@ -26,7 +26,7 @@ workflows:
           npm install @capacitor/ios @capacitor/assets
           npx cap add ios || true
           
-          # Ensure assets folder exists for the tool
+          # This command looks for 'assets/icon.png'
           npx @capacitor/assets generate --ios
           
           npx cap sync ios
