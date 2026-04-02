@@ -15,7 +15,9 @@ workflows:
       - name: Setup and Install
         script: |
           cd frontend
-          yarn install
+          # Fix Yarn workspace error by creating empty root yarn.lock
+          touch ../yarn.lock
+          yarn install --frozen-lockfile
       - name: Build React App
         script: |
           cd frontend
@@ -30,8 +32,8 @@ workflows:
           cd frontend/ios/App
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 4" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.2" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
