@@ -1,96 +1,73 @@
 workflows:
-  ios-release:
+  ios-workflow:
     name: Kitab Cloud iOS Build
-    instance_type: mac_mini_m2
-    max_build_duration: 60
-    integrations:
-      app_store_connect: appstore_credentials
+    max_build_duration: 120
+    instance_type: mac_mini_m1
     environment:
       groups:
         - appstore_credentials
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: host.emergent.kitabcloud
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
     scripts:
       - name: Setup and Install
+        script: | 
+          npm install -g @ionic/cli @capacitor/cli
+          npm install
+          
+      - name: Build Web Assets
         script: |
-          cd frontend
-          yarn install
-          npm install @capacitor/assets @capacitor/cli
-
-      - name: Build React App
-        script: |
-          cd frontend
-          CI=false yarn build
-
+          npm run build
+          npx cap copy
+          
       - name: Fix Assets and Icons
         script: |
-          # 1. Create the assets folder at the top level
-          mkdir -p assets
+          # Force create the iOS folder and generate icons
+          npm install @capacitor/ios @capacitor/assets
+          npx cap add ios || true
           
-          # 2. This finds your image wherever it is and moves it to the right spot
-          find . -name "IMG_3931.png" -exec mv {} assets/icon.png \; || true
-          find . -name "icon.png" -exec mv {} assets/icon.png \; || true
-
-          # 3. Generate the icons (telling the tool where the iOS folder is)
-          npx @capacitor/assets generate --ios --ios-project frontend/ios/App
+          # This command looks for 'assets/icon.png'
+          npx @capacitor/assets generate --ios
           
-          # 4. Copy the web files
-          cd frontend
-          npx cap copy ios
-
-      - name: Sync Capacitor
-        script: |
-          cd frontend
           npx cap sync ios
 
-      - name: Build iOS
+      - name: CocoaPods and Signing Setup
         script: |
-          cd frontend/ios/App
-          python3 /Users/builder/clone/fix_podfile.py Podfile
-          pod install
+          cd ios/App && pod install && cd ../..
+          PROVISIONING_PROFILE=$(ls /Users/builder/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -n 1)
+          PROFILE_UUID=$(grep -aA1 "UUID" "$PROVISIONING_PROFILE" | grep -o "[-A-Z0-9]\{36\}")
+          echo "Using Profile UUID: $PROFILE_UUID"
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
-
+      - name: Build and Archive
+        script: |
           xcodebuild archive \
-            -workspace App.xcworkspace \
-            -scheme App \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
             -archivePath /Users/builder/archive.xcarchive \
-            -destination "generic/platform=iOS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APP_STORE_CONNECT_AUTH_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="96ff2b16-1462-4542-92fd-148e97cd2c44" \
-            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
-          APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
-
-          find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
-            FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
-            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
-          done
-
-          find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read framework; do
-            codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
-              --keychain /Library/Keychains/System.keychain \
-              "$framework"
-          done
-
-          ENTITLEMENTS=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "*.xcent" | head -n 1)
-          codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
-            --keychain /Library/Keychains/System.keychain \
-            --entitlements "$ENTITLEMENTS" \
-            "$APP_PATH"
-
-          mkdir -p /Users/builder/export/Payload
-          cp -r "$APP_PATH" /Users/builder/export/Payload/
-          cd /Users/builder/export
-          zip -r App.ipa Payload
+      - name: Export and Publish
+        script: |
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath /Users/builder/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APP_STORE_CONNECT_AUTH_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
 
     artifacts:
-      - /Users/builder/export/App.ipa
+      - /Users/builder/export/*.ipa
     publishing:
       app_store_connect:
-        auth: integration
+        auth_key: $APP_STORE_CONNECT_AUTH_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
