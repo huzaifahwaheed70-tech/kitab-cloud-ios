@@ -14,27 +14,29 @@ workflows:
     scripts:
       - name: Setup and Install
         script: |
-          # Clean any root files that confuse Yarn (this fixes the workspace error)
-          cd /Users/builder/clone
-          rm -f package.json yarn.lock || true
           cd frontend
-          yarn install --immutable
+          yarn install
+
       - name: Build React App
         script: |
           cd frontend
           CI=false yarn build
+
       - name: Sync Capacitor
         script: |
           cd frontend
           npx cap add ios || true
           npx cap sync ios
+
       - name: Build iOS
         script: |
           cd frontend/ios/App
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 12" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.10" App/Info.plist
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 13" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.2" App/Info.plist
+
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -46,28 +48,35 @@ workflows:
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
+
           APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
+
           find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
             FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
             echo "Setting bundle ID for $FRAMEWORK_NAME"
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
           done
+
           find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read framework; do
             codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
               --keychain /Library/Keychains/System.keychain \
               "$framework"
           done
+
           ENTITLEMENTS=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "*.xcent" | head -n 1)
           echo "Found entitlements: $ENTITLEMENTS"
+
           codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
             --keychain /Library/Keychains/System.keychain \
             --entitlements "$ENTITLEMENTS" \
             "$APP_PATH"
+
           mkdir -p /Users/builder/export/Payload
           cp -r "$APP_PATH" /Users/builder/export/Payload/
           cd /Users/builder/export
           zip -r App.ipa Payload
           echo "IPA created successfully"
+
     artifacts:
       - /Users/builder/export/App.ipa
     publishing:
