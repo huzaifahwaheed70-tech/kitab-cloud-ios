@@ -14,10 +14,10 @@ workflows:
     scripts:
       - name: Setup and Install
         script: |
+          # Clean any root files that confuse Yarn (this fixes the workspace error)
+          cd /Users/builder/clone
+          rm -f package.json yarn.lock || true
           cd frontend
-          # Remove any root package.json / yarn.lock that confuses Yarn
-          rm -f ../package.json ../yarn.lock || true
-          # Now install as standalone project
           yarn install --immutable
       - name: Build React App
         script: |
@@ -33,8 +33,8 @@ workflows:
           cd frontend/ios/App
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 11" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.9" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 12" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.10" App/Info.plist
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
