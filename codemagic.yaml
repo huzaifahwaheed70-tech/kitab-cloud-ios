@@ -16,11 +16,27 @@ workflows:
         script: |
           cd frontend
           yarn install
+          # Install asset tools to generate the icons in the cloud
+          npm install @capacitor/assets @capacitor/cli
 
       - name: Build React App
         script: |
           cd frontend
           CI=false yarn build
+
+      - name: Fix Assets and Icons
+        script: |
+          # 1. Ensure the assets folder exists at the root
+          mkdir -p assets
+          
+          # 2. Find your image and rename it to icon.png so the tool can find it
+          mv frontend/assets/IMG_3931.png assets/icon.png || mv assets/*.png assets/icon.png || true
+          
+          # 3. Generate all 20+ required Apple icon sizes
+          npx @capacitor/assets generate --ios
+          
+          # 4. Force the 'build' folder into the iOS app to fix the blank screen
+          npx cap copy ios
 
       - name: Sync Capacitor
         script: |
@@ -34,8 +50,9 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 4" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.2" App/Info.plist
+          # Version is 1.0.3, but Build is 5 to satisfy Apple's duplicate error
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 5" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
 
           xcodebuild archive \
             -workspace App.xcworkspace \
@@ -51,9 +68,9 @@ workflows:
 
           APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
 
+          # Sign frameworks and the main app
           find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
             FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
-            echo "Setting bundle ID for $FRAMEWORK_NAME"
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
           done
 
@@ -64,8 +81,6 @@ workflows:
           done
 
           ENTITLEMENTS=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "*.xcent" | head -n 1)
-          echo "Found entitlements: $ENTITLEMENTS"
-
           codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
             --keychain /Library/Keychains/System.keychain \
             --entitlements "$ENTITLEMENTS" \
@@ -75,11 +90,10 @@ workflows:
           cp -r "$APP_PATH" /Users/builder/export/Payload/
           cd /Users/builder/export
           zip -r App.ipa Payload
-          echo "IPA created successfully"
 
     artifacts:
       - /Users/builder/export/App.ipa
     publishing:
       app_store_connect:
         auth: integration
-
+        
