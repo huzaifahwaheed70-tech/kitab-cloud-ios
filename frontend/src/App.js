@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';  // ← CHANGED HERE
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
@@ -20,8 +20,6 @@ import SettingsPage from './pages/SettingsPage';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// ... (all your AuthContext, AuthProvider, AuthCallback, ProtectedRoute stay exactly the same)
-
 const AuthContext = createContext(null);
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -31,12 +29,11 @@ export const useAuth = () => {
   return context;
 };
 
-// Auth Provider Component (unchanged)
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
-  
+
   const checkAuth = useCallback(async () => {
     if (window.location.hash?.includes('session_id=')) {
       setLoading(false);
@@ -123,16 +120,84 @@ const AuthProvider = ({ children }) => {
   );
 };
 
-// Auth Callback, ProtectedRoute, AppRouter stay the same (no changes needed here)
+const AuthCallback = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasProcessed = useRef(false);
+  const { refreshUser } = useAuth();
 
-const AuthCallback = () => { ... };     // ← keep as is
-const ProtectedRoute = ({ children, requireAdmin = false }) => { ... };  // ← keep as is
+  useEffect(() => {
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
+    const processAuth = async () => {
+      const hash = location.hash;
+      const sessionIdMatch = hash.match(/session_id=([^&]+)/);
+      
+      if (sessionIdMatch) {
+        const sessionId = sessionIdMatch[1];
+        try {
+          const response = await axios.get(`${API}/auth/session`, {
+            params: { session_id: sessionId },
+            withCredentials: true
+          });
+          
+          if (response.data.user) {
+            await refreshUser();
+            navigate('/library', { replace: true, state: { user: response.data.user } });
+          }
+        } catch (error) {
+          console.error('Auth callback error:', error);
+          navigate('/login', { replace: true });
+        }
+      } else {
+        navigate('/library', { replace: true });
+      }
+    };
+
+    processAuth();
+  }, [location, navigate, refreshUser]);
+
+  return (
+    <div className="min-h-screen bg-dark flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-secondary">Authenticating...</p>
+      </div>
+    </div>
+  );
+};
+
+const ProtectedRoute = ({ children, requireAdmin = false }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requireAdmin && !user.is_admin) {
+    return <Navigate to="/library" replace />;
+  }
+
+  return children;
+};
 
 const AppRouter = () => {
   const location = useLocation();
+
   if (location.hash?.includes('session_id=')) {
     return <AuthCallback />;
   }
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -184,7 +249,7 @@ const AppRouter = () => {
 
 function App() {
   return (
-    <HashRouter>                          {/* ← CHANGED FROM BrowserRouter to HashRouter */}
+    <HashRouter>
       <AuthProvider>
         <AppRouter />
         <Toaster position="bottom-right" richColors />
