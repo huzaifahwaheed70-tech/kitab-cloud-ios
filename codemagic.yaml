@@ -17,10 +17,10 @@ workflows:
           cd frontend
           yarn install --no-immutable
 
-      
-        
-          
-       
+      - name: Build React App
+        script: |
+          cd frontend
+          CI=false yarn build
 
       - name: Sync Capacitor
         script: |
@@ -34,7 +34,7 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 14" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 15" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.2" App/Info.plist
 
           xcodebuild archive \
