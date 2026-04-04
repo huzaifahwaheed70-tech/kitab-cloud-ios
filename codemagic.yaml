@@ -17,10 +17,10 @@ workflows:
           cd frontend
           yarn install --no-immutable
 
-      - name: Build React App
-        script: |
-          cd frontend
-          CI=false yarn build
+      
+        
+          
+       
 
       - name: Sync Capacitor
         script: |
