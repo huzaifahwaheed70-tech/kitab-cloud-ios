@@ -18,7 +18,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 const BookDetailPage = () => {
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
-  const { user, token } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,23 +37,32 @@ const BookDetailPage = () => {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [pageSaved, setPageSaved] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
 
   useEffect(() => {
-    fetchBook();
-    checkBookshelf();
-    checkFavorites();
-    checkPurchased();
-    loadReadingProgress();
+    // Only fetch once auth is fully resolved
+    if (!authLoading) {
+      // Always try to fetch the book (it's public info)
+      fetchBook();
+      // Only fetch user-specific data if authenticated
+      if (user && token) {
+        checkBookshelf();
+        checkFavorites();
+        checkPurchased();
+        loadReadingProgress();
+      }
+    }
     
     // Check if just purchased
     if (searchParams.get('purchased') === 'true') {
       toast.success('PDF purchased successfully! You can now read it.');
       setHasPurchased(true);
     }
-  }, [bookId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId, authLoading, user, token]);
 
   const fetchBook = async () => {
     try {
@@ -63,16 +72,6 @@ const BookDetailPage = () => {
         withCredentials: true 
       });
       setBook(response.data);
-      
-      if (response.data.pdf_url) {
-        const pdfResponse = await axios.get(`${API}/files/${response.data.pdf_url}`, {
-          headers,
-          withCredentials: true,
-          responseType: 'blob'
-        });
-        const url = URL.createObjectURL(pdfResponse.data);
-        setPdfUrl(url);
-      }
     } catch (error) {
       console.error('Error fetching book:', error);
       if (error.response?.status === 403) {
@@ -83,6 +82,35 @@ const BookDetailPage = () => {
       navigate('/library');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPdf = async () => {
+    if (!book?.pdf_url || !token) return;
+    setPdfLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const pdfResponse = await axios.get(`${API}/files/${book.pdf_url}`, {
+        headers,
+        withCredentials: true,
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(pdfResponse.data);
+      setPdfUrl(url);
+      setShowReader(true);
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      toast.error('Failed to load PDF. Please try again.');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const handleReadNow = () => {
+    if (pdfUrl) {
+      setShowReader(true);
+    } else {
+      loadPdf();
     }
   };
 
@@ -617,12 +645,22 @@ const BookDetailPage = () => {
                   canRead || hasPurchased ? (
                     <Button
                       size="lg"
-                      onClick={() => setShowReader(true)}
+                      onClick={handleReadNow}
+                      disabled={pdfLoading}
                       className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold"
                       data-testid="read-now-btn"
                     >
-                      <BookOpen className="w-5 h-5 mr-2" />
-                      Read Now
+                      {pdfLoading ? (
+                        <>
+                          <div className="w-5 h-5 mr-2 border-2 border-[#02120F] border-t-transparent rounded-full animate-spin"></div>
+                          Loading PDF...
+                        </>
+                      ) : (
+                        <>
+                          <BookOpen className="w-5 h-5 mr-2" />
+                          Read Now
+                        </>
+                      )}
                     </Button>
                   ) : (
                     <Link to="/pricing">
