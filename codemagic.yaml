@@ -36,7 +36,8 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 20" App/Info.plist
+          # SET BUILD NUMBER TO 21
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 21" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
