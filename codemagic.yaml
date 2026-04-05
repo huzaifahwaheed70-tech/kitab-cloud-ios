@@ -36,14 +36,12 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          # Set Build Number to 18 and Version to 1.0.3
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 18" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 19" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
-          
-          # Generate Icons
+
           sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
           sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
           sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
@@ -102,3 +100,4 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
+
