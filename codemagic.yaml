@@ -36,10 +36,9 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 16" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 17" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
 
-          # Add app icon
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
