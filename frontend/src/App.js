@@ -4,7 +4,6 @@ import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
-// Pages
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -143,6 +142,9 @@ const AuthCallback = () => {
           });
           
           if (response.data.user) {
+            if (response.data.token) {
+              localStorage.setItem('auth_token', response.data.token);
+            }
             await refreshUser();
             navigate('/library', { replace: true, state: { user: response.data.user } });
           }
