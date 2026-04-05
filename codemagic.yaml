@@ -36,24 +36,29 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 19" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 20" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
 
-          sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
-          sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
-          sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
-          sips -z 87 87 "$ICON_SRC" --out "$ICONSET/AppIcon-29@3x.png"
-          sips -z 58 58 "$ICON_SRC" --out "$ICONSET/AppIcon-29@2x.png"
-          sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
-          sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
-          sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
-          sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
-          sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
-          sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
-          echo "Icons generated successfully"
+          if [ -f "$ICON_SRC" ]; then
+            sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
+            sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
+            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
+            sips -z 87 87 "$ICON_SRC" --out "$ICONSET/AppIcon-29@3x.png"
+            sips -z 58 58 "$ICON_SRC" --out "$ICONSET/AppIcon-29@2x.png"
+            sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
+            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
+            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
+            sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
+            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
+            sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
+            echo "Icons generated successfully"
+          else
+            echo "ERROR: Icon file not found at $ICON_SRC"
+            ls /Users/builder/clone/assets/
+          fi
 
           xcodebuild archive \
             -workspace App.xcworkspace \
@@ -100,4 +105,3 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-
