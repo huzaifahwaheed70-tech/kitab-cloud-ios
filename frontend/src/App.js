@@ -85,7 +85,7 @@ const AuthProvider = ({ children }) => {
   };
 
   const loginWithGoogle = () => {
-    const redirectUrl = window.location.origin + '/library';
+    const redirectUrl = 'https://kitab-cloud.emergent.host/library';
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
