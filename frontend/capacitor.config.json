@@ -6,14 +6,16 @@
   "server": {
     "hostname": "kitab-cloud.emergent.host",
     "androidScheme": "https",
-    "iosScheme": "https"
+    "iosScheme": "https",
+    "cleartext": true
   },
   "ios": {
     "contentInset": "automatic",
     "allowsLinkPreview": true,
     "scrollEnabled": true,
     "backgroundColor": "#02120F",
-    "allowNavigation": ["*"]
+    "allowNavigation": ["*"],
+    "limitsNavigationsToAppBoundDomains": false
   },
   "plugins": {
     "SplashScreen": {
