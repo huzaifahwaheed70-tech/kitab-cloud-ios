@@ -83,7 +83,6 @@ const PricingPage = () => {
 
   const handleSubscribe = async (tier) => {
     if (tier === 0) {
-      // Tier 0 is pay-per-book, redirect to library
       navigate(user ? '/library' : '/register');
       return;
     }
@@ -103,7 +102,7 @@ const PricingPage = () => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.post(`${API}/payments/create-checkout`, {
         tier,
-        origin_url: window.location.origin
+        origin_url: 'https://kitab-cloud.emergent.host'
       }, { headers, withCredentials: true });
 
       window.location.href = response.data.url;
