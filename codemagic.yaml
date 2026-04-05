@@ -11,6 +11,8 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
+      vars:
+        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
     scripts:
       - name: Setup and Install
         script: |
@@ -20,7 +22,7 @@ workflows:
       - name: Build React App
         script: |
           cd frontend
-          CI=false yarn build
+          REACT_APP_BACKEND_URL=https://kitab-cloud.emergent.host CI=false yarn build
 
       - name: Sync Capacitor
         script: |
@@ -34,8 +36,24 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 15" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.2" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 16" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.3" App/Info.plist
+
+          # Add app icon
+          ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
+          ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+          sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
+          sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
+          sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
+          sips -z 87 87 "$ICON_SRC" --out "$ICONSET/AppIcon-29@3x.png"
+          sips -z 58 58 "$ICON_SRC" --out "$ICONSET/AppIcon-29@2x.png"
+          sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
+          sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
+          sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
+          sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
+          sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
+          sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
+          echo "Icons generated successfully"
 
           xcodebuild archive \
             -workspace App.xcworkspace \
