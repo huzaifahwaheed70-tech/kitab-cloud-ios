@@ -14,7 +14,6 @@ import bcrypt
 import jwt
 import requests
 from io import BytesIO
-
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
@@ -31,6 +30,7 @@ JWT_EXPIRATION_HOURS = 24 * 7
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 APP_NAME = "darussalam-kitab"
+
 storage_key = None
 
 SUBSCRIPTION_TIERS = {
@@ -49,7 +49,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 
 def init_storage():
     global storage_key
@@ -83,7 +82,6 @@ def get_object(path: str) -> tuple:
     )
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
-
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -133,7 +131,6 @@ class PaymentCreate(BaseModel):
     tier: int = Field(ge=1, le=4)
     origin_url: str
 
-
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -154,7 +151,6 @@ def decode_jwt_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
-
 
 async def get_current_user(request: Request, authorization: str = Header(None)):
     session_token = request.cookies.get("session_token")
@@ -184,17 +180,14 @@ async def get_current_user(request: Request, authorization: str = Header(None)):
     
     raise HTTPException(status_code=401, detail="Not authenticated")
 
-
 async def get_admin_user(user: dict = Depends(get_current_user)):
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
-
 @api_router.get("/")
 async def root():
     return {"message": "Darussalam Kitab Cloud API"}
-
 
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
@@ -218,7 +211,6 @@ async def register(user_data: UserCreate):
     token = create_jwt_token(user_id)
     return {"token": token, "user": UserResponse(**user_doc).model_dump()}
 
-
 @api_router.post("/auth/login")
 async def login(user_data: UserLogin):
     user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
@@ -230,7 +222,6 @@ async def login(user_data: UserLogin):
     
     token = create_jwt_token(user["user_id"])
     return {"token": token, "user": UserResponse(**user).model_dump()}
-
 
 @api_router.get("/auth/session")
 async def get_session(request: Request, session_id: str = Query(...)):
@@ -277,7 +268,6 @@ async def get_session(request: Request, session_id: str = Query(...)):
         "expires_at": expires_at.isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-
     jwt_token = create_jwt_token(user_id)
     
     return {
@@ -286,11 +276,9 @@ async def get_session(request: Request, session_id: str = Query(...)):
         "set_cookie": True
     }
 
-
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     return UserResponse(**user).model_dump()
-
 
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):
@@ -299,7 +287,6 @@ async def logout(request: Request, response: Response):
         await db.user_sessions.delete_one({"session_token": session_token})
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out"}
-
 
 @api_router.get("/books", response_model=List[BookResponse])
 async def get_books(
@@ -322,7 +309,6 @@ async def get_books(
     books = await db.books.find(query, {"_id": 0}).to_list(100)
     return books
 
-
 @api_router.get("/books/all")
 async def get_all_books_preview(
     search: Optional[str] = None
@@ -337,7 +323,6 @@ async def get_all_books_preview(
     books = await db.books.find(query, {"_id": 0, "pdf_url": 0}).to_list(100)
     return books
 
-
 @api_router.get("/books/{book_id}")
 async def get_book(book_id: str, user: dict = Depends(get_current_user)):
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
@@ -349,7 +334,6 @@ async def get_book(book_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Upgrade required to access this book")
     
     return book
-
 
 @api_router.post("/books", response_model=BookResponse)
 async def create_book(book: BookCreate, user: dict = Depends(get_admin_user)):
@@ -364,7 +348,6 @@ async def create_book(book: BookCreate, user: dict = Depends(get_admin_user)):
     await db.books.insert_one(book_doc)
     return BookResponse(**book_doc)
 
-
 @api_router.put("/books/{book_id}")
 async def update_book(book_id: str, book: BookCreate, user: dict = Depends(get_admin_user)):
     result = await db.books.update_one(
@@ -377,14 +360,12 @@ async def update_book(book_id: str, book: BookCreate, user: dict = Depends(get_a
     updated = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     return updated
 
-
 @api_router.delete("/books/{book_id}")
 async def delete_book(book_id: str, user: dict = Depends(get_admin_user)):
     result = await db.books.delete_one({"book_id": book_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Book not found")
     return {"message": "Book deleted"}
-
 
 @api_router.post("/books/{book_id}/upload-pdf")
 async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = Depends(get_admin_user)):
@@ -400,8 +381,6 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
     cover_path = None
     try:
         import fitz
-        from io import BytesIO
-        
         pdf_doc = fitz.open(stream=data, filetype="pdf")
         if pdf_doc.page_count > 0:
             page = pdf_doc[0]
@@ -428,7 +407,6 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
     
     return {"pdf_url": result["path"], "cover_url": cover_path}
 
-
 @api_router.get("/covers/{path:path}")
 async def get_cover_image(path: str):
     try:
@@ -439,7 +417,6 @@ async def get_cover_image(path: str):
         logger.error(f"Cover fetch error: {e}")
         raise HTTPException(status_code=404, detail="Cover not found")
 
-
 @api_router.get("/files/{path:path}")
 async def get_file(path: str, user: dict = Depends(get_current_user)):
     try:
@@ -448,7 +425,6 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"File fetch error: {e}")
         raise HTTPException(status_code=404, detail="File not found")
-
 
 @api_router.get("/bookshelf")
 async def get_bookshelf(user: dict = Depends(get_current_user)):
@@ -471,7 +447,6 @@ async def get_bookshelf(user: dict = Depends(get_current_user)):
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
     
     return {"books": books, "count": len(books), "limit": limit, "month": current_month}
-
 
 @api_router.post("/bookshelf/{book_id}")
 async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user)):
@@ -519,7 +494,6 @@ async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user))
     
     return {"message": "Book added to this month's reading list"}
 
-
 @api_router.delete("/bookshelf/{book_id}")
 async def remove_from_bookshelf(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
@@ -534,7 +508,6 @@ async def remove_from_bookshelf(book_id: str, user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Book not in this month's reading list")
     
     return {"message": "Book removed from reading list"}
-
 
 @api_router.post("/reading-progress/{book_id}")
 async def save_reading_progress(book_id: str, page: int, user: dict = Depends(get_current_user)):
@@ -556,7 +529,6 @@ async def save_reading_progress(book_id: str, page: int, user: dict = Depends(ge
     
     return {"message": "Progress saved", "page": page}
 
-
 @api_router.get("/reading-progress/{book_id}")
 async def get_reading_progress(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
@@ -567,7 +539,6 @@ async def get_reading_progress(book_id: str, user: dict = Depends(get_current_us
     )
     
     return {"page": progress.get("page", 1) if progress else 1}
-
 
 @api_router.get("/continue-reading")
 async def get_continue_reading(user: dict = Depends(get_current_user)):
@@ -592,7 +563,6 @@ async def get_continue_reading(user: dict = Depends(get_current_user)):
     
     return {"books": books_with_progress}
 
-
 @api_router.post("/favorites/{book_id}")
 async def add_to_favorites(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
@@ -609,7 +579,6 @@ async def add_to_favorites(book_id: str, user: dict = Depends(get_current_user))
     
     return {"message": "Added to favorites"}
 
-
 @api_router.delete("/favorites/{book_id}")
 async def remove_from_favorites(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
@@ -620,7 +589,6 @@ async def remove_from_favorites(book_id: str, user: dict = Depends(get_current_u
     )
     
     return {"message": "Removed from favorites"}
-
 
 @api_router.get("/favorites")
 async def get_favorites(user: dict = Depends(get_current_user)):
@@ -636,7 +604,6 @@ async def get_favorites(user: dict = Depends(get_current_user)):
     
     return {"books": books}
 
-
 @api_router.post("/purchase-pdf/{book_id}")
 async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_current_user)):
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
@@ -651,8 +618,9 @@ async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_
     
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
     
-    success_url = f"https://kitab-cloud.emergent.host/book/{book_id}?purchased=true"
-    cancel_url = f"https://kitab-cloud.emergent.host/book/{book_id}"
+    # Updated with your requested hardcoded URLs
+    success_url = f"https://kitab-cloud.emergent.host/#/book/{book_id}?purchased=true"
+    cancel_url = f"https://kitab-cloud.emergent.host/#/book/{book_id}"
     
     checkout_request = CheckoutSessionRequest(
         amount=float(book["pdf_price"]),
@@ -670,7 +638,6 @@ async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_
     
     return {"url": session.url, "session_id": session.session_id}
 
-
 @api_router.get("/purchased-books")
 async def get_purchased_books(user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
@@ -684,7 +651,6 @@ async def get_purchased_books(user: dict = Depends(get_current_user)):
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
     
     return {"books": books}
-
 
 @api_router.post("/payments/create-checkout")
 async def create_checkout(payment: PaymentCreate, request: Request, user: dict = Depends(get_current_user)):
@@ -730,7 +696,6 @@ async def create_checkout(payment: PaymentCreate, request: Request, user: dict =
     
     return {"url": session.url, "session_id": session.session_id}
 
-
 @api_router.get("/payments/status/{session_id}")
 async def get_payment_status(session_id: str, user: dict = Depends(get_current_user)):
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
@@ -760,7 +725,6 @@ async def get_payment_status(session_id: str, user: dict = Depends(get_current_u
         "amount": status.amount_total,
         "metadata": status.metadata
     }
-
 
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
@@ -794,12 +758,10 @@ async def stripe_webhook(request: Request):
         logger.error(f"Webhook error: {e}")
         return {"status": "error"}
 
-
 @api_router.get("/admin/users")
 async def get_all_users(user: dict = Depends(get_admin_user)):
     users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(100)
     return users
-
 
 @api_router.put("/admin/users/{user_id}/tier")
 async def update_user_tier(user_id: str, tier: int, admin: dict = Depends(get_admin_user)):
@@ -815,7 +777,6 @@ async def update_user_tier(user_id: str, tier: int, admin: dict = Depends(get_ad
     
     return {"message": "Tier updated"}
 
-
 @api_router.put("/admin/users/{user_id}/admin")
 async def toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends(get_admin_user)):
     result = await db.users.update_one(
@@ -826,7 +787,6 @@ async def toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends(get_a
         raise HTTPException(status_code=404, detail="User not found")
     
     return {"message": "Admin status updated"}
-
 
 @api_router.get("/admin/stats")
 async def get_admin_stats(user: dict = Depends(get_admin_user)):
@@ -846,11 +806,9 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
         "tier_distribution": tier_stats
     }
 
-
 @api_router.get("/tiers")
 async def get_tiers():
     return SUBSCRIPTION_TIERS
-
 
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
@@ -884,7 +842,6 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
     if latest_payment and tier > 0:
         subscription_start = latest_payment.get("created_at")
         if subscription_start:
-            from datetime import datetime
             start_dt = datetime.fromisoformat(subscription_start.replace('Z', '+00:00'))
             end_dt = start_dt + timedelta(days=30)
             subscription_end = end_dt.isoformat()
@@ -902,7 +859,6 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
         "cancellation_pending": cancellation is not None,
         "cancellation_effective_date": cancellation.get("effective_date") if cancellation else None
     }
-
 
 @api_router.put("/user/profile")
 async def update_user_profile(profile: UpdateProfileRequest, user: dict = Depends(get_current_user)):
@@ -927,7 +883,6 @@ async def update_user_profile(profile: UpdateProfileRequest, user: dict = Depend
     
     return {"message": "Profile updated successfully"}
 
-
 @api_router.put("/user/password")
 async def change_password(passwords: ChangePasswordRequest, user: dict = Depends(get_current_user)):
     user_data = await db.users.find_one({"user_id": user["user_id"]})
@@ -949,7 +904,6 @@ async def change_password(passwords: ChangePasswordRequest, user: dict = Depends
     )
     
     return {"message": "Password changed successfully"}
-
 
 @api_router.post("/user/cancel-subscription")
 async def cancel_subscription(user: dict = Depends(get_current_user)):
@@ -994,7 +948,6 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
         "effective_date": effective_date
     }
 
-
 @api_router.post("/user/reactivate-subscription")
 async def reactivate_subscription(user: dict = Depends(get_current_user)):
     result = await db.subscription_cancellations.delete_one(
@@ -1005,7 +958,6 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="No pending cancellation found")
     
     return {"message": "Subscription reactivated"}
-
 
 app.include_router(api_router)
 
@@ -1023,7 +975,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.on_event("startup")
 async def startup():
     try:
@@ -1038,7 +989,6 @@ async def startup():
     await db.user_sessions.create_index("session_token")
     
     logger.info("Darussalam Kitab Cloud API started")
-
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
