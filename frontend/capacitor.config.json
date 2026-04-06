@@ -3,12 +3,17 @@
   "appName": "Kitab Cloud",
   "webDir": "build",
   "bundledWebRuntime": false,
+  "server": {
+    "hostname": "kitab-cloud.emergent.host",
+    "androidScheme": "https",
+    "iosScheme": "https"
+  },
   "ios": {
     "contentInset": "automatic",
     "allowsLinkPreview": true,
     "scrollEnabled": true,
     "backgroundColor": "#02120F",
-    "allowNavigation": ["kitab-cloud.emergent.host"]
+    "allowNavigation": ["*"]
   },
   "plugins": {
     "SplashScreen": {
