@@ -33,18 +33,16 @@ workflows:
       - name: Build iOS
         script: |
           cd frontend/ios/App
-          
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
-          
-          # Set Version and Build Number
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 5" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
-          
-          # Generate App Icons
+
+          # UPDATED TO VERSION 1.0.5 BUILD 4
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 4" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
+
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
-          
+
           if [ -f "$ICON_SRC" ]; then
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
@@ -58,7 +56,7 @@ workflows:
             sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
             sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
             echo "Icons generated successfully"
-            
+
             cat > "$ICONSET/Contents.json" << 'ICONEOF'
 {
   "images": [
@@ -76,14 +74,12 @@ workflows:
   "info": { "author": "xcode", "version": 1 }
 }
 ICONEOF
-            
             echo "Contents.json updated"
           else
             echo "ERROR: Icon file not found at $ICON_SRC"
             ls /Users/builder/clone/assets/
           fi
-          
-          # Build Archive
+
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -95,35 +91,33 @@ ICONEOF
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
-          
+
           APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
-          
-          # Fix framework bundle identifiers
+
           find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
             FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
           done
-          
-          # Re-sign frameworks
+
           find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read framework; do
             codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
               --keychain /Library/Keychains/System.keychain \
               "$framework"
           done
-          
-          # Re-sign main app
+
           ENTITLEMENTS=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "*.xcent" | head -n 1)
+
           codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
             --keychain /Library/Keychains/System.keychain \
             --entitlements "$ENTITLEMENTS" \
             "$APP_PATH"
-          
-          # Create IPA
+
           mkdir -p /Users/builder/export/Payload
           cp -r "$APP_PATH" /Users/builder/export/Payload/
           cd /Users/builder/export
           zip -r App.ipa Payload
           echo "IPA created successfully"
+
     artifacts:
       - /Users/builder/export/App.ipa
     publishing:
