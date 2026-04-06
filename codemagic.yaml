@@ -76,6 +76,7 @@ workflows:
   "info": { "author": "xcode", "version": 1 }
 }
 ICONEOF
+            
             echo "Contents.json updated"
           else
             echo "ERROR: Icon file not found at $ICON_SRC"
