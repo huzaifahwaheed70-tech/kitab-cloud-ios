@@ -36,14 +36,15 @@ workflows:
           python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          # UPDATED TO VERSION 1.0.5 BUILD 4
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 4" App/Info.plist
+          # UPDATED TO VERSION 1.0.5 BUILD 5
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 5" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
 
           if [ -f "$ICON_SRC" ]; then
+            # iPhone Icons
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
             sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
@@ -55,9 +56,14 @@ workflows:
             sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
             sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
             sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
+            
+            # iPad Icons (Fixes the 152x152 error)
+            sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
+            sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
+            sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
+
             echo "Icons generated successfully"
 
-            # Indented to prevent YAML parsing errors
             cat > "$ICONSET/Contents.json" << 'ICONEOF'
             {
               "images": [
@@ -70,6 +76,15 @@ workflows:
                 { "filename": "AppIcon-40@3x.png", "idiom": "iphone", "scale": "3x", "size": "40x40" },
                 { "filename": "AppIcon-60@2x.png", "idiom": "iphone", "scale": "2x", "size": "60x60" },
                 { "filename": "AppIcon-60@3x.png", "idiom": "iphone", "scale": "3x", "size": "60x60" },
+                { "filename": "AppIcon-20@1x.png", "idiom": "ipad", "scale": "1x", "size": "20x20" },
+                { "filename": "AppIcon-20@2x.png", "idiom": "ipad", "scale": "2x", "size": "20x20" },
+                { "filename": "AppIcon-29@1x.png", "idiom": "ipad", "scale": "1x", "size": "29x29" },
+                { "filename": "AppIcon-29@2x.png", "idiom": "ipad", "scale": "2x", "size": "29x29" },
+                { "filename": "AppIcon-40@1x.png", "idiom": "ipad", "scale": "1x", "size": "40x40" },
+                { "filename": "AppIcon-40@2x.png", "idiom": "ipad", "scale": "2x", "size": "40x40" },
+                { "filename": "AppIcon-76@1x.png", "idiom": "ipad", "scale": "1x", "size": "76x76" },
+                { "filename": "AppIcon-76@2x.png", "idiom": "ipad", "scale": "2x", "size": "76x76" },
+                { "filename": "AppIcon-83.5@2x.png", "idiom": "ipad", "scale": "2x", "size": "83.5x83.5" },
                 { "filename": "AppIcon-1024@1x.png", "idiom": "ios-marketing", "scale": "1x", "size": "1024x1024" }
               ],
               "info": { "author": "xcode", "version": 1 }
