@@ -34,16 +34,14 @@ workflows:
         script: |
           cd frontend/ios/App
           
-          # Fix Podfile if needed
           python3 /Users/builder/clone/fix_podfile.py Podfile
-          
           pod install
           
-          # Updated Version and Build Number
+          # Set Version and Build Number
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 5" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
           
-          # Icon generation
+          # Generate App Icons
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           
@@ -84,7 +82,7 @@ ICONEOF
             ls /Users/builder/clone/assets/
           fi
           
-          # Build the app
+          # Build Archive
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -97,8 +95,9 @@ ICONEOF
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
           
-          # Fix framework bundle identifiers
           APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
+          
+          # Fix framework bundle identifiers
           find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
             FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
