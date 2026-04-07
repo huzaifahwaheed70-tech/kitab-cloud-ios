@@ -13,7 +13,10 @@ import { toast } from 'sonner';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 const BookDetailPage = () => {
   const { bookId } = useParams();
@@ -372,6 +375,11 @@ const BookDetailPage = () => {
               loading={
                 <div className="flex items-center justify-center py-20">
                   <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              }
+              error={
+                <div className="flex items-center justify-center py-20 text-red-400">
+                  Failed to load PDF. Please try again.
                 </div>
               }
             >
