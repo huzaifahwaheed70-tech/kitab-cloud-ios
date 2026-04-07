@@ -11,18 +11,16 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
-      vars:
-        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
     scripts:
       - name: Setup and Install
         script: |
           cd frontend
-          yarn install --no-immutable
+          yarn install
 
       - name: Build React App
         script: |
           cd frontend
-          REACT_APP_BACKEND_URL=https://kitab-cloud.emergent.host CI=false yarn build
+          CI=false yarn build
 
       - name: Sync Capacitor
         script: |
@@ -30,71 +28,54 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
+      - name: Set Build Number
+        script: |
+          cd frontend/ios/App
+          # UPDATED TO VERSION 1.0.4 BUILD 6
+          CURRENT_BUILD=6
+          MARKETING_VER="1.0.4"
+          
+          /usr/bin/sed -i.bak "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $CURRENT_BUILD/" App.xcodeproj/project.pbxproj
+          /usr/bin/sed -i.bak2 "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = $MARKETING_VER/" App.xcodeproj/project.pbxproj
+          
+          echo "Build number set to: $CURRENT_BUILD"
+          echo "Marketing version set to: $MARKETING_VER"
+
       - name: Build iOS
         script: |
           cd frontend/ios/App
-          python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          # UPDATED TO VERSION 1.0.5 BUILD 5
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 5" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
+          PODS_PBXPROJ="Pods/Pods.xcodeproj/project.pbxproj"
+          /usr/bin/sed -i.bak 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
+          /usr/bin/sed -i.bak2 's/CODE_SIGN_IDENTITY = "iPhone Distribution";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
 
-          ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
-          ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+          PBXPROJ="App.xcodeproj/project.pbxproj"
+          /usr/bin/sed -i.bak3 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
 
-          if [ -f "$ICON_SRC" ]; then
-            # iPhone Icons
-            sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
-            sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
-            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
-            sips -z 87 87 "$ICON_SRC" --out "$ICONSET/AppIcon-29@3x.png"
-            sips -z 58 58 "$ICON_SRC" --out "$ICONSET/AppIcon-29@2x.png"
-            sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
-            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
-            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
-            sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
-            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
-            sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
-            
-            # iPad Icons (Fixes the 152x152 error)
-            sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
-            sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
-            sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
-
-            echo "Icons generated successfully"
-
-            cat > "$ICONSET/Contents.json" << 'ICONEOF'
-            {
-              "images": [
-                { "filename": "AppIcon-20@1x.png", "idiom": "iphone", "scale": "1x", "size": "20x20" },
-                { "filename": "AppIcon-20@2x.png", "idiom": "iphone", "scale": "2x", "size": "20x20" },
-                { "filename": "AppIcon-20@3x.png", "idiom": "iphone", "scale": "3x", "size": "20x20" },
-                { "filename": "AppIcon-29@2x.png", "idiom": "iphone", "scale": "2x", "size": "29x29" },
-                { "filename": "AppIcon-29@3x.png", "idiom": "iphone", "scale": "3x", "size": "29x29" },
-                { "filename": "AppIcon-40@2x.png", "idiom": "iphone", "scale": "2x", "size": "40x40" },
-                { "filename": "AppIcon-40@3x.png", "idiom": "iphone", "scale": "3x", "size": "40x40" },
-                { "filename": "AppIcon-60@2x.png", "idiom": "iphone", "scale": "2x", "size": "60x60" },
-                { "filename": "AppIcon-60@3x.png", "idiom": "iphone", "scale": "3x", "size": "60x60" },
-                { "filename": "AppIcon-20@1x.png", "idiom": "ipad", "scale": "1x", "size": "20x20" },
-                { "filename": "AppIcon-20@2x.png", "idiom": "ipad", "scale": "2x", "size": "20x20" },
-                { "filename": "AppIcon-29@1x.png", "idiom": "ipad", "scale": "1x", "size": "29x29" },
-                { "filename": "AppIcon-29@2x.png", "idiom": "ipad", "scale": "2x", "size": "29x29" },
-                { "filename": "AppIcon-40@1x.png", "idiom": "ipad", "scale": "1x", "size": "40x40" },
-                { "filename": "AppIcon-40@2x.png", "idiom": "ipad", "scale": "2x", "size": "40x40" },
-                { "filename": "AppIcon-76@1x.png", "idiom": "ipad", "scale": "1x", "size": "76x76" },
-                { "filename": "AppIcon-76@2x.png", "idiom": "ipad", "scale": "2x", "size": "76x76" },
-                { "filename": "AppIcon-83.5@2x.png", "idiom": "ipad", "scale": "2x", "size": "83.5x83.5" },
-                { "filename": "AppIcon-1024@1x.png", "idiom": "ios-marketing", "scale": "1x", "size": "1024x1024" }
-              ],
-              "info": { "author": "xcode", "version": 1 }
-            }
-          ICONEOF
-            echo "Contents.json updated"
-          else
-            echo "ERROR: Icon file not found at $ICON_SRC"
-            ls /Users/builder/clone/assets/
-          fi
+          cat > /Users/builder/exportOptions.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>app-store</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>host.emergent.kitabcloud</key>
+    <string>Dar-Us-Salam Kitab Cloud</string>
+  </dict>
+  <key>uploadBitcode</key>
+  <false/>
+  <key>uploadSymbols</key>
+  <true/>
+</dict>
+</plist>
+EOF
 
           xcodebuild archive \
             -workspace App.xcworkspace \
@@ -103,39 +84,17 @@ workflows:
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="96ff2b16-1462-4542-92fd-148e97cd2c44" \
+            PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            OTHER_CODE_SIGN_FLAGS="--keychain /Library/Keychains/System.keychain"
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
-          APP_PATH="/Users/builder/archive.xcarchive/Products/Applications/App.app"
-
-          find "$APP_PATH/Frameworks" -name "Info.plist" | while read plist; do
-            FRAMEWORK_NAME=$(basename $(dirname "$plist") .framework)
-            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $FRAMEWORK_NAME" "$plist" 2>/dev/null || true
-          done
-
-          find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read framework; do
-            codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
-              --keychain /Library/Keychains/System.keychain \
-              "$framework"
-          done
-
-          ENTITLEMENTS=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "*.xcent" | head -n 1)
-
-          codesign --force --sign "Apple Distribution: Omar Waheed ($APPLE_TEAM_ID)" \
-            --keychain /Library/Keychains/System.keychain \
-            --entitlements "$ENTITLEMENTS" \
-            "$APP_PATH"
-
-          mkdir -p /Users/builder/export/Payload
-          cp -r "$APP_PATH" /Users/builder/export/Payload/
-          cd /Users/builder/export
-          zip -r App.ipa Payload
-          echo "IPA created successfully"
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportOptionsPlist /Users/builder/exportOptions.plist \
+            -exportPath /Users/builder/export
 
     artifacts:
-      - /Users/builder/export/App.ipa
+      - /Users/builder/export/*.ipa
     publishing:
       app_store_connect:
         auth: integration
