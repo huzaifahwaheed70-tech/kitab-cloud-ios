@@ -18,11 +18,14 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # Use Codemagic's built-in keychain helper to install the cert and profile
+          # Initialize keychain
           keychain initialize
+          
+          # Install Certificate
           echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --pkcs12 /tmp/certificate.p12 --pod "$CM_CERTIFICATE_PASSWORD"
           
+          # Install Provisioning Profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/distribution.mobileprovision
 
@@ -40,17 +43,20 @@ workflows:
       - name: Build iOS
         script: |
           cd frontend/ios/App
-          python3 /Users/builder/clone/fix_podfile.py Podfile
           pod install
 
-          # Set Version 1.0.4 Build 6 (as requested previously)
+          # 1. FORCE PODS TO NOT REQUIRE SIGNING
+          # This prevents the "No signing certificate found" error for Pods
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' Pods/Pods.xcodeproj/project.pbxproj
+
+          # 2. Set Version 1.0.4 Build 6
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
 
-          # --- ICON GENERATION LOGIC ---
+          # 3. ICON GENERATION (Keep this as is)
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
-
           if [ -f "$ICON_SRC" ]; then
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
@@ -66,7 +72,7 @@ workflows:
             sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
             sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
             sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
-
+            
             cat > "$ICONSET/Contents.json" << 'ICONEOF'
             {
               "images": [
@@ -95,18 +101,21 @@ workflows:
           ICONEOF
           fi
 
-          # Archive targeting only the main App scheme
+          # 4. ARCHIVE
+          # We explicitly pass the keychain path to ensure it uses the one we initialized
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
+            -allowProvisioningUpdates \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
+            OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
 
-          # Export with the profile specified in the ExportOptions
+          # 5. EXPORT
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
