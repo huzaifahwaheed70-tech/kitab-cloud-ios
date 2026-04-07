@@ -31,20 +31,33 @@ workflows:
       - name: Set Build Number
         script: |
           cd frontend/ios/App
-          # Setting Version to 1.0.4 and Build to 6
-          /usr/bin/sed -i.bak "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = 6/" App.xcodeproj/project.pbxproj
-          /usr/bin/sed -i.bak2 "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = 1.0.4/" App.xcodeproj/project.pbxproj
-          echo "Build number set to: 6"
-          echo "Marketing version set to: 1.0.4"
+          CURRENT_BUILD=$(date +%s)
+          /usr/bin/sed -i.bak "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $CURRENT_BUILD/" App.xcodeproj/project.pbxproj
+          /usr/bin/sed -i.bak2 "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = 1.0.1/" App.xcodeproj/project.pbxproj
+          echo "Build number set to: $CURRENT_BUILD"
 
       - name: Build iOS
         script: |
           cd frontend/ios/App
           pod install
 
-          PODS_PBXPROJ="Pods/Pods.xcodeproj/project.pbxproj"
-          /usr/bin/sed -i.bak 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
-          /usr/bin/sed -i.bak2 's/CODE_SIGN_IDENTITY = "iPhone Distribution";/CODE_SIGN_IDENTITY = "";/g' "$PODS_PBXPROJ"
+          python3 << 'PYEOF'
+import re
+
+pods_pbxproj = "Pods/Pods.xcodeproj/project.pbxproj"
+with open(pods_pbxproj, "r") as f:
+    content = f.read()
+
+content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
+content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = "[^"]*";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
+content = re.sub(r"PROVISIONING_PROFILE_SPECIFIER = '[^']*';", "PROVISIONING_PROFILE_SPECIFIER = '';", content)
+content = re.sub(r'CODE_SIGN_IDENTITY = "[^"]*";', 'CODE_SIGN_IDENTITY = "";', content)
+
+with open(pods_pbxproj, "w") as f:
+    f.write(content)
+
+print("Pods signing fixed successfully")
+PYEOF
 
           PBXPROJ="App.xcodeproj/project.pbxproj"
           /usr/bin/sed -i.bak3 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
