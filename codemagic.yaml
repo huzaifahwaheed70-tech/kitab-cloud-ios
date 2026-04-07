@@ -18,16 +18,20 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # Initialize keychain
           keychain initialize
           
           # Install Certificate
           echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --pkcs12 /tmp/certificate.p12 --pod "$CM_CERTIFICATE_PASSWORD"
           
-          # Install Provisioning Profile
+          # Install Provisioning Profile with correct name
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo $CM_PROVISIONING_PROFILE | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/distribution.mobileprovision
+          echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/temp.mobileprovision
+          
+          # Extract UUID from the profile so Xcode can actually find it
+          UUID=$(grep -aA1 UUID /tmp/temp.mobileprovision | grep -oE "[-A-Z0-9]{36}")
+          cp /tmp/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "Installed Profile UUID: $UUID"
 
       - name: Build React App
         script: |
@@ -45,16 +49,18 @@ workflows:
           cd frontend/ios/App
           pod install
 
-          # 1. FORCE PODS TO NOT REQUIRE SIGNING
-          # This prevents the "No signing certificate found" error for Pods
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' Pods/Pods.xcodeproj/project.pbxproj
+          # 1. AGGRESSIVE POD SIGNING STRIP
+          # This disables code signing for EVERY target in the Pods project
+          PROJ_PATH="Pods/Pods.xcodeproj/project.pbxproj"
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "$PROJ_PATH"
+          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PROJ_PATH"
+          sed -i '' '/ProvisioningStyle = Manual/d' "$PROJ_PATH"
 
           # 2. Set Version 1.0.4 Build 6
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
 
-          # 3. ICON GENERATION (Keep this as is)
+          # 3. ICON GENERATION
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -102,13 +108,12 @@ workflows:
           fi
 
           # 4. ARCHIVE
-          # We explicitly pass the keychain path to ensure it uses the one we initialized
+          # Explicitly target the keychain we created in Step 2
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
