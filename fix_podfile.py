@@ -1,31 +1,16 @@
-import sys
 import re
+import sys
 
-podfile_path = sys.argv[1]
-
-with open(podfile_path, 'r') as f:
+pods_pbxproj = sys.argv[1]
+with open(pods_pbxproj, "r") as f:
     content = f.read()
 
-hook = """
-post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-      config.build_settings['CODE_SIGN_IDENTITY'] = ''
-    end
-  end
-end"""
+content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
+content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = "[^"]*";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
+content = re.sub(r"PROVISIONING_PROFILE_SPECIFIER = '[^']*';", "PROVISIONING_PROFILE_SPECIFIER = '';", content)
+content = re.sub(r'CODE_SIGN_IDENTITY = "[^"]*";', 'CODE_SIGN_IDENTITY = "";', content)
 
-# Remove any existing post_install block
-content = re.sub(r'post_install do.*?^end', '', content, flags=re.DOTALL | re.MULTILINE)
-
-# Add our hook
-content = content + hook
-
-with open(podfile_path, 'w') as f:
+with open(pods_pbxproj, "w") as f:
     f.write(content)
 
-print('Podfile updated successfully')
-print('New Podfile contents:')
-print(content)
+print("Pods signing fixed successfully")
