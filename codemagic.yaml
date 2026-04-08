@@ -18,13 +18,18 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
+          # Install Certificate into codemagic keychain
           keychain initialize
           echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --pkcs12 /tmp/certificate.p12 --password "$CM_CERTIFICATE_PASSWORD"
+          security find-identity -v -p codesigning
+          
+          # Install Provisioning Profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/temp.mobileprovision
           UUID=$(grep -aA1 UUID /tmp/temp.mobileprovision | grep -oE "[-A-Z0-9]{36}")
           cp /tmp/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "Installed Profile UUID: $UUID"
 
       - name: Build React App
         script: |
@@ -41,12 +46,24 @@ workflows:
         script: |
           cd frontend/ios/App
           pod install
+
+          # Fix Pods project - disable ALL signing for Pod targets
           PROJ_PATH="Pods/Pods.xcodeproj/project.pbxproj"
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "$PROJ_PATH"
-          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PROJ_PATH"
-          sed -i '' '/ProvisioningStyle = Manual/d' "$PROJ_PATH"
+          /usr/bin/sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$PROJ_PATH"
+          /usr/bin/sed -i.bak2 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' "$PROJ_PATH"
+          /usr/bin/sed -i.bak3 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' "$PROJ_PATH"
+          /usr/bin/sed -i.bak4 '/ProvisioningStyle = Manual/d' "$PROJ_PATH"
+          echo "Fixed Pods signing"
+
+          # Fix main app bundle ID
+          PBXPROJ="App.xcodeproj/project.pbxproj"
+          /usr/bin/sed -i.bak5 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' "$PBXPROJ"
+
+          # Set Version
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
+
+          # Icon Generation
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -64,33 +81,38 @@ workflows:
             sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
             sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
             sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
+            sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
+
             cat > "$ICONSET/Contents.json" << 'ICONEOF'
-            {
-              "images": [
-                { "filename": "AppIcon-20@1x.png", "idiom": "iphone", "scale": "1x", "size": "20x20" },
-                { "filename": "AppIcon-20@2x.png", "idiom": "iphone", "scale": "2x", "size": "20x20" },
-                { "filename": "AppIcon-20@3x.png", "idiom": "iphone", "scale": "3x", "size": "20x20" },
-                { "filename": "AppIcon-29@2x.png", "idiom": "iphone", "scale": "2x", "size": "29x29" },
-                { "filename": "AppIcon-29@3x.png", "idiom": "iphone", "scale": "3x", "size": "29x29" },
-                { "filename": "AppIcon-40@2x.png", "idiom": "iphone", "scale": "2x", "size": "40x40" },
-                { "filename": "AppIcon-40@3x.png", "idiom": "iphone", "scale": "3x", "size": "40x40" },
-                { "filename": "AppIcon-60@2x.png", "idiom": "iphone", "scale": "2x", "size": "60x60" },
-                { "filename": "AppIcon-60@3x.png", "idiom": "iphone", "scale": "3x", "size": "60x60" },
-                { "filename": "AppIcon-20@1x.png", "idiom": "ipad", "scale": "1x", "size": "20x20" },
-                { "filename": "AppIcon-20@2x.png", "idiom": "ipad", "scale": "2x", "size": "20x20" },
-                { "filename": "AppIcon-29@1x.png", "idiom": "ipad", "scale": "1x", "size": "29x29" },
-                { "filename": "AppIcon-29@2x.png", "idiom": "ipad", "scale": "2x", "size": "29x29" },
-                { "filename": "AppIcon-40@1x.png", "idiom": "ipad", "scale": "1x", "size": "40x40" },
-                { "filename": "AppIcon-40@2x.png", "idiom": "ipad", "scale": "2x", "size": "40x40" },
-                { "filename": "AppIcon-76@1x.png", "idiom": "ipad", "scale": "1x", "size": "76x76" },
-                { "filename": "AppIcon-76@2x.png", "idiom": "ipad", "scale": "2x", "size": "76x76" },
-                { "filename": "AppIcon-83.5@2x.png", "idiom": "ipad", "scale": "2x", "size": "83.5x83.5" },
-                { "filename": "AppIcon-1024@1x.png", "idiom": "ios-marketing", "scale": "1x", "size": "1024x1024" }
-              ],
-              "info": { "author": "xcode", "version": 1 }
-            }
-          ICONEOF
+{
+  "images": [
+    { "filename": "AppIcon-20@1x.png", "idiom": "iphone", "scale": "1x", "size": "20x20" },
+    { "filename": "AppIcon-20@2x.png", "idiom": "iphone", "scale": "2x", "size": "20x20" },
+    { "filename": "AppIcon-20@3x.png", "idiom": "iphone", "scale": "3x", "size": "20x20" },
+    { "filename": "AppIcon-29@1x.png", "idiom": "iphone", "scale": "1x", "size": "29x29" },
+    { "filename": "AppIcon-29@2x.png", "idiom": "iphone", "scale": "2x", "size": "29x29" },
+    { "filename": "AppIcon-29@3x.png", "idiom": "iphone", "scale": "3x", "size": "29x29" },
+    { "filename": "AppIcon-40@2x.png", "idiom": "iphone", "scale": "2x", "size": "40x40" },
+    { "filename": "AppIcon-40@3x.png", "idiom": "iphone", "scale": "3x", "size": "40x40" },
+    { "filename": "AppIcon-60@2x.png", "idiom": "iphone", "scale": "2x", "size": "60x60" },
+    { "filename": "AppIcon-60@3x.png", "idiom": "iphone", "scale": "3x", "size": "60x60" },
+    { "filename": "AppIcon-20@1x.png", "idiom": "ipad", "scale": "1x", "size": "20x20" },
+    { "filename": "AppIcon-20@2x.png", "idiom": "ipad", "scale": "2x", "size": "20x20" },
+    { "filename": "AppIcon-29@1x.png", "idiom": "ipad", "scale": "1x", "size": "29x29" },
+    { "filename": "AppIcon-29@2x.png", "idiom": "ipad", "scale": "2x", "size": "29x29" },
+    { "filename": "AppIcon-40@1x.png", "idiom": "ipad", "scale": "1x", "size": "40x40" },
+    { "filename": "AppIcon-40@2x.png", "idiom": "ipad", "scale": "2x", "size": "40x40" },
+    { "filename": "AppIcon-76@1x.png", "idiom": "ipad", "scale": "1x", "size": "76x76" },
+    { "filename": "AppIcon-76@2x.png", "idiom": "ipad", "scale": "2x", "size": "76x76" },
+    { "filename": "AppIcon-83.5@2x.png", "idiom": "ipad", "scale": "2x", "size": "83.5x83.5" },
+    { "filename": "AppIcon-1024@1x.png", "idiom": "ios-marketing", "scale": "1x", "size": "1024x1024" }
+  ],
+  "info": { "author": "xcode", "version": 1 }
+}
+ICONEOF
           fi
+
+          # Archive
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -101,6 +123,8 @@ workflows:
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
+
+          # Export
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
