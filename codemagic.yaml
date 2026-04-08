@@ -21,10 +21,12 @@ workflows:
           keychain initialize
           echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --pkcs12 /tmp/certificate.p12 --password "$CM_CERTIFICATE_PASSWORD"
+          security find-identity -v -p codesigning
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/temp.mobileprovision
           UUID=$(grep -aA1 UUID /tmp/temp.mobileprovision | grep -oE "[-A-Z0-9]{36}")
           cp /tmp/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "Installed Profile UUID: $UUID"
 
       - name: Build React App
         script: |
@@ -41,22 +43,18 @@ workflows:
         script: |
           cd frontend/ios/App
           pod install
-          python3 << 'PYEOF'
-import re
-with open('Pods/Pods.xcodeproj/project.pbxproj', 'r') as f:
-    content = f.read()
-content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
-content = re.sub(r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;', content)
-content = re.sub(r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;', content)
-content = re.sub(r'CODE_SIGN_IDENTITY = ".*?";', 'CODE_SIGN_IDENTITY = "";', content)
-content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = ".*?";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
-content = re.sub(r'ProvisioningStyle = Manual;', 'ProvisioningStyle = Automatic;', content)
-with open('Pods/Pods.xcodeproj/project.pbxproj', 'w') as f:
-    f.write(content)
-PYEOF
-          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
+
+          # Fix Pods signing using Python script
+          python3 /Users/builder/clone/fix_podfile.py
+
+          # Fix main app bundle ID
+          /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
+
+          # Set Version 1.0.4 Build 6
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
+
+          # Icon Generation
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -76,7 +74,10 @@ PYEOF
             sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
+            echo "Icons generated successfully"
           fi
+
+          # Archive
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -88,6 +89,8 @@ PYEOF
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
+
+          # Export
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
