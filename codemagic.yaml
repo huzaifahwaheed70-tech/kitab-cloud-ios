@@ -41,11 +41,19 @@ workflows:
         script: |
           cd frontend/ios/App
           pod install
-          PROJ_PATH="Pods/Pods.xcodeproj/project.pbxproj"
-          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PROJ_PATH"
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "$PROJ_PATH"
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' "$PROJ_PATH"
-          sed -i '' '/ProvisioningStyle = Manual/d' "$PROJ_PATH"
+          python3 << 'PYEOF'
+import re
+with open('Pods/Pods.xcodeproj/project.pbxproj', 'r') as f:
+    content = f.read()
+content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
+content = re.sub(r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;', content)
+content = re.sub(r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;', content)
+content = re.sub(r'CODE_SIGN_IDENTITY = ".*?";', 'CODE_SIGN_IDENTITY = "";', content)
+content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = ".*?";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
+content = re.sub(r'ProvisioningStyle = Manual;', 'ProvisioningStyle = Automatic;', content)
+with open('Pods/Pods.xcodeproj/project.pbxproj', 'w') as f:
+    f.write(content)
+PYEOF
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
@@ -76,6 +84,7 @@ workflows:
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
