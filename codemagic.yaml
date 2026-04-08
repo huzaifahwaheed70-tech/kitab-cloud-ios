@@ -19,19 +19,12 @@ workflows:
       - name: Install Certificate and Profile
         script: |
           keychain initialize
-          
-          # Install Certificate
           echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --pkcs12 /tmp/certificate.p12 --pod "$CM_CERTIFICATE_PASSWORD"
-          
-          # Install Provisioning Profile with correct name
+          keychain add-certificates --pkcs12 /tmp/certificate.p12 --password "$CM_CERTIFICATE_PASSWORD"
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/temp.mobileprovision
-          
-          # Extract UUID from the profile so Xcode can actually find it
           UUID=$(grep -aA1 UUID /tmp/temp.mobileprovision | grep -oE "[-A-Z0-9]{36}")
           cp /tmp/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "Installed Profile UUID: $UUID"
 
       - name: Build React App
         script: |
@@ -48,19 +41,12 @@ workflows:
         script: |
           cd frontend/ios/App
           pod install
-
-          # 1. AGGRESSIVE POD SIGNING STRIP
-          # This disables code signing for EVERY target in the Pods project
           PROJ_PATH="Pods/Pods.xcodeproj/project.pbxproj"
           sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "$PROJ_PATH"
           sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PROJ_PATH"
           sed -i '' '/ProvisioningStyle = Manual/d' "$PROJ_PATH"
-
-          # 2. Set Version 1.0.4 Build 6
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
-
-          # 3. ICON GENERATION
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -78,7 +64,6 @@ workflows:
             sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
             sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
             sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
-            
             cat > "$ICONSET/Contents.json" << 'ICONEOF'
             {
               "images": [
@@ -106,9 +91,6 @@ workflows:
             }
           ICONEOF
           fi
-
-          # 4. ARCHIVE
-          # Explicitly target the keychain we created in Step 2
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -119,8 +101,6 @@ workflows:
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
-
-          # 5. EXPORT
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
