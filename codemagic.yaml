@@ -40,24 +40,19 @@ workflows:
         script: |
           cd frontend/ios/App
           pod install
-          python3 << 'PYEOF'
-          import re
-          with open('Pods/Pods.xcodeproj/project.pbxproj', 'r') as f:
-              content = f.read()
-          content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
-          content = re.sub(r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;', content)
-          content = re.sub(r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;', content)
-          content = re.sub(r'CODE_SIGN_IDENTITY = ".*?";', 'CODE_SIGN_IDENTITY = "";', content)
-          content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = ".*?";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
-          content = re.sub(r'ProvisioningStyle = Manual;', 'ProvisioningStyle = Automatic;', content)
-          with open('Pods/Pods.xcodeproj/project.pbxproj', 'w') as f:
-              f.write(content)
-          PYEOF
-          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
+
+          # ✅ FIX 1: Remove ANY provisioning profile references (critical)
+          sed -i '' '/PROVISIONING_PROFILE_SPECIFIER/d' App.xcodeproj/project.pbxproj
+          sed -i '' '/PROVISIONING_PROFILE =/d' App.xcodeproj/project.pbxproj
+
+          # ✅ FIX 2: Disable signing for ALL pods
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' Pods/Pods.xcodeproj/project.pbxproj
+
+          # Version (1.0.4 build 6)
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" App/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" App/Info.plist || true
+
+          # ICONS (unchanged)
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -78,6 +73,8 @@ workflows:
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
+
+          # ✅ FIX 3: Use UUID (not name!)
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -87,8 +84,9 @@ workflows:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
+            PROVISIONING_PROFILE_SPECIFIER="$UUID" \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
+
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
