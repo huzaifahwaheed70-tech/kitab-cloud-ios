@@ -10,11 +10,14 @@ workflows:
     environment:
       groups:
         - appstore_credentials
+
+      vars:
+        APPLE_TEAM_ID: 6HUND32X2N
+        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
-      vars:
-        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
 
     scripts:
       - name: Setup and Install
@@ -38,13 +41,14 @@ workflows:
           cd frontend/ios/App
           pod install --repo-update
 
-          # Version
+          # ✅ Set Version (1.0.4 build 6)
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
 
-          # ICONS (unchanged)
+          # ✅ ICONS (UNCHANGED - your working setup)
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+
           if [ -f "$ICON_SRC" ]; then
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
@@ -62,17 +66,19 @@ workflows:
             sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
+            echo "Icons generated successfully"
           fi
 
-          # Archive (auto signing)
+          # ✅ ARCHIVE (FIXED SIGNING)
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
+            -allowProvisioningUpdates \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID
 
-          # Export
+          # ✅ EXPORT IPA
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
