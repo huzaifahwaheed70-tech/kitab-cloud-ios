@@ -29,12 +29,18 @@ workflows:
 
       - name: Build iOS
         script: |
-          # Install certificate
+          # Install certificate using security directly
           keychain initialize
           echo $CM_CERTIFICATE | base64 --decode > /tmp/cert.p12
-          keychain add-certificates \
-            --pkcs12 /tmp/cert.p12 \
-            --password "$CM_CERTIFICATE_PASSWORD"
+          security import /tmp/cert.p12 \
+            -k ~/Library/Keychains/codemagic.keychain \
+            -P "$CM_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/xcodebuild
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "" \
+            ~/Library/Keychains/codemagic.keychain
           echo "Installed certificates:"
           security find-identity -v -p codesigning
 
@@ -48,7 +54,7 @@ workflows:
           cd frontend/ios/App
           pod install
 
-          # Disable signing on Pods
+          # Fix Pods signing
           python3 /Users/builder/clone/fix_podfile.py
 
           # Fix bundle ID
