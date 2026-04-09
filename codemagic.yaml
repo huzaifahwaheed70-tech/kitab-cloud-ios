@@ -3,58 +3,74 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
+
     integrations:
       app_store_connect: appstore_credentials
+
     environment:
       groups:
         - appstore_credentials
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+
     scripts:
       - name: Setup
         script: |
           cd frontend
           yarn install --no-immutable
+
       - name: Build React
         script: |
           cd frontend
           CI=false yarn build
+
       - name: Sync Capacitor
         script: |
           cd frontend
           npx cap add ios || true
           npx cap sync ios
+
+      # ✅ CRITICAL: INSTALL CERT + PROFILE
       - name: Install Signing
         script: |
           keychain initialize
+
           echo $CM_CERTIFICATE | base64 --decode > /tmp/cert.p12
           keychain add-certificates \
             --pkcs12 /tmp/cert.p12 \
             --password "$CM_CERTIFICATE_PASSWORD"
+
+          # Confirm cert exists
+          security find-identity -v -p codesigning
+
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/profile.mobileprovision
+
           UUID=$(grep -aA1 UUID /tmp/profile.mobileprovision | grep -oE "[-A-Z0-9]{36}")
           cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "Installed profile: $UUID"
+
+          echo "PROFILE UUID: $UUID"
+
       - name: Build iOS
         script: |
           cd frontend/ios/App
           pod install
 
-          # ✅ FIX 1: Remove ANY provisioning profile references (critical)
+          # ❌ REMOVE ANY OLD PROFILE REFERENCES
           sed -i '' '/PROVISIONING_PROFILE_SPECIFIER/d' App.xcodeproj/project.pbxproj
           sed -i '' '/PROVISIONING_PROFILE =/d' App.xcodeproj/project.pbxproj
 
-          # ✅ FIX 2: Disable signing for ALL pods
+          # ✅ DISABLE PODS SIGNING (VERY IMPORTANT)
           sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' Pods/Pods.xcodeproj/project.pbxproj
 
-          # Version (1.0.4 build 6)
+          # VERSION
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
 
-          # ICONS (unchanged)
+          # ICONS (UNCHANGED)
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+
           if [ -f "$ICON_SRC" ]; then
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
@@ -74,7 +90,7 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
-          # ✅ FIX 3: Use UUID (not name!)
+          # ✅ BUILD WITH UUID PROFILE
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -87,12 +103,15 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="$UUID" \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
 
+          # EXPORT
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
             -exportPath /Users/builder/export
+
     artifacts:
       - /Users/builder/export/*.ipa
+
     publishing:
       app_store_connect:
         auth: integration
