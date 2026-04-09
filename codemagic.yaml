@@ -3,79 +3,63 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
-
     integrations:
       app_store_connect: appstore_credentials
-
     environment:
       groups:
         - appstore_credentials
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
-
     scripts:
       - name: Setup
         script: |
           cd frontend
           yarn install --no-immutable
-
       - name: Build React
         script: |
           cd frontend
           CI=false yarn build
-
       - name: Sync Capacitor
         script: |
           cd frontend
           npx cap add ios || true
           npx cap sync ios
-
       - name: Install Signing
         script: |
           keychain initialize
-
           echo $CM_CERTIFICATE | base64 --decode > /tmp/cert.p12
           keychain add-certificates \
             --pkcs12 /tmp/cert.p12 \
             --password "$CM_CERTIFICATE_PASSWORD"
-
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/profile.mobileprovision
-
           UUID=$(grep -aA1 UUID /tmp/profile.mobileprovision | grep -oE "[-A-Z0-9]{36}")
           cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-
           echo "Installed profile: $UUID"
-
       - name: Build iOS
         script: |
           cd frontend/ios/App
           pod install
-
           python3 << 'PYEOF'
-import re
-with open('Pods/Pods.xcodeproj/project.pbxproj', 'r') as f:
-    content = f.read()
-content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
-content = re.sub(r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;', content)
-content = re.sub(r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;', content)
-content = re.sub(r'CODE_SIGN_IDENTITY = ".*?";', 'CODE_SIGN_IDENTITY = "";', content)
-content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = ".*?";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
-content = re.sub(r'ProvisioningStyle = Manual;', 'ProvisioningStyle = Automatic;', content)
-with open('Pods/Pods.xcodeproj/project.pbxproj', 'w') as f:
-    f.write(content)
-PYEOF
-
+          import re
+          with open('Pods/Pods.xcodeproj/project.pbxproj', 'r') as f:
+              content = f.read()
+          content = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', content)
+          content = re.sub(r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;', content)
+          content = re.sub(r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;', content)
+          content = re.sub(r'CODE_SIGN_IDENTITY = ".*?";', 'CODE_SIGN_IDENTITY = "";', content)
+          content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = ".*?";', 'PROVISIONING_PROFILE_SPECIFIER = "";', content)
+          content = re.sub(r'ProvisioningStyle = Manual;', 'ProvisioningStyle = Automatic;', content)
+          with open('Pods/Pods.xcodeproj/project.pbxproj', 'w') as f:
+              f.write(content)
+          PYEOF
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
-
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" App/Info.plist || true
-
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
-
           if [ -f "$ICON_SRC" ]; then
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
@@ -94,7 +78,6 @@ PYEOF
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
-
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -106,15 +89,12 @@ PYEOF
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
             PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud" \
             OTHER_CODE_SIGN_FLAGS="--keychain /Users/builder/Library/Keychains/codemagic.keychain"
-
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
             -exportPath /Users/builder/export
-
     artifacts:
       - /Users/builder/export/*.ipa
-
     publishing:
       app_store_connect:
         auth: integration
