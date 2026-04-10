@@ -47,12 +47,12 @@ workflows:
           echo "Installed certificates:"
           security find-identity -v -p codesigning
 
-          # Install provisioning profile and extract UUID using grep
+          # Install provisioning profile with hardcoded UUID
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/profile.mobileprovision
-          UUID=$(grep -aA1 UUID /tmp/profile.mobileprovision | grep -oE "[-A-F0-9]{36}" | head -1)
-          echo "PROFILE UUID: $UUID"
+          UUID="fee1525c-1c69-4b63-81f2-b6093a784242"
           cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "PROFILE UUID: $UUID"
 
           cd frontend/ios/App
           pod install
