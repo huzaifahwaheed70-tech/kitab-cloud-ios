@@ -29,7 +29,7 @@ workflows:
 
       - name: Build iOS
         script: |
-          # Install certificate - use the keychain that keychain initialize creates
+          # Install certificate
           keychain initialize
           KEYCHAIN_PATH=$(security default-keychain | tr -d '"' | tr -d ' ')
           echo "Keychain path: $KEYCHAIN_PATH"
@@ -44,16 +44,13 @@ workflows:
             -S apple-tool:,apple:,codesign: \
             -s -k "" \
             "$KEYCHAIN_PATH"
-
           echo "Installed certificates:"
           security find-identity -v -p codesigning
 
-          # Install provisioning profile
+          # Install provisioning profile and extract UUID using grep
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/profile.mobileprovision
-
-          # Better UUID extraction
-          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i /tmp/profile.mobileprovision))
+          UUID=$(grep -aA1 UUID /tmp/profile.mobileprovision | grep -oE "[-A-F0-9]{36}" | head -1)
           echo "PROFILE UUID: $UUID"
           cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
 
