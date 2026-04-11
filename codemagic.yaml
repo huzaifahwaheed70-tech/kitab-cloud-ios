@@ -40,23 +40,20 @@ workflows:
 
           pod install
 
-          # Fix bundle ID
+          # Fix bundle ID everywhere
           /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
 
           # Versioning
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/App/Info.plist
 
-          # ---- FIX PODS SIGNING (KEEP THIS) ----
+          # ---- FIX PODS (CRITICAL) ----
           sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i.bak 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = "";/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i.bak 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i.bak 's/PROVISIONING_PROFILE = .*;/PROVISIONING_PROFILE = "";/g' Pods/Pods.xcodeproj/project.pbxproj
 
-          # ---- ADD ATS FIX (THIS CREATES Info.plist ENTRY AUTOMATICALLY) ----
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" App/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" App/Info.plist || true
-
-          # ---- ARCHIVE (FINAL FIX) ----
+          # ---- ARCHIVE (NO PROFILE HERE) ----
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -65,8 +62,7 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            PROVISIONING_PROFILE_SPECIFIER="Dar-Us-Salam Kitab Cloud"
+            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
           # ---- EXPORT ----
           xcodebuild -exportArchive \
