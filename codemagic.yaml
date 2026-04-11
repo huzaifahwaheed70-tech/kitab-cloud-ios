@@ -12,6 +12,7 @@ workflows:
         - appstore_credentials
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+        APPLE_TEAM_ID: 6HUND32X2N
 
     scripts:
       - name: Setup
@@ -41,23 +42,22 @@ workflows:
           /usr/bin/sed -i.bak2 '/PROVISIONING_PROFILE_SPECIFIER/d' App.xcodeproj/project.pbxproj
           /usr/bin/sed -i.bak3 '/PROVISIONING_PROFILE =/d' App.xcodeproj/project.pbxproj
 
-          # Set bundle ID
+          # Bundle ID
           /usr/bin/sed -i.bak4 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
 
           # Version
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
 
-          # Build (AUTO SIGN)
+          # Archive
           xcodebuild archive \
-  -workspace App.xcworkspace \
-  -scheme App \
-  -archivePath /Users/builder/archive.xcarchive \
-  -destination "generic/platform=iOS" \
-  DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-  CODE_SIGN_STYLE=Automatic \
-  -allowProvisioningUpdates
-            
+            -workspace App.xcworkspace \
+            -scheme App \
+            -archivePath /Users/builder/archive.xcarchive \
+            -destination "generic/platform=iOS" \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates
 
           # Export
           xcodebuild -exportArchive \
