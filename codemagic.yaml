@@ -3,13 +3,21 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
+
     integrations:
       app_store_connect: appstore_credentials
+
     environment:
       groups:
         - appstore_credentials
+
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: host.emergent.kitabcloud
+
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+
     scripts:
       - name: Setup
         script: |
@@ -29,51 +37,24 @@ workflows:
 
       - name: Build iOS
         script: |
-          # Install certificate
-          keychain initialize
-          KEYCHAIN_PATH=$(security default-keychain | tr -d '"' | tr -d ' ')
-          echo "Keychain path: $KEYCHAIN_PATH"
-
-          echo $CM_CERTIFICATE | base64 --decode > /tmp/cert.p12
-          security import /tmp/cert.p12 \
-            -k "$KEYCHAIN_PATH" \
-            -P "$CM_CERTIFICATE_PASSWORD" \
-            -T /usr/bin/codesign \
-            -T /usr/bin/xcodebuild
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s -k "" \
-            "$KEYCHAIN_PATH"
-          echo "Installed certificates:"
-          security find-identity -v -p codesigning
-
-          # Install provisioning profile with hardcoded UUID
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/profile.mobileprovision
-          UUID="fee1525c-1c69-4b63-81f2-b6093a784242"
-          cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "PROFILE UUID: $UUID"
-
           cd frontend/ios/App
           pod install
 
-          # Fix Pods signing
-          python3 /Users/builder/clone/fix_podfile.py
+          # ❌ REMOVE ALL MANUAL SIGNING
+          sed -i '' '/PROVISIONING_PROFILE/d' App.xcodeproj/project.pbxproj
+          sed -i '' '/CODE_SIGN_IDENTITY/d' App.xcodeproj/project.pbxproj
 
-          # Fix bundle ID
-          /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
+          # ✅ DISABLE PODS SIGNING
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' Pods/Pods.xcodeproj/project.pbxproj
 
-          # Remove old profile references
-          /usr/bin/sed -i.bak2 '/PROVISIONING_PROFILE_SPECIFIER/d' App.xcodeproj/project.pbxproj
-          /usr/bin/sed -i.bak3 '/PROVISIONING_PROFILE =/d' App.xcodeproj/project.pbxproj
-
-          # Set Version 1.0.4 Build 6
+          # VERSION
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/Info.plist
 
-          # Icon Generation
+          # ICONS (UNCHANGED)
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+
           if [ -f "$ICON_SRC" ]; then
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
@@ -94,20 +75,16 @@ workflows:
             echo "Icons generated successfully"
           fi
 
-          # Archive
+          # ✅ AUTO SIGNING (THIS FIXES EVERYTHING)
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            PROVISIONING_PROFILE_SPECIFIER="$UUID" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH"
+            -allowProvisioningUpdates
 
-          # Export
+          # EXPORT
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
@@ -115,6 +92,7 @@ workflows:
 
     artifacts:
       - /Users/builder/export/*.ipa
+
     publishing:
       app_store_connect:
         auth: integration
