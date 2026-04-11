@@ -69,13 +69,23 @@ workflows:
             echo "Icons generated successfully"
           fi
 
-          # Print what Codemagic installed
-          echo "CM_CERTIFICATE: $CM_CERTIFICATE"
-          echo "CM_PROVISIONING_PROFILE: $CM_PROVISIONING_PROFILE"
+          # Show what signing assets Codemagic installed
+          echo "Keychain identities:"
           security find-identity -v -p codesigning
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/
+          echo "Provisioning profiles:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "No profiles found"
 
-          # Archive using Codemagic's installed signing
+          # Get the profile UUID that Codemagic installed
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -n "$PROFILE_PATH" ]; then
+            UUID=$(grep -aA1 UUID "$PROFILE_PATH" | grep -oE "[-A-F0-9]{36}" | head -1)
+            echo "Found profile UUID: $UUID"
+          else
+            echo "No profile found - using profile name"
+            UUID="Dar-Us-Salam Kitab Cloud"
+          fi
+
+          # Archive
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -85,7 +95,7 @@ workflows:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud \
-            PROVISIONING_PROFILE_SPECIFIER="$CM_PROVISIONING_PROFILE"
+            PROVISIONING_PROFILE_SPECIFIER="$UUID"
 
           # Export
           xcodebuild -exportArchive \
