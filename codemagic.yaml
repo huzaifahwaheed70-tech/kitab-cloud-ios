@@ -57,7 +57,12 @@ workflows:
 
           echo "Extracted UUID: $UUID"
 
-          # ---- BUILD ----
+          # ---- FIX PODS SIGNING ----
+          sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i.bak 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i.bak 's/PROVISIONING_PROFILE = .*;/PROVISIONING_PROFILE = "";/g' Pods/Pods.xcodeproj/project.pbxproj
+
+          # ---- ARCHIVE ----
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
