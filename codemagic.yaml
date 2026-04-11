@@ -13,17 +13,18 @@ workflows:
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
         APPLE_TEAM_ID: 6HUND32X2N
+
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
 
     scripts:
-      - name: Setup
+      - name: Install dependencies
         script: |
           cd frontend
           yarn install --no-immutable
 
-      - name: Build React
+      - name: Build React app
         script: |
           cd frontend
           CI=false yarn build
@@ -31,40 +32,32 @@ workflows:
       - name: Sync Capacitor
         script: |
           cd frontend
-          npx cap add ios || true
           npx cap sync ios
 
-      - name: Build iOS
+      - name: Install CocoaPods
+        script: |
+          cd frontend/ios/App
+          pod install
+
+      - name: Build iOS (FIXED SIGNING)
         script: |
           cd frontend/ios/App
 
-          pod install
+          # IMPORTANT: DO NOT touch Pods signing
+          # DO NOT set manual provisioning profiles anywhere
 
-          # Fix bundle ID everywhere
-          /usr/bin/sed -i.bak 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = host.emergent.kitabcloud;/g' App.xcodeproj/project.pbxproj
-
-          # Versioning
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" App/App/Info.plist
-
-          # ---- FIX PODS (CRITICAL) ----
-          sed -i.bak 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i.bak 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = "";/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i.bak 's/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i.bak 's/PROVISIONING_PROFILE = .*;/PROVISIONING_PROFILE = "";/g' Pods/Pods.xcodeproj/project.pbxproj
-
-          # ---- ARCHIVE (NO PROFILE HERE) ----
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
 
-          # ---- EXPORT ----
+      - name: Export IPA
+        script: |
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
             -exportOptionsPlist /Users/builder/clone/export_options.plist \
