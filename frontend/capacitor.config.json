@@ -4,11 +4,9 @@
   "webDir": "build",
   "bundledWebRuntime": false,
   "server": {
-    "hostname": "kitab-cloud.emergent.host",
-    "androidScheme": "https",
-    "iosScheme": "https",
-    "allowNavigation": ["*"],
-    "cleartext": true
+    "url": "https://kitab-cloud.emergent.host",
+    "cleartext": true,
+    "allowNavigation": ["*"]
   },
   "ios": {
     "contentInset": "automatic",
