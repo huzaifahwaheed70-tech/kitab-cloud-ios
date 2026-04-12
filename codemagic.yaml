@@ -29,9 +29,17 @@ workflows:
           cd frontend
           CI=false yarn build
 
-      - name: Sync Capacitor
+      - name: Setup Capacitor iOS (CRITICAL FIX)
         script: |
           cd frontend
+
+          # Remove broken ios folder if partially exists
+          rm -rf ios
+
+          # Add iOS platform fresh
+          npx cap add ios
+
+          # Sync project
           npx cap sync ios
 
       - name: Install CocoaPods
@@ -39,12 +47,9 @@ workflows:
           cd frontend/ios/App
           pod install
 
-      - name: Build iOS (FIXED SIGNING)
+      - name: Build iOS
         script: |
           cd frontend/ios/App
-
-          # IMPORTANT: DO NOT touch Pods signing
-          # DO NOT set manual provisioning profiles anywhere
 
           xcodebuild archive \
             -workspace App.xcworkspace \
