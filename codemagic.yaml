@@ -11,44 +11,60 @@ workflows:
     environment:
       groups:
         - appstore_credentials
+      vars:
+        APPLE_TEAM_ID: 6HUND32X2N
 
     scripts:
       - name: Install dependencies
         script: |
-          npm install
+          cd frontend
+          yarn install --no-immutable
 
-      - name: Build web app
+      - name: Build React app
         script: |
-          npm run build
+          cd frontend
+          CI=false yarn build
 
       - name: Add iOS platform
         script: |
+          cd frontend
           npx cap add ios || true
 
       - name: Sync Capacitor
         script: |
+          cd frontend
           npx cap sync ios
 
       - name: Install CocoaPods
         script: |
-          cd ios/App
+          cd frontend/ios/App
           pod install
 
-      - name: Build iOS (Automatic Signing)
+      - name: Build iOS (FINAL)
         script: |
+          cd frontend/ios/App
+
+          # Inject Team ID (CRITICAL)
+          sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
+
           xcodebuild archive \
-            -workspace ios/App/App.xcworkspace \
+            -workspace App.xcworkspace \
             -scheme App \
-            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
-            -destination 'generic/platform=iOS' \
+            -archivePath /Users/builder/archive.xcarchive \
+            -destination "generic/platform=iOS" \
             -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM=6HUND32X2N
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID
+
+      - name: Export IPA
+        script: |
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath /Users/builder/export
 
     artifacts:
-      - build/App.xcarchive
+      - /Users/builder/export/*.ipa
 
     publishing:
       app_store_connect:
-        auth:
-          integration: appstore_credentials
-        submit_to_app_store: false
+        auth: integration
