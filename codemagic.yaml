@@ -12,8 +12,6 @@ workflows:
         - appstore_credentials
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
-        APPLE_TEAM_ID: 6HUND32X2N
-
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
@@ -29,43 +27,29 @@ workflows:
           cd frontend
           CI=false yarn build
 
-      - name: Setup Capacitor iOS (CRITICAL FIX)
+      - name: Add & Sync iOS
         script: |
           cd frontend
-
-          # Remove broken ios folder if partially exists
-          rm -rf ios
-
-          # Add iOS platform fresh
           npx cap add ios
-
-          # Sync project
           npx cap sync ios
 
-      - name: Install CocoaPods
+      - name: Build iOS (NO MANUAL SIGNING)
         script: |
           cd frontend/ios/App
           pod install
-
-      - name: Build iOS
-        script: |
-          cd frontend/ios/App
 
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PRODUCT_BUNDLE_IDENTIFIER=host.emergent.kitabcloud
+            -allowProvisioningUpdates
 
       - name: Export IPA
         script: |
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /Users/builder/clone/export_options.plist \
+            -exportOptionsPlist /Users/builder/export_options.plist \
             -exportPath /Users/builder/export
 
     artifacts:
