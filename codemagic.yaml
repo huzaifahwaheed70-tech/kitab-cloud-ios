@@ -1,63 +1,54 @@
 workflows:
   ios-release:
     name: Kitab Cloud iOS Build
+
     instance_type: mac_mini_m2
     max_build_duration: 60
+
+    integrations:
+      app_store_connect: appstore_credentials
 
     environment:
       groups:
         - appstore_credentials
-      vars:
-        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
-        APPLE_TEAM_ID: 6HUND32X2N
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: host.emergent.kitabcloud
 
     scripts:
       - name: Install dependencies
         script: |
-          cd frontend
-          yarn install --no-immutable
+          npm install
 
-      - name: Build React app
+      - name: Build web app
         script: |
-          cd frontend
-          CI=false yarn build
+          npm run build
 
-      - name: Add & Sync iOS
+      - name: Add iOS platform
         script: |
-          cd frontend
-          npx cap add ios
+          npx cap add ios || true
+
+      - name: Sync Capacitor
+        script: |
           npx cap sync ios
 
-      - name: Build iOS (FINAL FIX)
+      - name: Install CocoaPods
         script: |
-          cd frontend/ios/App
-
+          cd ios/App
           pod install
 
-          # Inject team ID
-          sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
-
-          xcodebuild archive \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -archivePath /Users/builder/archive.xcarchive \
-            -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM=$APPLE_TEAM_ID
-
-      - name: Export IPA
+      - name: Build iOS (Automatic Signing)
         script: |
-          xcodebuild -exportArchive \
-            -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /Users/builder/export_options.plist \
-            -exportPath /Users/builder/export
+          xcodebuild archive \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            DEVELOPMENT_TEAM=6HUND32X2N
 
     artifacts:
-      - /Users/builder/export/*.ipa
+      - build/App.xcarchive
 
     publishing:
       app_store_connect:
-        auth: integration
+        auth:
+          integration: appstore_credentials
+        submit_to_app_store: false
