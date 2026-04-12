@@ -12,6 +12,7 @@ workflows:
         - appstore_credentials
       vars:
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+        APPLE_TEAM_ID: 6HUND32X2N
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
@@ -33,17 +34,23 @@ workflows:
           npx cap add ios
           npx cap sync ios
 
-      - name: Build iOS (NO MANUAL SIGNING)
+      - name: Build iOS (FINAL FIX)
         script: |
           cd frontend/ios/App
+
           pod install
 
+          # ✅ Inject Apple Team ID into Xcode project
+          sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
+
+          # ✅ Build using automatic signing (handled by Codemagic)
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates
+            -allowProvisioningUpdates \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID
 
       - name: Export IPA
         script: |
