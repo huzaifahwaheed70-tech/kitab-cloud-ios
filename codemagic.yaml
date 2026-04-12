@@ -4,9 +4,6 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
 
-    integrations:
-      app_store_connect: appstore_credentials
-
     environment:
       groups:
         - appstore_credentials
@@ -40,10 +37,9 @@ workflows:
 
           pod install
 
-          # ✅ Inject Apple Team ID into Xcode project
+          # Inject team ID
           sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
-          # ✅ Build using automatic signing (handled by Codemagic)
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
