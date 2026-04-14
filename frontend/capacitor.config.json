@@ -1,7 +1,7 @@
 {
   "appId": "host.emergent.kitabcloud",
   "appName": "Kitab Cloud",
-  "webDir": "build",
+  "webDir": "public",
   "bundledWebRuntime": false,
   "server": {
     "url": "https://kitab-cloud.emergent.host",
