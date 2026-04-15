@@ -26,11 +26,6 @@ workflows:
           cd frontend
           CI=false npm run build
 
-      - name: Add iOS platform
-        script: |
-          cd frontend
-          npx cap add ios || true
-
       - name: Sync Capacitor
         script: |
           cd frontend
@@ -38,7 +33,7 @@ workflows:
 
       - name: Install CocoaPods
         script: |
-          cd frontend/ios/App
+          cd frontend/ios
           pod install
 
       - name: Build iOS (FINAL)
@@ -74,7 +69,7 @@ workflows:
             echo "Warning: Icon source not found at $ICON_SRC"
           fi
 
-          # Inject Team ID (CRITICAL)
+          # Inject Team ID
           sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
           # ---- ARCHIVE ----
