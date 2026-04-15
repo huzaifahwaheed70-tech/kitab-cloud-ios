@@ -355,6 +355,7 @@ const LibraryPage = () => {
 
 const BookCard = ({ book, userTier }) => {
   // Check access restrictions
+  const isTierLocked = book.tier_level > userTier;
   const isVolumeLocked = book.is_volume && userTier < 3;
   const isAdvancedLocked = book.is_advanced && userTier < 4;
   const isLocked = isVolumeLocked || isAdvancedLocked;
@@ -378,6 +379,16 @@ const BookCard = ({ book, userTier }) => {
           </div>
         )}
         
+        {/* Tier Lock Badge - shows when user's tier is lower than book's tier */}
+        {isTierLocked && !isLocked && (
+          <div className="absolute top-2 right-2">
+            <span className="text-[10px] px-2 py-1 bg-[#02120F]/90 text-gold rounded flex items-center gap-1 font-medium">
+              <Lock className="w-3 h-3" />
+              TIER {book.tier_level}+
+            </span>
+          </div>
+        )}
+        
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {book.is_volume && (
@@ -388,7 +399,7 @@ const BookCard = ({ book, userTier }) => {
           )}
         </div>
         
-        {/* Lock Overlay */}
+        {/* Lock Overlay for Volume/Advanced books */}
         {isLocked && (
           <div className="absolute inset-0 bg-[#02120F]/80 flex items-center justify-center">
             <div className="text-center">

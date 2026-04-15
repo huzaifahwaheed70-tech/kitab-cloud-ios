@@ -1,11 +1,37 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../App';
-import { BookOpen, Shield, Sparkles, ArrowRight, ShoppingCart, BookMarked } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth, API } from '../App';
+import axios from 'axios';
+import { BookOpen, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 const LandingPage = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const [books, setBooks] = useState([]);
+  const [loadingBooks, setLoadingBooks] = useState(true);
+
+  // Auto-redirect to library if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/library', { replace: true });
+    }
+  }, [user, loading, navigate]);
+
+  // Fetch books for preview
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const response = await axios.get(`${API}/books/all`);
+        setBooks(response.data.slice(0, 8)); // Show first 8 books
+      } catch (error) {
+        console.error('Error fetching books:', error);
+      } finally {
+        setLoadingBooks(false);
+      }
+    };
+    fetchBooks();
+  }, []);
 
   const features = [
     {
@@ -38,175 +64,189 @@ const LandingPage = () => {
     { tier: 4, name: "Premium", price: 80, features: ["Unlimited books", "All books including advanced", "In-book search"], featured: true },
   ];
 
+  const getTierBadgeClass = (tier) => {
+    const classes = {
+      1: 'bg-blue-500/20 text-blue-400',
+      2: 'bg-purple-500/20 text-purple-400',
+      3: 'bg-gold/20 text-gold',
+      4: 'bg-gradient-to-r from-gold/30 to-amber-500/30 text-gold'
+    };
+    return classes[tier] || 'bg-gray-500/20 text-gray-400';
+  };
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-dark relative noise-overlay">
       {/* Navigation */}
       <nav className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3" data-testid="nav-logo">
-            <div className="w-10 h-10 rounded-sm bg-gold flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-[#02120F]" />
-            </div>
+            <img src="/logo.png" alt="Kitab Cloud" className="w-10 h-10 rounded-sm object-cover" />
             <span className="font-serif text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
           </Link>
           
           <div className="flex items-center gap-4">
-            {user ? (
-              <Link to="/library">
-                <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-medium" data-testid="enter-library-btn">
-                  Enter Library
-                </Button>
-              </Link>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]" data-testid="login-btn">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link to="/register">
-                  <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-medium" data-testid="register-btn">
-                    Get Started
-                  </Button>
-                </Link>
-              </>
-            )}
+            <Link to="/login">
+              <Button variant="ghost" className="text-[#FDFBF7] hover:bg-[#082E26]" data-testid="login-btn">
+                Sign In
+              </Button>
+            </Link>
+            <Link to="/register">
+              <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-medium" data-testid="register-btn">
+                Get Started
+              </Button>
+            </Link>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ 
-            backgroundImage: 'url(https://images.unsplash.com/photo-1505664063603-28e48ca204eb?crop=entropy&cs=srgb&fm=jpg&q=85)',
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-[#02120F]/90 via-[#004D40]/80 to-[#02120F]" />
+      <section className="relative py-20 px-6">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#FDFBF7] mb-6">
+            Your Digital Islamic
+            <span className="text-gold block">Library</span>
+          </h1>
+          <p className="text-lg text-[#B0C4BF] max-w-2xl mx-auto mb-8">
+            Access the complete Dar-Us-Salam digital collection. Subscribe monthly or buy individual books.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/register">
+              <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8" data-testid="hero-cta">
+                Start Reading
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+            </Link>
+            <a href="#browse-books">
+              <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8">
+                Browse Books
+              </Button>
+            </a>
+          </div>
         </div>
-        
-        <div className="relative max-w-7xl mx-auto px-6 py-32 md:py-48">
-          <div className="max-w-3xl">
-            <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-6 animate-fade-in-up">
-              Dar-Us-Salam Publications
-            </p>
-            <h1 className="font-serif text-5xl md:text-7xl font-bold text-[#FDFBF7] leading-tight mb-6 tracking-tight animate-fade-in-up animate-delay-100">
-              Your Digital<br />
-              <span className="text-gradient-gold">Islamic Library</span>
-            </h1>
-            <p className="text-xl text-[#B0C4BF] mb-4 max-w-xl leading-relaxed animate-fade-in-up animate-delay-200">
-              Access a curated collection of authentic Islamic literature. Subscribe monthly or buy individual PDFs.
-            </p>
-            <p className="text-lg text-gold mb-10 animate-fade-in-up animate-delay-200">
-              <ShoppingCart className="w-5 h-5 inline mr-2" />
-              Buy PDFs individually without a subscription!
-            </p>
-            <div className="flex flex-wrap gap-4 animate-fade-in-up animate-delay-300">
-              <Link to={user ? "/library" : "/register"}>
-                <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold text-lg px-8 py-6" data-testid="hero-cta-btn">
-                  Start Reading <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-              <Link to="/pricing">
-                <Button size="lg" variant="outline" className="border-gold/50 text-gold hover:bg-gold/10 font-semibold text-lg px-8 py-6" data-testid="view-plans-btn">
-                  View Plans
-                </Button>
-              </Link>
+      </section>
+
+      {/* Browse Books Section */}
+      <section id="browse-books" className="py-16 px-6 bg-[#082E26]/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] mb-4">Browse Our Collection</h2>
+            <p className="text-[#B0C4BF]">Preview our library. Sign up to start reading!</p>
+          </div>
+          
+          {loadingBooks ? (
+            <div className="flex justify-center py-12">
+              <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
             </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {books.map((book) => (
+                <div 
+                  key={book.book_id} 
+                  className="glass-card rounded-sm overflow-hidden group hover:border-gold/50 transition-all"
+                  data-testid={`preview-book-${book.book_id}`}
+                >
+                  {/* Book Cover */}
+                  <div className="aspect-[3/4] relative bg-gradient-to-br from-[#004D40] to-[#00332A]">
+                    {book.cover_url ? (
+                      <img 
+                        src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
+                        alt={book.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookOpen className="w-12 h-12 text-gold/30" />
+                      </div>
+                    )}
+                    
+                    {/* Tier Badge */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${getTierBadgeClass(book.tier_level)}`}>
+                        <Lock className="w-3 h-3" />
+                        Tier {book.tier_level}
+                      </span>
+                    </div>
+                    
+                    {/* Hover Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#02120F] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                      <Link to="/register">
+                        <Button size="sm" className="bg-gold text-[#02120F] hover:bg-[#E9C85C]">
+                          Sign Up to Read
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                  
+                  {/* Book Info */}
+                  <div className="p-3">
+                    <h3 className="font-serif text-sm text-[#FDFBF7] line-clamp-2 mb-1">{book.title}</h3>
+                    <p className="text-xs text-gold font-mono">{book.darussalam_code}</p>
+                    {book.pdf_price && (
+                      <p className="text-xs text-[#B0C4BF] mt-1">PDF: ${book.pdf_price}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="text-center mt-8">
+            <Link to="/register">
+              <Button variant="outline" className="border-gold text-gold hover:bg-gold/10">
+                View All Books
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-surface relative">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Why Choose Us</p>
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#FDFBF7] tracking-tight">
-              A Modern Approach to Islamic Learning
-            </h2>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <section className="py-16 px-6">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] text-center mb-12">Why Kitab Cloud?</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
-              <div 
-                key={index}
-                className="glass-card rounded-sm p-8 book-card-hover"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="w-14 h-14 rounded-sm bg-gold/10 flex items-center justify-center text-gold mb-6">
+              <div key={index} className="glass-card p-6 rounded-sm hover:border-gold/30 transition-all">
+                <div className="w-14 h-14 rounded-sm bg-gold/10 flex items-center justify-center text-gold mb-4">
                   {feature.icon}
                 </div>
-                <h3 className="font-serif text-xl font-semibold text-[#FDFBF7] mb-3">{feature.title}</h3>
-                <p className="text-[#B0C4BF] leading-relaxed">{feature.description}</p>
+                <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">{feature.title}</h3>
+                <p className="text-sm text-[#B0C4BF]">{feature.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Tier Info */}
-      <section className="py-16 bg-dark">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="glass-card rounded-sm p-8 border-gold/30">
-            <h3 className="font-serif text-2xl text-[#FDFBF7] mb-6 text-center">What's Included in Each Tier</h3>
-            <div className="grid md:grid-cols-2 gap-6 text-[#B0C4BF]">
-              <div>
-                <h4 className="text-gold font-medium mb-2">Volume Books (Tier 3+)</h4>
-                <p className="text-sm">Multi-volume collections and comprehensive Islamic texts are only available for Advanced and Premium subscribers.</p>
-              </div>
-              <div>
-                <h4 className="text-gold font-medium mb-2">Advanced Books (Tier 4 only)</h4>
-                <p className="text-sm">Highly advanced Islamic scholarly works are exclusively available to Premium subscribers.</p>
-              </div>
-              <div>
-                <h4 className="text-gold font-medium mb-2">In-Book Search (Tier 3+)</h4>
-                <p className="text-sm">Search within any book to find specific text passages. Available for Advanced and Premium tiers.</p>
-              </div>
-              <div>
-                <h4 className="text-gold font-medium mb-2">Bookmarks & Progress</h4>
-                <p className="text-sm">All subscribers can bookmark pages and track reading progress across all their books.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Preview */}
-      <section className="py-24 bg-surface relative">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Tiers</p>
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#FDFBF7] tracking-tight mb-4">
-              Choose Your Access Level
-            </h2>
-            <p className="text-[#B0C4BF] max-w-2xl mx-auto">
-              From buying individual PDFs to unlimited access, find the perfect plan for your learning journey.
-            </p>
-          </div>
+      {/* Pricing Section */}
+      <section className="py-16 px-6 bg-[#082E26]/30">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] text-center mb-4">Simple Pricing</h2>
+          <p className="text-[#B0C4BF] text-center mb-12">Choose the plan that fits your reading goals</p>
           
-          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
+          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
             {tiers.map((tier) => (
               <div 
                 key={tier.tier}
-                className={`rounded-sm p-6 border book-card-hover ${
-                  tier.featured 
-                    ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold' 
-                    : 'bg-surface border-[rgba(212,175,55,0.2)]'
-                }`}
-                data-testid={`tier-${tier.tier}-card`}
+                className={`glass-card rounded-sm p-6 ${tier.featured ? 'border-gold ring-2 ring-gold/20' : ''}`}
               >
                 {tier.featured && (
-                  <div className="text-xs font-mono text-gold uppercase tracking-wider mb-2">Best Value</div>
+                  <span className="text-xs font-semibold text-gold mb-2 block">MOST POPULAR</span>
                 )}
-                <div className={`tier-badge tier-${tier.tier} inline-block mb-3`}>
-                  {tier.tier === 0 ? 'No Sub' : `Tier ${tier.tier}`}
-                </div>
-                <h3 className="font-serif text-2xl font-semibold text-[#FDFBF7] mb-2">{tier.name}</h3>
-                <div className="flex items-baseline gap-1 mb-4">
+                <h3 className="font-serif text-lg text-[#FDFBF7] mb-1">{tier.name}</h3>
+                <div className="mb-4">
                   {tier.perBook ? (
-                    <span className="text-lg text-gold">Pay per book</span>
+                    <span className="text-[#B0C4BF] text-sm">Pay per book</span>
                   ) : (
                     <>
                       <span className="text-3xl font-bold text-gold">${tier.price}</span>
@@ -214,45 +254,55 @@ const LandingPage = () => {
                     </>
                   )}
                 </div>
-                <ul className="space-y-2 text-sm">
-                  {tier.features.map((feature, idx) => (
-                    <li key={idx} className="text-[#B0C4BF] flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-gold" />
+                <ul className="space-y-2 mb-6">
+                  {tier.features.map((feature, i) => (
+                    <li key={i} className="text-sm text-[#B0C4BF] flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-gold rounded-full"></span>
                       {feature}
                     </li>
                   ))}
                 </ul>
+                <Link to="/register">
+                  <Button 
+                    className={`w-full ${tier.featured ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' : 'bg-[#082E26] text-[#FDFBF7] hover:bg-[#0A3D33]'}`}
+                    size="sm"
+                  >
+                    Get Started
+                  </Button>
+                </Link>
               </div>
             ))}
-          </div>
-          
-          <div className="text-center mt-12">
-            <Link to="/pricing">
-              <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="compare-plans-btn">
-                Compare All Plans <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
           </div>
         </div>
       </section>
 
+      {/* CTA Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] mb-4">Ready to Start Reading?</h2>
+          <p className="text-[#B0C4BF] mb-8">Join thousands of readers accessing the Dar-Us-Salam digital library.</p>
+          <Link to="/register">
+            <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8">
+              Create Free Account
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </Link>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="bg-dark border-t border-[rgba(212,175,55,0.2)] py-12">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-sm bg-gold flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-[#02120F]" />
-              </div>
-              <span className="font-serif text-lg text-[#FDFBF7]">Dar-Us-Salam Kitab Cloud</span>
-            </div>
-            <p className="text-[#B0C4BF] text-sm">
-              © {new Date().getFullYear()} Dar-Us-Salam Publications. All rights reserved.
-            </p>
-            <p className="text-[#B0C4BF] text-sm">
-              Support: sales@dar-us-salam.com
-            </p>
+      <footer className="glass border-t border-[rgba(212,175,55,0.2)] py-8 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Kitab Cloud" className="w-8 h-8 rounded-sm object-cover" />
+            <span className="font-serif text-[#FDFBF7]">Kitab Cloud</span>
           </div>
+          <p className="text-sm text-[#B0C4BF]">
+            Powered by <a href="https://dar-us-salam.com" target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">Dar-Us-Salam Publications</a>
+          </p>
+          <a href="https://dar-us-salam.com" target="_blank" rel="noopener noreferrer" className="text-sm text-gold hover:underline flex items-center gap-1">
+            Visit Dar-Us-Salam.com <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       </footer>
     </div>

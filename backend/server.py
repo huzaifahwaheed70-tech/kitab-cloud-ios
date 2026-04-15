@@ -123,6 +123,7 @@ class BookCreate(BaseModel):
     description: Optional[str] = None
     original_price: Optional[float] = None  # Original book price
     pdf_price: Optional[float] = None  # Price to buy PDF
+    purchase_link: Optional[str] = None  # Link to buy physical book from Dar-Us-Salam
 
 class BookResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -137,6 +138,7 @@ class BookResponse(BaseModel):
     pdf_url: Optional[str] = None
     original_price: Optional[float] = None
     pdf_price: Optional[float] = None
+    purchase_link: Optional[str] = None
     created_at: str
 
 class PaymentCreate(BaseModel):
@@ -890,6 +892,7 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
     total_users = await db.users.count_documents({})
     total_books = await db.books.count_documents({})
     total_purchases = await db.pdf_purchases.count_documents({})
+    total_subscriptions = await db.payment_transactions.count_documents({"payment_status": "paid"})
     
     tier_stats = {}
     for tier in range(0, 5):
@@ -900,7 +903,91 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
         "total_users": total_users,
         "total_books": total_books,
         "total_purchases": total_purchases,
+        "total_subscriptions": total_subscriptions,
         "tier_distribution": tier_stats
+    }
+
+
+@api_router.get("/admin/purchases")
+async def get_admin_purchases(user: dict = Depends(get_admin_user)):
+    """Get all PDF purchases with user details"""
+    purchases = []
+    cursor = db.pdf_purchases.find({}, {"_id": 0}).sort("purchased_at", -1)
+    async for purchase in cursor:
+        # Get user email
+        user_data = await db.users.find_one({"user_id": purchase.get("user_id")}, {"_id": 0, "email": 1, "name": 1})
+        # Get book title
+        book_data = await db.books.find_one({"book_id": purchase.get("book_id")}, {"_id": 0, "title": 1})
+        purchases.append({
+            **purchase,
+            "user_email": user_data.get("email") if user_data else "Unknown",
+            "user_name": user_data.get("name") if user_data else "Unknown",
+            "book_title": book_data.get("title") if book_data else "Unknown"
+        })
+    return purchases
+
+
+@api_router.get("/admin/subscriptions")
+async def get_admin_subscriptions(user: dict = Depends(get_admin_user)):
+    """Get all subscription payments with user details"""
+    subscriptions = []
+    cursor = db.payment_transactions.find({"payment_status": "paid"}, {"_id": 0}).sort("created_at", -1)
+    async for payment in cursor:
+        # Get user email
+        user_data = await db.users.find_one({"user_id": payment.get("user_id")}, {"_id": 0, "email": 1, "name": 1})
+        subscriptions.append({
+            **payment,
+            "user_email": user_data.get("email") if user_data else "Unknown",
+            "user_name": user_data.get("name") if user_data else "Unknown"
+        })
+    return subscriptions
+
+
+@api_router.get("/admin/users/{user_id}/details")
+async def get_user_details(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Get detailed user info including favorites, bookshelf, and purchases"""
+    user_data = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get favorite books
+    favorite_ids = user_data.get("favorite_books", [])
+    favorites = []
+    for book_id in favorite_ids:
+        book = await db.books.find_one({"book_id": book_id}, {"_id": 0, "book_id": 1, "title": 1})
+        if book:
+            favorites.append(book)
+    
+    # Get bookshelf
+    bookshelf_ids = user_data.get("bookshelf", [])
+    bookshelf = []
+    for book_id in bookshelf_ids:
+        book = await db.books.find_one({"book_id": book_id}, {"_id": 0, "book_id": 1, "title": 1})
+        if book:
+            bookshelf.append(book)
+    
+    # Get purchases
+    purchases = []
+    cursor = db.pdf_purchases.find({"user_id": user_id}, {"_id": 0})
+    async for purchase in cursor:
+        book = await db.books.find_one({"book_id": purchase.get("book_id")}, {"_id": 0, "title": 1})
+        purchases.append({
+            **purchase,
+            "book_title": book.get("title") if book else "Unknown"
+        })
+    
+    # Get subscription payments
+    payments = []
+    cursor = db.payment_transactions.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1)
+    async for payment in cursor:
+        payments.append(payment)
+    
+    return {
+        **user_data,
+        "favorites": favorites,
+        "bookshelf_books": bookshelf,
+        "purchases": purchases,
+        "payment_history": payments
     }
 
 
