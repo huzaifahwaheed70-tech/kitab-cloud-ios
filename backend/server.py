@@ -14,6 +14,8 @@ import bcrypt
 import jwt
 import requests
 from io import BytesIO
+import resend
+import secrets
 
 # Stripe Integration
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
@@ -25,6 +27,9 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Resend email setup
+resend.api_key = os.environ.get('RESEND_API_KEY')
 
 # Constants
 JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'default_secret')
@@ -44,6 +49,143 @@ SUBSCRIPTION_TIERS = {
     3: {"name": "Advanced", "price": 60.00, "book_limit": 30},
     4: {"name": "Premium", "price": 80.00, "book_limit": None},
 }
+
+# Email Helper Functions
+async def send_welcome_email(email: str, name: str = None):
+    """Send welcome email to new users"""
+    try:
+        user_name = name if name else email.split('@')[0]
+        params = {
+            "from": "Kitab Cloud <noreply@duskitab.com>",
+            "to": [email],
+            "subject": "Welcome to Kitab Cloud!",
+            "html": f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
+                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
+                    <p style="color: #B0C4BF; margin: 5px 0;">Your Digital Islamic Library</p>
+                </div>
+                <div style="padding: 30px 0;">
+                    <h2 style="color: #FDFBF7;">Assalamu Alaikum {user_name}!</h2>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Welcome to Kitab Cloud! We're excited to have you join our community of readers.
+                    </p>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        With your account, you can:
+                    </p>
+                    <ul style="color: #B0C4BF; line-height: 1.8;">
+                        <li>Browse our collection of Islamic books</li>
+                        <li>Purchase individual PDFs</li>
+                        <li>Subscribe for monthly reading access</li>
+                        <li>Save your reading progress</li>
+                        <li>Create your favorites list</li>
+                    </ul>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="https://duskitab.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                            Start Reading
+                        </a>
+                    </div>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        JazakAllah Khair for choosing Kitab Cloud!
+                    </p>
+                </div>
+                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
+                    <p>Powered by Dar-Us-Salam Publications</p>
+                    <p><a href="https://dar-us-salam.com" style="color: #D4AF37;">dar-us-salam.com</a></p>
+                </div>
+            </div>
+            """
+        }
+        resend.Emails.send(params)
+        logger.info(f"Welcome email sent to {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send welcome email: {e}")
+        return False
+
+
+async def send_verification_email(email: str, code: str):
+    """Send email verification code"""
+    try:
+        params = {
+            "from": "Kitab Cloud <noreply@duskitab.com>",
+            "to": [email],
+            "subject": "Verify Your Email - Kitab Cloud",
+            "html": f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
+                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
+                </div>
+                <div style="padding: 30px 0; text-align: center;">
+                    <h2 style="color: #FDFBF7;">Verify Your Email</h2>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Enter this code to verify your email address:
+                    </p>
+                    <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                        <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #D4AF37;">{code}</span>
+                    </div>
+                    <p style="color: #B0C4BF; font-size: 14px;">
+                        This code expires in 15 minutes.
+                    </p>
+                </div>
+                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
+                    <p>If you didn't create an account, you can ignore this email.</p>
+                </div>
+            </div>
+            """
+        }
+        resend.Emails.send(params)
+        logger.info(f"Verification email sent to {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send verification email: {e}")
+        return False
+
+
+async def send_password_reset_email(email: str, reset_token: str):
+    """Send password reset link"""
+    try:
+        reset_link = f"https://duskitab.com/reset-password?token={reset_token}"
+        params = {
+            "from": "Kitab Cloud <noreply@duskitab.com>",
+            "to": [email],
+            "subject": "Reset Your Password - Kitab Cloud",
+            "html": f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
+                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
+                </div>
+                <div style="padding: 30px 0; text-align: center;">
+                    <h2 style="color: #FDFBF7;">Reset Your Password</h2>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Click the button below to reset your password:
+                    </p>
+                    <div style="margin: 30px 0;">
+                        <a href="{reset_link}" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                            Reset Password
+                        </a>
+                    </div>
+                    <p style="color: #B0C4BF; font-size: 14px;">
+                        This link expires in 1 hour.
+                    </p>
+                    <p style="color: #B0C4BF; font-size: 12px; margin-top: 20px;">
+                        If the button doesn't work, copy this link:<br/>
+                        <a href="{reset_link}" style="color: #D4AF37; word-break: break-all;">{reset_link}</a>
+                    </p>
+                </div>
+                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
+                    <p>If you didn't request this, you can ignore this email.</p>
+                </div>
+            </div>
+            """
+        }
+        resend.Emails.send(params)
+        logger.info(f"Password reset email sent to {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send password reset email: {e}")
+        return False
+
 
 # Create the main app
 app = FastAPI()
