@@ -51,12 +51,14 @@ SUBSCRIPTION_TIERS = {
 }
 
 # Email Helper Functions
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <onboarding@resend.dev>')
+
 async def send_welcome_email(email: str, name: str = None):
     """Send welcome email to new users"""
     try:
         user_name = name if name else email.split('@')[0]
         params = {
-            "from": "Kitab Cloud <noreply@duskitab.com>",
+            "from": RESEND_FROM_EMAIL,
             "to": [email],
             "subject": "Welcome to Kitab Cloud!",
             "html": f"""
@@ -81,7 +83,7 @@ async def send_welcome_email(email: str, name: str = None):
                         <li>Create your favorites list</li>
                     </ul>
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="https://duskitab.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                        <a href="https://kitab-cloud.preview.emergentagent.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
                             Start Reading
                         </a>
                     </div>
@@ -108,7 +110,7 @@ async def send_verification_email(email: str, code: str):
     """Send email verification code"""
     try:
         params = {
-            "from": "Kitab Cloud <noreply@duskitab.com>",
+            "from": RESEND_FROM_EMAIL,
             "to": [email],
             "subject": "Verify Your Email - Kitab Cloud",
             "html": f"""
@@ -145,9 +147,9 @@ async def send_verification_email(email: str, code: str):
 async def send_password_reset_email(email: str, reset_token: str):
     """Send password reset link"""
     try:
-        reset_link = f"https://duskitab.com/reset-password?token={reset_token}"
+        reset_link = f"https://kitab-cloud.preview.emergentagent.com/reset-password?token={reset_token}"
         params = {
-            "from": "Kitab Cloud <noreply@duskitab.com>",
+            "from": RESEND_FROM_EMAIL,
             "to": [email],
             "subject": "Reset Your Password - Kitab Cloud",
             "html": f"""
@@ -312,22 +314,6 @@ def decode_jwt_token(token: str) -> dict:
 
 
 async def get_current_user(request: Request, authorization: str = Header(None)):
-    # Check for session_token cookie first (Google OAuth)
-    session_token = request.cookies.get("session_token")
-    
-    if session_token:
-        session = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
-        if session:
-            expires_at = session.get("expires_at")
-            if isinstance(expires_at, str):
-                expires_at = datetime.fromisoformat(expires_at)
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if expires_at > datetime.now(timezone.utc):
-                user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
-                if user:
-                    return user
-    
     # Check Authorization header (JWT)
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -374,6 +360,12 @@ async def register(user_data: UserCreate):
     }
     await db.users.insert_one(user_doc)
     
+    # Send welcome email (non-blocking)
+    try:
+        await send_welcome_email(user_data.email, user_data.name)
+    except Exception as e:
+        logger.warning(f"Failed to send welcome email to {user_data.email}: {e}")
+    
     token = create_jwt_token(user_id)
     return {"token": token, "user": UserResponse(**user_doc).model_dump()}
 
@@ -391,69 +383,80 @@ async def login(user_data: UserLogin):
     return {"token": token, "user": UserResponse(**user).model_dump()}
 
 
-@api_router.get("/auth/session")
-async def get_session(request: Request, session_id: str = Query(...)):
-    # Fetch user data from Emergent Auth
-    try:
-        resp = requests.get(
-            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": session_id},
-            timeout=30
-        )
-        resp.raise_for_status()
-        auth_data = resp.json()
-    except Exception as e:
-        logger.error(f"Failed to fetch session data: {e}")
-        raise HTTPException(status_code=401, detail="Invalid session")
+# Password Reset Models
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Request password reset link"""
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
     
-    email = auth_data.get("email")
-    name = auth_data.get("name")
-    picture = auth_data.get("picture")
-    session_token = auth_data.get("session_token")
-    
-    # Find or create user
-    user = await db.users.find_one({"email": email}, {"_id": 0})
+    # Always return success to prevent email enumeration
     if not user:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        user = {
-            "user_id": user_id,
-            "email": email,
-            "name": name,
-            "picture": picture,
-            "subscription_tier": 0,
-            "is_admin": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.users.insert_one(user)
-    else:
-        user_id = user["user_id"]
-        # Update picture if changed
-        if picture and user.get("picture") != picture:
-            await db.users.update_one({"user_id": user_id}, {"$set": {"picture": picture}})
-            user["picture"] = picture
+        return {"message": "If an account with that email exists, a reset link has been sent."}
     
-    # Create session
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
+    # Check if user has a password (not just OAuth user)
+    if not user.get("password_hash"):
+        return {"message": "If an account with that email exists, a reset link has been sent."}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store reset token
+    await db.password_resets.delete_many({"user_id": user["user_id"]})  # Remove old tokens
+    await db.password_resets.insert_one({
+        "user_id": user["user_id"],
+        "email": request.email,
+        "token": reset_token,
         "expires_at": expires_at.isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    response_data = {"user": UserResponse(**user).model_dump()}
-    response = Response(content=str(response_data).replace("'", '"'), media_type="application/json")
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        max_age=7 * 24 * 60 * 60,
-        path="/"
+    # Send email
+    try:
+        await send_password_reset_email(request.email, reset_token)
+    except Exception as e:
+        logger.error(f"Failed to send password reset email: {e}")
+    
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password with token"""
+    # Find reset token
+    reset_record = await db.password_resets.find_one({"token": request.token})
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    
+    # Check expiration
+    expires_at = datetime.fromisoformat(reset_record["expires_at"])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        await db.password_resets.delete_one({"token": request.token})
+        raise HTTPException(status_code=400, detail="Reset link has expired")
+    
+    # Update password
+    new_hash = hash_password(request.new_password)
+    await db.users.update_one(
+        {"user_id": reset_record["user_id"]},
+        {"$set": {"password_hash": new_hash}}
     )
     
-    return {"user": UserResponse(**user).model_dump(), "set_cookie": True}
+    # Delete used token
+    await db.password_resets.delete_one({"token": request.token})
+    
+    return {"message": "Password has been reset successfully"}
 
 
 @api_router.get("/auth/me")
@@ -462,11 +465,7 @@ async def get_me(user: dict = Depends(get_current_user)):
 
 
 @api_router.post("/auth/logout")
-async def logout(request: Request, response: Response):
-    session_token = request.cookies.get("session_token")
-    if session_token:
-        await db.user_sessions.delete_one({"session_token": session_token})
-    response.delete_cookie(key="session_token", path="/")
+async def logout():
     return {"message": "Logged out"}
 
 

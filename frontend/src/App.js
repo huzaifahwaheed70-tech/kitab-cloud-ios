@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
@@ -16,6 +16,8 @@ import PricingPage from './pages/PricingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import AdminDashboard from './pages/AdminDashboard';
 import SettingsPage from './pages/SettingsPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -38,13 +40,6 @@ const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
 
   const checkAuth = useCallback(async () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    // Skip if returning from OAuth callback
-    if (window.location.hash?.includes('session_id=')) {
-      setLoading(false);
-      return;
-    }
-
     try {
       const storedToken = localStorage.getItem('auth_token');
       if (storedToken) {
@@ -53,12 +48,6 @@ const AuthProvider = ({ children }) => {
         });
         setUser(response.data);
         setToken(storedToken);
-      } else {
-        // Try cookie-based auth
-        const response = await axios.get(`${API}/auth/me`, {
-          withCredentials: true
-        });
-        setUser(response.data);
       }
     } catch (error) {
       setUser(null);
@@ -91,15 +80,9 @@ const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const loginWithGoogle = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + '/library';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
-
   const logout = async () => {
     try {
-      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+      await axios.post(`${API}/auth/logout`, {});
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -111,69 +94,21 @@ const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     try {
       const storedToken = localStorage.getItem('auth_token');
-      const response = await axios.get(`${API}/auth/me`, {
-        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
-        withCredentials: true
-      });
-      setUser(response.data);
+      if (storedToken) {
+        const response = await axios.get(`${API}/auth/me`, {
+          headers: { Authorization: `Bearer ${storedToken}` }
+        });
+        setUser(response.data);
+      }
     } catch (error) {
       console.error('Refresh user error:', error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
-  );
-};
-
-// Auth Callback Component
-const AuthCallback = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const hasProcessed = useRef(false);
-  const { refreshUser } = useAuth();
-
-  useEffect(() => {
-    if (hasProcessed.current) return;
-    hasProcessed.current = true;
-
-    const processAuth = async () => {
-      const hash = location.hash;
-      const sessionIdMatch = hash.match(/session_id=([^&]+)/);
-      
-      if (sessionIdMatch) {
-        const sessionId = sessionIdMatch[1];
-        try {
-          const response = await axios.get(`${API}/auth/session`, {
-            params: { session_id: sessionId },
-            withCredentials: true
-          });
-          
-          if (response.data.user) {
-            await refreshUser();
-            navigate('/library', { replace: true, state: { user: response.data.user } });
-          }
-        } catch (error) {
-          console.error('Auth callback error:', error);
-          navigate('/login', { replace: true });
-        }
-      } else {
-        navigate('/library', { replace: true });
-      }
-    };
-
-    processAuth();
-  }, [location, navigate, refreshUser]);
-
-  return (
-    <div className="min-h-screen bg-dark flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-secondary">Authenticating...</p>
-      </div>
-    </div>
   );
 };
 
@@ -203,18 +138,13 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 
 // App Router Component
 const AppRouter = () => {
-  const location = useLocation();
-
-  // Check for session_id in hash (OAuth callback)
-  if (location.hash?.includes('session_id=')) {
-    return <AuthCallback />;
-  }
-
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/payment-success" element={<PaymentSuccessPage />} />
       
