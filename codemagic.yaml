@@ -14,7 +14,7 @@ workflows:
         APPLE_TEAM_ID: 6HUND32X2N
 
     scripts:
-      - name: Install dependencies (FORCE NPM)
+      - name: Install dependencies (NPM)
         script: |
           cd frontend
           rm -f yarn.lock
@@ -31,16 +31,11 @@ workflows:
           cd frontend
           npx cap sync ios
 
-      - name: Install CocoaPods
-        script: |
-          cd frontend/ios
-          pod install
-
-      - name: Build iOS (FINAL)
+      - name: Build iOS (NO COCOAPODS)
         script: |
           cd frontend/ios/App
 
-          # ---- VERSIONING (1.0.5 Build 6) ----
+          # ---- VERSIONING ----
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
@@ -48,7 +43,7 @@ workflows:
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
-            echo "Processing icons from $ICON_SRC..."
+            echo "Processing icons..."
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
             sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
@@ -66,7 +61,7 @@ workflows:
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           else
-            echo "Warning: Icon source not found at $ICON_SRC"
+            echo "Warning: Icon source not found at $ICON_SRC. Skipping icon generation."
           fi
 
           # Inject Team ID
