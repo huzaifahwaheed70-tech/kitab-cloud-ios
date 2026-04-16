@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { BookOpen, Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import Logo from '../components/Logo';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -106,12 +107,7 @@ const ResetPasswordPage = () => {
   return (
     <div className="min-h-screen bg-dark flex items-center justify-center p-8">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-3 mb-12" data-testid="reset-password-logo">
-          <div className="w-10 h-10 rounded-sm bg-gold flex items-center justify-center">
-            <BookOpen className="w-6 h-6 text-[#02120F]" />
-          </div>
-          <span className="font-serif text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
-        </Link>
+        <Logo className="mb-12" testId="reset-password-logo" />
 
         <h1 className="font-serif text-4xl font-bold text-[#FDFBF7] mb-2">New Password</h1>
         <p className="text-[#B0C4BF] mb-8">

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
-  BookOpen, Search, Grid, List, Lock, BookMarked, Heart,
+  Search, Grid, List, Lock, BookMarked, Heart,
   LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import Logo from '../components/Logo';
 
 const LibraryPage = () => {
   const { user, token, logout } = useAuth();
@@ -76,12 +77,7 @@ const LibraryPage = () => {
       <nav className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
           <div className="flex items-center justify-between">
-            <Link to="/library" className="flex items-center gap-3" data-testid="library-logo">
-              <div className="w-10 h-10 rounded-sm bg-gold flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-[#02120F]" />
-              </div>
-              <span className="font-serif text-xl font-semibold text-[#FDFBF7] hidden sm:block">Kitab Cloud</span>
-            </Link>
+            <Logo linkTo="/library" testId="library-logo" />
 
             {/* Search Bar - Search by Title */}
             <div className="flex-1 max-w-md mx-4 hidden md:block">
@@ -262,7 +258,7 @@ const LibraryPage = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
-                        <BookOpen className="w-10 h-10 text-gold/30" />
+                        <img src="/logo.png" alt="Book" className="w-10 h-10 opacity-30" />
                       </div>
                     )}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#02120F] to-transparent p-2">
@@ -329,7 +325,7 @@ const LibraryPage = () => {
           </div>
         ) : books.length === 0 ? (
           <div className="text-center py-20">
-            <BookOpen className="w-16 h-16 text-[#B0C4BF] mx-auto mb-4" />
+            <img src="/logo.png" alt="No books" className="w-16 h-16 opacity-50 mx-auto mb-4" />
             <h3 className="font-serif text-2xl text-[#FDFBF7] mb-2">No books found</h3>
             <p className="text-[#B0C4BF]">
               {searchQuery ? 'Try a different search term' : 'Books will appear here once added'}
@@ -375,7 +371,7 @@ const BookCard = ({ book, userTier }) => {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
-            <BookOpen className="w-12 h-12 text-gold/30" />
+            <img src="/logo.png" alt="Book" className="w-12 h-12 opacity-30" />
           </div>
         )}
         
@@ -457,7 +453,7 @@ const BookListItem = ({ book, userTier }) => {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
-            <BookOpen className="w-8 h-8 text-gold/30" />
+            <img src="/logo.png" alt="Book" className="w-8 h-8 opacity-30" />
           </div>
         )}
         {isLocked && (

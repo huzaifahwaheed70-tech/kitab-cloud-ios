@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { BookOpen, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink } from 'lucide-react';
+import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 const LandingPage = () => {
@@ -35,7 +35,7 @@ const LandingPage = () => {
 
   const features = [
     {
-      icon: <BookOpen className="w-8 h-8" />,
+      icon: <Library className="w-8 h-8" />,
       title: "Premium Digital Library",
       description: "Access hundreds of carefully digitized Islamic texts from the Dar-Us-Salam collection."
     },
@@ -164,7 +164,7 @@ const LandingPage = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-12 h-12 text-gold/30" />
+                        <img src="/logo.png" alt="Book" className="w-12 h-12 opacity-30" />
                       </div>
                     )}
                     

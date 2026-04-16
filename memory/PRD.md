@@ -44,8 +44,9 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Admin dashboard (books, users management)
 - ✅ PWA support with service worker
 - ✅ Capacitor integration for native iOS/Android wrapping
+- ✅ Custom logo (user-provided open book icon) throughout app
 
-### Email Integration (NEW - April 2026)
+### Email Integration (April 2026)
 - ✅ Resend email service integration
 - ✅ Welcome emails sent to new users on registration
 - ✅ Password reset flow with email links
@@ -67,6 +68,7 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Fixed save page functionality (correct API parameter format)
 - ✅ Fixed password form not showing for email/password users
 - ✅ Removed Google OAuth completely (was causing login bugs)
+- ✅ Updated logo throughout the app to use user's custom logo
 
 ## Subscription Tiers
 | Tier | Name | Price | Book Limit | Features |

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { BookOpen, Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
+import Logo from '../components/Logo';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -120,12 +121,7 @@ const PricingPage = () => {
       {/* Navigation */}
       <nav className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3" data-testid="pricing-logo">
-            <div className="w-10 h-10 rounded-sm bg-gold flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-[#02120F]" />
-            </div>
-            <span className="font-serif text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
-          </Link>
+          <Logo testId="pricing-logo" />
           
           <div className="flex items-center gap-4">
             {user ? (
@@ -303,9 +299,7 @@ const PricingPage = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-sm bg-gold flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-[#02120F]" />
-              </div>
+              <img src="/logo.png" alt="Kitab Cloud" className="w-8 h-8 rounded-sm object-cover" />
               <span className="font-serif text-lg text-[#FDFBF7]">Dar-Us-Salam Kitab Cloud</span>
             </div>
             <p className="text-[#B0C4BF] text-sm">

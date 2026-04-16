@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { BookOpen, BookMarked, Trash2, ArrowLeft } from 'lucide-react';
+import { BookMarked, Trash2, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Progress } from '../components/ui/progress';
 import { toast } from 'sonner';
@@ -133,7 +133,7 @@ const BookshelfPage = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
-                        <BookOpen className="w-12 h-12 text-gold/30" />
+                        <img src="/logo.png" alt="Book" className="w-12 h-12 opacity-30" />
                       </div>
                     )}
                     <div className={`absolute top-2 left-2 tier-badge tier-${book.tier_level}`}>

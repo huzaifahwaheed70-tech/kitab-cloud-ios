@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   User, ArrowLeft, Mail, Lock, CreditCard, AlertTriangle,
-  CheckCircle, XCircle, Calendar, BookOpen, Crown
+  CheckCircle, XCircle, Calendar, Library, Crown
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -368,7 +368,7 @@ const SettingsPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div className="bg-[#082E26] rounded-sm p-4">
                   <div className="flex items-center gap-2 text-[#B0C4BF] mb-1">
-                    <BookOpen className="w-4 h-4" />
+                    <Library className="w-4 h-4" />
                     <span className="text-sm">Book Limit</span>
                   </div>
                   <p className="text-[#FDFBF7] font-medium">

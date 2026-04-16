@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
-  BookOpen, Users, ArrowLeft, Plus, Edit, Trash2, 
+  Library, Users, ArrowLeft, Plus, Edit, Trash2, 
   Search, Save
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -259,7 +259,7 @@ const AdminDashboard = () => {
             <div className="glass-card rounded-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center">
-                  <BookOpen className="w-5 h-5 text-gold" />
+                  <Library className="w-5 h-5 text-gold" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-[#FDFBF7]">{stats.total_books}</p>
@@ -459,7 +459,7 @@ const AdminDashboard = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-6 h-6 text-gold/30" />
+                        <img src="/logo.png" alt="Book" className="w-6 h-6 opacity-30" />
                       </div>
                     )}
                   </div>

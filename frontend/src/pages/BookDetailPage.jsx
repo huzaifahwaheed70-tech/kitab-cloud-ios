@@ -4,8 +4,8 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { 
-  BookOpen, ArrowLeft, BookMarked, ChevronLeft, ChevronRight, 
-  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search
+  ArrowLeft, BookMarked, ChevronLeft, ChevronRight, 
+  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -569,7 +569,7 @@ const BookDetailPage = () => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
-                  <BookOpen className="w-20 h-20 text-gold/30" />
+                  <img src="/logo.png" alt="Book" className="w-20 h-20 opacity-30" />
                 </div>
               )}
               
@@ -657,7 +657,7 @@ const BookDetailPage = () => {
                         </>
                       ) : (
                         <>
-                          <BookOpen className="w-5 h-5 mr-2" />
+                          <Library className="w-5 h-5 mr-2" />
                           Read Now
                         </>
                       )}
