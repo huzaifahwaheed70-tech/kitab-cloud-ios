@@ -38,4 +38,8 @@
     "@capacitor/cli": "^8.3.0",
     "@capacitor/ios": "^8.3.0"
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d72059b33a3acecc7570bbf5337f6b89da72556b

@@ -1,7 +1,6 @@
 workflows:
   ios-release:
     name: Kitab Cloud iOS Build
-
     instance_type: mac_mini_m2
     max_build_duration: 60
 
@@ -15,20 +14,17 @@ workflows:
         APPLE_TEAM_ID: 6HUND32X2N
 
     scripts:
-      - name: Install dependencies
+      - name: Install dependencies (FORCE NPM)
         script: |
           cd frontend
-          yarn install --no-immutable
+          rm -f yarn.lock
+          rm -rf node_modules
+          npm install
 
       - name: Build React app
         script: |
           cd frontend
-          CI=false yarn build
-
-      - name: Add iOS platform
-        script: |
-          cd frontend
-          npx cap add ios || true
+          CI=false npm run build
 
       - name: Sync Capacitor
         script: |
@@ -37,16 +33,46 @@ workflows:
 
       - name: Install CocoaPods
         script: |
-          cd frontend/ios/App
+          cd frontend/ios
           pod install
 
       - name: Build iOS (FINAL)
         script: |
           cd frontend/ios/App
 
-          # Inject Team ID (CRITICAL)
+          # ---- VERSIONING (1.0.5 Build 6) ----
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
+
+          # ---- ICONS ----
+          ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
+          ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+          if [ -f "$ICON_SRC" ]; then
+            echo "Processing icons from $ICON_SRC..."
+            sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
+            sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
+            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
+            sips -z 87 87 "$ICON_SRC" --out "$ICONSET/AppIcon-29@3x.png"
+            sips -z 58 58 "$ICON_SRC" --out "$ICONSET/AppIcon-29@2x.png"
+            sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
+            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
+            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
+            sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
+            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
+            sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
+            sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
+            sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
+            sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
+            sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
+            cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
+          else
+            echo "Warning: Icon source not found at $ICON_SRC"
+          fi
+
+          # Inject Team ID
           sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
+          # ---- ARCHIVE ----
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -59,7 +85,7 @@ workflows:
         script: |
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportOptionsPlist /Users/builder/clone/export_options.plist \
             -exportPath /Users/builder/export
 
     artifacts:
