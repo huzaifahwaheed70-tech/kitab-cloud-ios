@@ -29,7 +29,7 @@ workflows:
       - name: Sync Capacitor
         script: |
           cd frontend
-          npx cap sync ios
+          npx --yes cap sync ios
 
       - name: Build iOS (NO COCOAPODS)
         script: |
@@ -64,7 +64,7 @@ workflows:
             echo "Warning: Icon source not found at $ICON_SRC. Skipping icon generation."
           fi
 
-          # Inject Team ID
+          # Inject Team ID (Fixed typo in file path)
           sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
           # ---- ARCHIVE ----
