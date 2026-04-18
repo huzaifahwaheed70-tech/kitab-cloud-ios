@@ -3,10 +3,8 @@ workflows:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
     max_build_duration: 60
-
     integrations:
       app_store_connect: appstore_credentials
-
     environment:
       groups:
         - appstore_credentials
@@ -15,7 +13,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
-
     scripts:
       - name: Install dependencies (NPM)
         script: |
@@ -34,15 +31,15 @@ workflows:
           cd frontend
           npx --yes cap sync ios
 
-      - name: Build iOS (FINAL FIXED)
+      - name: Build iOS
         script: |
           cd frontend/ios/App
 
-          # ---- VERSIONING ----
+          # Versioning
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
-          # ---- ICONS ----
+          # Icons
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -63,28 +60,27 @@ workflows:
             sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
-          else
-            echo "Warning: Icon source not found at $ICON_SRC. Skipping icon generation."
           fi
 
-          # ---- MANUAL SIGNING CONFIG ----
-          # Force the project to use Manual signing instead of searching for an Apple Account
+          # Fix signing settings
           sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
-          sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
+          sed -i.bak2 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
-          # Extract the UUID of the provisioning profile downloaded by Codemagic
-          PROV_PROFILE_UUID=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1 | xargs basename -s .mobileprovision)
-          echo "Using Provisioning Profile UUID: $PROV_PROFILE_UUID"
+          # Get provisioning profile UUID properly
+          PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
+          PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
+          echo "Using Provisioning Profile UUID: $PROV_UUID"
 
-          # ---- ARCHIVE ----
+          # Archive
           xcodebuild archive \
             -project App.xcodeproj \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
-            PROVISIONING_PROFILE=$PROV_PROFILE_UUID \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE="$PROV_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution"
 
       - name: Export IPA
@@ -96,7 +92,6 @@ workflows:
 
     artifacts:
       - /Users/builder/export/*.ipa
-
     publishing:
       app_store_connect:
         auth: integration
