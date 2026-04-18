@@ -12,6 +12,9 @@ workflows:
         - appstore_credentials
       vars:
         APPLE_TEAM_ID: 6HUND32X2N
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: host.emergent.kitabcloud
 
     scripts:
       - name: Install dependencies (NPM)
@@ -64,17 +67,25 @@ workflows:
             echo "Warning: Icon source not found at $ICON_SRC. Skipping icon generation."
           fi
 
-          # Inject Team ID
+          # ---- MANUAL SIGNING CONFIG ----
+          # Force the project to use Manual signing instead of searching for an Apple Account
+          sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
           sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
-          # ---- ARCHIVE (USE PROJECT, NOT WORKSPACE) ----
+          # Extract the UUID of the provisioning profile downloaded by Codemagic
+          PROV_PROFILE_UUID=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1 | xargs basename -s .mobileprovision)
+          echo "Using Provisioning Profile UUID: $PROV_PROFILE_UUID"
+
+          # ---- ARCHIVE ----
           xcodebuild archive \
             -project App.xcodeproj \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM=$APPLE_TEAM_ID
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
+            PROVISIONING_PROFILE=$PROV_PROFILE_UUID \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
       - name: Export IPA
         script: |
