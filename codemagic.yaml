@@ -31,7 +31,7 @@ workflows:
           cd frontend
           npx --yes cap sync ios
 
-      - name: Build iOS (NO COCOAPODS)
+      - name: Build iOS (FINAL FIXED)
         script: |
           cd frontend/ios/App
 
@@ -64,12 +64,12 @@ workflows:
             echo "Warning: Icon source not found at $ICON_SRC. Skipping icon generation."
           fi
 
-          # Inject Team ID (Fixed typo in file path)
+          # Inject Team ID
           sed -i.bak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
-          # ---- ARCHIVE ----
+          # ---- ARCHIVE (USE PROJECT, NOT WORKSPACE) ----
           xcodebuild archive \
-            -workspace App.xcworkspace \
+            -project App.xcodeproj \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
