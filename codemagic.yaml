@@ -93,7 +93,7 @@ workflows:
 
   android-release:
     name: Kitab Cloud Android Build
-    instance_type: linux
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       groups:
@@ -121,14 +121,14 @@ workflows:
 
       - name: Decode keystore
         script: |
-          echo $CM_KEYSTORE | base64 --decode > /home/builder/kitabcloud.keystore
+          echo $CM_KEYSTORE | base64 --decode > /Users/builder/kitabcloud.keystore
 
       - name: Build Android AAB
         script: |
           cd frontend/android
           chmod +x gradlew
           ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=/home/builder/kitabcloud.keystore \
+            -Pandroid.injected.signing.store.file=/Users/builder/kitabcloud.keystore \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
             -Pandroid.injected.signing.key.password=$KEY_PASSWORD
