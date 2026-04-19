@@ -15,6 +15,12 @@
     "backgroundColor": "#02120F",
     "allowNavigation": ["*"]
   },
+  "android": {
+    "backgroundColor": "#02120F",
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 2000,
