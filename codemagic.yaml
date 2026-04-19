@@ -35,11 +35,9 @@ workflows:
         script: |
           cd frontend/ios/App
 
-          # Versioning
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
-          # Icons
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -62,17 +60,14 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
-          # Fix signing settings
           sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
           sed -i.bak2 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
-          # Get provisioning profile UUID properly
           PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
           security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
           PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
           echo "Using Provisioning Profile UUID: $PROV_UUID"
 
-          # Archive
           xcodebuild archive \
             -project App.xcodeproj \
             -scheme App \
@@ -95,3 +90,55 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
+
+  android-release:
+    name: Kitab Cloud Android Build
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      groups:
+        - android_credentials
+      vars:
+        PACKAGE_NAME: host.emergent.kitabcloud
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd frontend
+          rm -f yarn.lock
+          rm -rf node_modules
+          npm install
+
+      - name: Build React app
+        script: |
+          cd frontend
+          CI=false npm run build
+
+      - name: Add Android platform
+        script: |
+          cd frontend
+          npx cap add android || true
+          npx cap sync android
+
+      - name: Build Android AAB
+        script: |
+          cd frontend/android
+          chmod +x gradlew
+
+          # Set version
+          sed -i "s/versionCode [0-9]*/versionCode 6/" app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"1.0.5\"/" app/build.gradle
+
+          # Build signed AAB
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=/Users/builder/clone/kitabcloud.keystore \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+
+    artifacts:
+      - frontend/android/app/build/outputs/bundle/release/app-release.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+
