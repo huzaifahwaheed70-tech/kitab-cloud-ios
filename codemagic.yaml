@@ -93,7 +93,7 @@ workflows:
 
   android-release:
     name: Kitab Cloud Android Build
-    instance_type: linux_x2
+    instance_type: linux_x64
     max_build_duration: 60
     environment:
       groups:
@@ -113,24 +113,22 @@ workflows:
           cd frontend
           CI=false npm run build
 
-      - name: Add Android platform
+      - name: Add and Sync Capacitor Android
         script: |
           cd frontend
           npx cap add android || true
           npx cap sync android
 
+      - name: Decode keystore
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > /home/builder/kitabcloud.keystore
+
       - name: Build Android AAB
         script: |
           cd frontend/android
           chmod +x gradlew
-
-          # Set version
-          sed -i "s/versionCode [0-9]*/versionCode 6/" app/build.gradle
-          sed -i "s/versionName \".*\"/versionName \"1.0.5\"/" app/build.gradle
-
-          # Build signed AAB
           ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=/Users/builder/clone/kitabcloud.keystore \
+            -Pandroid.injected.signing.store.file=/home/builder/kitabcloud.keystore \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
             -Pandroid.injected.signing.key.password=$KEY_PASSWORD
@@ -139,6 +137,5 @@ workflows:
       - frontend/android/app/build/outputs/bundle/release/app-release.aab
     publishing:
       google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        credentials: $GPLAY_SERVICE_ACCOUNT_JSON
         track: internal
-
