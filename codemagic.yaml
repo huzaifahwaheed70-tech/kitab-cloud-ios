@@ -93,7 +93,7 @@ workflows:
 
   android-release:
     name: Kitab Cloud Android Build
-    instance_type: linux_x64
+    instance_type: linux
     max_build_duration: 60
     environment:
       groups:
