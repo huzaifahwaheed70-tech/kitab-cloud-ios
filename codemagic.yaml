@@ -34,7 +34,6 @@ workflows:
       - name: Build iOS
         script: |
           cd frontend/ios/App
-
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 6" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
@@ -123,19 +122,24 @@ workflows:
         script: |
           echo $CM_KEYSTORE | base64 --decode > /Users/builder/kitabcloud.keystore
 
+      - name: Decode Google credentials
+        script: |
+          echo $GPLAY_SERVICE_ACCOUNT_JSON | base64 --decode > /Users/builder/google_credentials.json
+
       - name: Build Android AAB
         script: |
           cd frontend/android
           chmod +x gradlew
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=/Users/builder/kitabcloud.keystore \
-            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
 
     artifacts:
-      - frontend/android/app/build/outputs/bundle/release/app-release.aab
+      - frontend/android/app/build/outputs/bundle/release/*.aab
+    
     publishing:
       google_play:
-        credentials: $GPLAY_SERVICE_ACCOUNT_JSON
+        credentials: /Users/builder/google_credentials.json
         track: internal
