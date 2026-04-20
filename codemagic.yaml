@@ -120,11 +120,8 @@ workflows:
 
       - name: Decode keystore
         script: |
+          # Ensure $CM_KEYSTORE is your base64 encoded keystore file
           echo $CM_KEYSTORE | base64 --decode > /Users/builder/kitabcloud.keystore
-
-      - name: Decode Google credentials
-        script: |
-          echo $GPLAY_SERVICE_ACCOUNT_JSON | base64 --decode > /Users/builder/google_credentials.json
 
       - name: Build Android AAB
         script: |
@@ -141,5 +138,6 @@ workflows:
     
     publishing:
       google_play:
-        credentials: /Users/builder/google_credentials.json
+        # Codemagic expects the variable name starting with $ here
+        credentials: $GPLAY_SERVICE_ACCOUNT_JSON
         track: internal
