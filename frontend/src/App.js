@@ -1,182 +1,282 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, API } from '../App';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { BookOpen, Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { toast } from 'sonner';
-import { Capacitor } from '@capacitor/core';
-import { buySubscription } from '../purchase';
+import { Toaster } from './components/ui/sonner';
+import './App.css';
 
-const PricingPage = () => {
-  const { user, token } = useAuth();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(null);
+// Import the store initialization
+import { initStore } from './purchase';
 
-  // THIS IS THE PLATFORM CHECK FROM YOUR SCREENSHOT
-  const platform = Capacitor.getPlatform();
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import LibraryPage from './pages/LibraryPage';
+import BookDetailPage from './pages/BookDetailPage';
+import BookshelfPage from './pages/BookshelfPage';
+import FavoritesPage from './pages/FavoritesPage';
+import PricingPage from './pages/PricingPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import AdminDashboard from './pages/AdminDashboard';
+import SettingsPage from './pages/SettingsPage';
 
-  const tiers = [
-    { 
-      tier: 0, 
-      name: "Pay Per Book", 
-      price: 0, 
-      features: ["Buy individual PDFs", "Own books forever", "No monthly commitment", "Access anytime", "Email support"],
-      color: "tier-0",
-      perBook: true
-    },
-    { 
-      tier: 1, 
-      name: "Basic", 
-      price: 20, 
-      features: ["10 books per month", "Standard library access", "Bookmarks & progress tracking", "Favorites list", "Email support"],
-      color: "tier-1"
-    },
-    { 
-      tier: 2, 
-      name: "Standard", 
-      price: 40, 
-      features: ["20 books per month", "Standard library access", "Bookmarks & progress tracking", "Favorites list", "Email support"],
-      color: "tier-2"
-    },
-    { 
-      tier: 3, 
-      name: "Advanced", 
-      price: 60, 
-      features: ["30 books per month", "Volume books included", "In-book text search", "Bookmarks & progress tracking", "Email support"],
-      color: "tier-3"
-    },
-    { 
-      tier: 4, 
-      name: "Premium", 
-      price: 80, 
-      features: ["Unlimited books", "All books including advanced", "Volume books included", "In-book text search", "Email support"],
-      color: "tier-4",
-      featured: true
-    }
-  ];
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
-  // THIS IS THE HANDLESUBSCRIBE LOGIC FROM YOUR SCREENSHOT
-  const handleSubscribe = async (tier) => {
-    if (tier === 0) {
-      navigate(user ? '/library' : '/register');
+// --- Auth Context & Provider ---
+
+const AuthContext = createContext(null);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};
+
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(localStorage.getItem('auth_token'));
+
+  const checkAuth = useCallback(async () => {
+    if (window.location.hash?.includes('session_id=')) {
+      setLoading(false);
       return;
     }
-
-    if (!user) {
-      navigate('/register');
-      return;
-    }
-
-    if (user.subscription_tier >= tier) {
-      toast.info(`You already have Tier ${user.subscription_tier} or higher`);
-      return;
-    }
-
-    setLoading(tier);
-
-    if (platform === 'ios') {
-      try {
-        // Apple StoreKit logic for iOS
-        await buySubscription(tier);
-        setLoading(null);
-      } catch (error) {
-        toast.error('Failed to initiate Apple purchase');
-        setLoading(null);
+    try {
+      const storedToken = localStorage.getItem('auth_token');
+      if (storedToken) {
+        const response = await axios.get(`${API}/auth/me`, {
+          headers: { Authorization: `Bearer ${storedToken}` }
+        });
+        setUser(response.data);
+        setToken(storedToken);
+      } else {
+        const response = await axios.get(`${API}/auth/me`, {
+          withCredentials: true
+        });
+        setUser(response.data);
       }
-    } else {
-      try {
-        // Stripe logic for Web and Android
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const response = await axios.post(`${API}/payments/create-checkout`, {
-          tier,
-          origin_url: 'https://kitab-cloud.emergent.host'
-        }, { headers, withCredentials: true });
+    } catch (error) {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('auth_token');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-        window.location.href = response.data.url;
-      } catch (error) {
-        toast.error(error.response?.data?.detail || 'Failed to start checkout');
-        setLoading(null);
-      }
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  const login = async (email, password) => {
+    const response = await axios.post(`${API}/auth/login`, { email, password });
+    const { token: newToken, user: userData } = response.data;
+    localStorage.setItem('auth_token', newToken);
+    setToken(newToken);
+    setUser(userData);
+    return userData;
+  };
+
+  const register = async (email, password, name) => {
+    const response = await axios.post(`${API}/auth/register`, { email, password, name });
+    const { token: newToken, user: userData } = response.data;
+    localStorage.setItem('auth_token', newToken);
+    setToken(newToken);
+    setUser(userData);
+    return userData;
+  };
+
+  const loginWithGoogle = () => {
+    const redirectUrl = 'https://kitab-cloud.emergent.host/library';
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  const logout = async () => {
+    try {
+      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    localStorage.removeItem('auth_token');
+    setToken(null);
+    setUser(null);
+  };
+
+  const refreshUser = async () => {
+    try {
+      const storedToken = localStorage.getItem('auth_token');
+      const response = await axios.get(`${API}/auth/me`, {
+        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+        withCredentials: true
+      });
+      setUser(response.data);
+    } catch (error) {
+      console.error('Refresh user error:', error);
     }
   };
 
-  const userTier = user?.subscription_tier || 0;
+  return (
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, logout, refreshUser }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// --- Auth Callback Component ---
+
+const AuthCallback = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasProcessed = useRef(false);
+  const { refreshUser } = useAuth();
+
+  useEffect(() => {
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
+    const processAuth = async () => {
+      const hash = location.hash;
+      const sessionIdMatch = hash.match(/session_id=([^&]+)/);
+      
+      if (sessionIdMatch) {
+        const sessionId = sessionIdMatch[1];
+        try {
+          const response = await axios.get(`${API}/auth/session`, {
+            params: { session_id: sessionId },
+            withCredentials: true
+          });
+          
+          if (response.data.user) {
+            if (response.data.token) {
+              localStorage.setItem('auth_token', response.data.token);
+            }
+            await refreshUser();
+            navigate('/library', { replace: true, state: { user: response.data.user } });
+          }
+        } catch (error) {
+          console.error('Auth callback error:', error);
+          navigate('/login', { replace: true });
+        }
+      } else {
+        navigate('/library', { replace: true });
+      }
+    };
+
+    processAuth();
+  }, [location, navigate, refreshUser]);
 
   return (
-    <div className="min-h-screen bg-dark">
-      <nav className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-sm bg-gold flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-[#02120F]" />
-            </div>
-            <span className="font-serif text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            {user ? (
-              <Link to="/library">
-                <Button variant="ghost" className="text-[#B0C4BF]">
-                  <ArrowLeft className="w-5 h-5 mr-2" />
-                  Back to Library
-                </Button>
-              </Link>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" className="text-[#B0C4BF]">Sign In</Button>
-                </Link>
-                <Link to="/register">
-                  <Button className="bg-gold text-[#02120F]">Get Started</Button>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      <section className="py-16 md:py-24 text-center">
-        <div className="max-w-7xl mx-auto px-6">
-          <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Plans</p>
-          <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] mb-6">Choose Your Access Level</h1>
-          <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">Subscribe monthly to read books, or buy individual PDFs.</p>
-        </div>
-      </section>
-
-      <section className="pb-24">
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-3 lg:grid-cols-5 gap-6">
-          {tiers.map((tier) => (
-            <div key={tier.tier} className={`rounded-sm border p-6 ${tier.featured ? 'bg-gold/10 border-gold' : 'bg-surface border-gold/20'}`}>
-              <div className={`tier-badge ${tier.color} mb-3`}>{tier.tier === 0 ? 'No Sub' : `Tier ${tier.tier}`}</div>
-              <h3 className="font-serif text-2xl font-semibold text-[#FDFBF7] mb-2">{tier.name}</h3>
-              <div className="text-4xl font-bold text-gold mb-6">${tier.price}<span className="text-base text-[#B0C4BF]">/mo</span></div>
-              <ul className="space-y-3 mb-6">
-                {tier.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
-                    <Check className="w-4 h-4 text-gold" /> {f}
-                  </li>
-                ))}
-              </ul>
-              
-              {/* THIS IS THE CLEAN UI SEPARATION FROM YOUR SCREENSHOT */}
-              <Button
-                onClick={() => handleSubscribe(tier.tier)}
-                disabled={loading === tier.tier || (tier.tier !== 0 && userTier >= tier.tier)}
-                className="w-full bg-gold text-[#02120F]"
-              >
-                {loading === tier.tier ? 'Processing...' : (
-                  <>
-                    {platform === 'ios' ? 'Join with Apple' : 'Subscribe'} 
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </>
-                )}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </section>
+    <div className="min-h-screen bg-dark flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-secondary">Authenticating...</p>
+      </div>
     </div>
   );
 };
 
-export default PricingPage;
+// --- Route Protection ---
+
+const ProtectedRoute = ({ children, requireAdmin = false }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requireAdmin && !user.is_admin) {
+    return <Navigate to="/library" replace />;
+  }
+
+  return children;
+};
+
+// --- Router Logic ---
+
+const AppRouter = () => {
+  const location = useLocation();
+
+  if (location.hash?.includes('session_id=')) {
+    return <AuthCallback />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/payment-success" element={<PaymentSuccessPage />} />
+      
+      <Route path="/library" element={
+        <ProtectedRoute>
+          <LibraryPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/book/:bookId" element={
+        <ProtectedRoute>
+          <BookDetailPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/bookshelf" element={
+        <ProtectedRoute>
+          <BookshelfPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/favorites" element={
+        <ProtectedRoute>
+          <FavoritesPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <SettingsPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin" element={
+        <ProtectedRoute requireAdmin>
+          <AdminDashboard />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+// --- Main App Component ---
+
+function App() {
+  // Initialize the store once when the app mounts
+  useEffect(() => {
+    initStore();
+  }, []);
+
+  return (
+    <HashRouter>
+      <AuthProvider>
+        <AppRouter />
+        <Toaster position="bottom-right" richColors />
+      </AuthProvider>
+    </HashRouter>
+  );
+}
+
+export default App;
+export { API, BACKEND_URL };
