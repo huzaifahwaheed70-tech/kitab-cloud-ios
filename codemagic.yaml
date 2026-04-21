@@ -120,7 +120,6 @@ workflows:
 
       - name: Decode keystore
         script: |
-          # Ensure $CM_KEYSTORE is your base64 encoded keystore file
           echo $CM_KEYSTORE | base64 --decode > /Users/builder/kitabcloud.keystore
 
       - name: Build Android AAB
@@ -129,15 +128,13 @@ workflows:
           chmod +x gradlew
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=/Users/builder/kitabcloud.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
 
     artifacts:
       - frontend/android/app/build/outputs/bundle/release/*.aab
-    
     publishing:
       google_play:
-        # Codemagic expects the variable name starting with $ here
-        credentials: $GPLAY_SERVICE_ACCOUNT_JSON
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
