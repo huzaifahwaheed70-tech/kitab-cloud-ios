@@ -99,7 +99,14 @@ workflows:
         - android_credentials
       vars:
         PACKAGE_NAME: host.emergent.kitabcloud
+        JAVA_HOME: /Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
     scripts:
+      - name: Set Java 21
+        script: |
+          export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
+
       - name: Install dependencies
         script: |
           cd frontend
@@ -124,6 +131,8 @@ workflows:
 
       - name: Build Android AAB
         script: |
+          export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
+          export PATH=$JAVA_HOME/bin:$PATH
           cd frontend/android
           chmod +x gradlew
           ./gradlew bundleRelease \
