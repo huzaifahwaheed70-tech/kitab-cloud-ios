@@ -4,6 +4,9 @@ import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
+// Import the store initialization
+import { initStore } from './purchase';
+
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -18,6 +21,8 @@ import SettingsPage from './pages/SettingsPage';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// --- Auth Context & Provider ---
 
 const AuthContext = createContext(null);
 export const useAuth = () => {
@@ -119,6 +124,8 @@ const AuthProvider = ({ children }) => {
   );
 };
 
+// --- Auth Callback Component ---
+
 const AuthCallback = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -170,6 +177,8 @@ const AuthCallback = () => {
   );
 };
 
+// --- Route Protection ---
+
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -192,6 +201,8 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 
   return children;
 };
+
+// --- Router Logic ---
 
 const AppRouter = () => {
   const location = useLocation();
@@ -249,7 +260,14 @@ const AppRouter = () => {
   );
 };
 
+// --- Main App Component ---
+
 function App() {
+  // Initialize the store once when the app mounts
+  useEffect(() => {
+    initStore();
+  }, []);
+
   return (
     <HashRouter>
       <AuthProvider>
