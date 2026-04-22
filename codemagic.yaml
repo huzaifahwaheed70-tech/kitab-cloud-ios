@@ -1,4 +1,4 @@
-Workflows:
+workflows:
   ios-release:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
