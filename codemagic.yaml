@@ -59,6 +59,13 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
+          # Install Cordova Purchase Plugin
+          cd ../../..
+          npx cap add ios || true
+          npm install cordova-plugin-purchase
+          npx cap sync ios
+          cd ios/App
+
           sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
           sed -i.bak2 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
