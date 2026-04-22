@@ -29,11 +29,13 @@ workflows:
       - name: Sync Capacitor
         script: |
           cd frontend
-          npx --yes cap sync ios
+          npx cap add ios || true
+          npx cap sync ios
 
       - name: Build iOS
         script: |
           cd frontend/ios/App
+
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 8" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
@@ -58,13 +60,6 @@ workflows:
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
-
-          # Install Cordova Purchase Plugin
-          cd ../../..
-          npx cap add ios || true
-          npm install cordova-plugin-purchase
-          npx cap sync ios
-          cd ios/App
 
           sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
           sed -i.bak2 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
@@ -154,4 +149,3 @@ workflows:
       google_play:
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
-        submit_as_draft: true
