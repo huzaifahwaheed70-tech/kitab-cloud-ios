@@ -1,37 +1,78 @@
 import { Capacitor } from '@capacitor/core';
 
-let store;
+// This function initializes the store and sets up the listeners
+export const initializeStore = () => {
+  if (Capacitor.getPlatform() === 'web') return;
 
-export function initStore() {
-  if (!window.store) return;
+  const { store, ProductType, Platform } = window.CdvPurchase;
 
-  store = window.store;
+  // 1. Register your Products
+  // Replace these IDs with the exact ones from App Store Connect
+  store.register([
+    {
+      id: 'host.emergent.kitabcloud.tier1',
+      type: ProductType.PAID_SUBSCRIPTION,
+      platform: Platform.APPLE_APP_STORE,
+    },
+    {
+      id: 'host.emergent.kitabcloud.tier2',
+      type: ProductType.PAID_SUBSCRIPTION,
+      platform: Platform.APPLE_APP_STORE,
+    },
+    {
+      id: 'host.emergent.kitabcloud.tier3',
+      type: ProductType.PAID_SUBSCRIPTION,
+      platform: Platform.APPLE_APP_STORE,
+    },
+    {
+      id: 'host.emergent.kitabcloud.tier4',
+      type: ProductType.PAID_SUBSCRIPTION,
+      platform: Platform.APPLE_APP_STORE,
+    }
+  ]);
 
-  store.register({
-    id: 'kitabcloud.premium',
-    type: store.PAID_SUBSCRIPTION
-  });
+  // 2. Handle Purchase Validation/Approval
+  store.when()
+    .approved((transaction) => {
+      console.log('Purchase Approved:', transaction);
+      // This is where you tell your backend to verify the receipt
+      transaction.verify();
+    })
+    .verified((receipt) => {
+      console.log('Purchase Verified:', receipt);
+      receipt.finish();
+    })
+    .finished((transaction) => {
+      console.log('Transaction Finished:', transaction);
+    });
 
-  store.when('kitabcloud.premium').approved((order) => {
-    console.log('Purchase approved');
+  // 3. Initialize the store
+  store.initialize([Platform.APPLE_APP_STORE]);
+};
 
-    order.verify();
-  });
+// This is the function called by your PricingPage.jsx
+export const buySubscription = async (tierNumber) => {
+  if (Capacitor.getPlatform() === 'web') {
+    console.warn('In-App Purchases are not available on web.');
+    return;
+  }
 
-  store.when('kitabcloud.premium').verified((receipt) => {
-    console.log('Purchase verified');
+  const { store } = window.CdvPurchase;
+  
+  // Map your tier numbers to your Apple Product IDs
+  const productId = `host.emergent.kitabcloud.tier${tierNumber}`;
+  
+  const product = store.get(productId);
 
-    receipt.finish();
+  if (product && product.canPurchase) {
+    product.getOffer().order();
+  } else {
+    console.error('Product not found or unavailable:', productId);
+  }
+};
 
-    // Unlock books
-    localStorage.setItem('premium', 'true');
-  });
-
-  store.refresh();
-}
-
-export function buySubscription() {
-  if (!store) return;
-
-  store.order('kitabcloud.premium');
-}
+// Function for the "Restore Purchases" button Apple requires
+export const restorePurchases = () => {
+  if (Capacitor.getPlatform() === 'web') return;
+  window.CdvPurchase.store.restore();
+};
