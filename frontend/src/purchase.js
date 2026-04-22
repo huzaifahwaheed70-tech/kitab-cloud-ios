@@ -1,67 +1,62 @@
 import { Capacitor } from '@capacitor/core';
 
-// This function initializes the store and sets up the listeners
-export const initializeStore = () => {
+export const initStore = () => {
   if (Capacitor.getPlatform() === 'web') return;
+  if (!window.CdvPurchase) return;
 
   const { store, ProductType, Platform } = window.CdvPurchase;
 
-  // 1. Register your Products
-  // Replace these IDs with the exact ones from App Store Connect
   store.register([
     {
-      id: 'host.emergent.kitabcloud.tier1',
+      id: 'kitabcloud.basic',
       type: ProductType.PAID_SUBSCRIPTION,
       platform: Platform.APPLE_APP_STORE,
     },
     {
-      id: 'host.emergent.kitabcloud.tier2',
+      id: 'kitabcloud.standard',
       type: ProductType.PAID_SUBSCRIPTION,
       platform: Platform.APPLE_APP_STORE,
     },
     {
-      id: 'host.emergent.kitabcloud.tier3',
+      id: 'kitabcloud.advanced',
       type: ProductType.PAID_SUBSCRIPTION,
       platform: Platform.APPLE_APP_STORE,
     },
     {
-      id: 'host.emergent.kitabcloud.tier4',
+      id: 'kitabcloud.premium',
       type: ProductType.PAID_SUBSCRIPTION,
       platform: Platform.APPLE_APP_STORE,
     }
   ]);
 
-  // 2. Handle Purchase Validation/Approval
   store.when()
     .approved((transaction) => {
-      console.log('Purchase Approved:', transaction);
-      // This is where you tell your backend to verify the receipt
       transaction.verify();
     })
     .verified((receipt) => {
-      console.log('Purchase Verified:', receipt);
       receipt.finish();
     })
     .finished((transaction) => {
       console.log('Transaction Finished:', transaction);
     });
 
-  // 3. Initialize the store
   store.initialize([Platform.APPLE_APP_STORE]);
 };
 
-// This is the function called by your PricingPage.jsx
 export const buySubscription = async (tierNumber) => {
-  if (Capacitor.getPlatform() === 'web') {
-    console.warn('In-App Purchases are not available on web.');
-    return;
-  }
+  if (Capacitor.getPlatform() !== 'ios') return;
+  if (!window.CdvPurchase) return;
 
   const { store } = window.CdvPurchase;
-  
-  // Map your tier numbers to your Apple Product IDs
-  const productId = `host.emergent.kitabcloud.tier${tierNumber}`;
-  
+
+  const TIER_PRODUCTS = {
+    1: 'kitabcloud.basic',
+    2: 'kitabcloud.standard',
+    3: 'kitabcloud.advanced',
+    4: 'kitabcloud.premium'
+  };
+
+  const productId = TIER_PRODUCTS[tierNumber];
   const product = store.get(productId);
 
   if (product && product.canPurchase) {
@@ -71,8 +66,8 @@ export const buySubscription = async (tierNumber) => {
   }
 };
 
-// Function for the "Restore Purchases" button Apple requires
 export const restorePurchases = () => {
-  if (Capacitor.getPlatform() === 'web') return;
+  if (Capacitor.getPlatform() !== 'ios') return;
+  if (!window.CdvPurchase) return;
   window.CdvPurchase.store.restore();
 };
