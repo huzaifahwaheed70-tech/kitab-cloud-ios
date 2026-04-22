@@ -1,4 +1,4 @@
-workflows:
+Workflows:
   ios-release:
     name: Kitab Cloud iOS Build
     instance_type: mac_mini_m2
@@ -30,6 +30,7 @@ workflows:
         script: |
           cd frontend
           npx cap add ios || true
+          npm install cordova-plugin-purchase
           npx cap sync ios
 
       - name: Build iOS
@@ -125,6 +126,7 @@ workflows:
         script: |
           cd frontend
           npx cap add android || true
+          npm install cordova-plugin-purchase
           npx cap sync android
 
       - name: Decode keystore
