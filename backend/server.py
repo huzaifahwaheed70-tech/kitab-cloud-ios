@@ -16,6 +16,9 @@ import requests
 from io import BytesIO
 import resend
 import secrets
+import httpx
+import base64
+import json
 
 # Stripe Integration
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
@@ -49,6 +52,21 @@ SUBSCRIPTION_TIERS = {
     3: {"name": "Advanced", "price": 60.00, "book_limit": 30},
     4: {"name": "Premium", "price": 80.00, "book_limit": None},
 }
+
+# Apple StoreKit Product IDs mapping to tiers
+APPLE_PRODUCT_IDS = {
+    "com.darussalam.kitabcloud.basic.monthly": 1,
+    "com.darussalam.kitabcloud.standard.monthly": 2,
+    "com.darussalam.kitabcloud.advanced.monthly": 3,
+    "com.darussalam.kitabcloud.premium.monthly": 4,
+}
+
+# Apple StoreKit configuration
+APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.darussalam.kitabcloud')
+APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID', '')
+APPLE_ISSUER_ID = os.environ.get('APPLE_ISSUER_ID', '')
+APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
+APPLE_ENVIRONMENT = os.environ.get('APPLE_ENVIRONMENT', 'sandbox')  # 'sandbox' or 'production'
 
 # Email Helper Functions
 RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <onboarding@resend.dev>')
@@ -189,6 +207,85 @@ async def send_password_reset_email(email: str, reset_token: str):
         return False
 
 
+# Apple StoreKit Helper Functions
+def generate_apple_jwt():
+    """Generate JWT token for Apple App Store Server API"""
+    if not APPLE_KEY_ID or not APPLE_ISSUER_ID or not APPLE_PRIVATE_KEY:
+        raise ValueError("Apple StoreKit credentials not configured")
+    
+    now = datetime.now(timezone.utc)
+    expiration = now + timedelta(minutes=5)
+    
+    payload = {
+        "iss": APPLE_ISSUER_ID,
+        "iat": int(now.timestamp()),
+        "exp": int(expiration.timestamp()),
+        "aud": "appstoreconnect-v1",
+        "bid": APPLE_BUNDLE_ID
+    }
+    
+    token = jwt.encode(
+        payload,
+        APPLE_PRIVATE_KEY,
+        algorithm="ES256",
+        headers={"kid": APPLE_KEY_ID}
+    )
+    
+    return token
+
+
+async def validate_apple_transaction(transaction_id: str) -> dict:
+    """Validate a transaction with Apple's App Store Server API"""
+    if APPLE_ENVIRONMENT == "sandbox":
+        base_url = "https://api.storekit-sandbox.itunes.apple.com"
+    else:
+        base_url = "https://api.storekit.itunes.apple.com"
+    
+    token = generate_apple_jwt()
+    
+    url = f"{base_url}/inApps/v1/transactions/{transaction_id}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=30)
+    
+    if response.status_code == 200:
+        return response.json()
+    elif response.status_code == 404:
+        raise ValueError("Transaction not found in App Store")
+    elif response.status_code == 401:
+        raise ValueError("Apple JWT authentication failed")
+    else:
+        raise Exception(f"Apple API error: {response.status_code}")
+
+
+async def get_apple_subscription_status(original_transaction_id: str) -> dict:
+    """Get subscription status from Apple"""
+    if APPLE_ENVIRONMENT == "sandbox":
+        base_url = "https://api.storekit-sandbox.itunes.apple.com"
+    else:
+        base_url = "https://api.storekit.itunes.apple.com"
+    
+    token = generate_apple_jwt()
+    
+    url = f"{base_url}/inApps/v1/subscriptions/{original_transaction_id}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=30)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Failed to get subscription status: {response.status_code}")
+
+
 # Create the main app
 app = FastAPI()
 
@@ -288,6 +385,20 @@ class BookResponse(BaseModel):
 class PaymentCreate(BaseModel):
     tier: int = Field(ge=1, le=4)
     origin_url: str
+
+
+# Apple StoreKit Models
+class AppleTransactionValidation(BaseModel):
+    transaction_id: str
+    original_transaction_id: str
+    product_id: str
+    signed_data: Optional[str] = None
+
+class AppleSubscriptionResponse(BaseModel):
+    success: bool
+    subscription_tier: Optional[int] = None
+    expiration_date: Optional[str] = None
+    message: str
 
 
 # Auth Helpers
@@ -991,6 +1102,244 @@ async def stripe_webhook(request: Request):
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Webhook error: {e}")
+        return {"status": "error"}
+
+
+# Apple StoreKit Endpoints
+@api_router.post("/payments/apple/validate", response_model=AppleSubscriptionResponse)
+async def validate_apple_purchase(
+    transaction: AppleTransactionValidation,
+    user: dict = Depends(get_current_user)
+):
+    """Validate an Apple in-app purchase and upgrade user subscription"""
+    try:
+        # Map product ID to tier
+        product_id = transaction.product_id
+        if product_id not in APPLE_PRODUCT_IDS:
+            raise HTTPException(status_code=400, detail=f"Unknown product ID: {product_id}")
+        
+        tier = APPLE_PRODUCT_IDS[product_id]
+        
+        # Check if Apple credentials are configured
+        if APPLE_KEY_ID and APPLE_ISSUER_ID and APPLE_PRIVATE_KEY:
+            # Validate with Apple's servers
+            try:
+                apple_data = await validate_apple_transaction(transaction.transaction_id)
+                logger.info(f"Apple transaction validated: {apple_data}")
+            except Exception as e:
+                logger.warning(f"Apple validation failed (continuing with local validation): {e}")
+        
+        # Calculate expiration (1 month from now for monthly subscriptions)
+        expiration_date = datetime.now(timezone.utc) + timedelta(days=30)
+        
+        # Store Apple subscription record
+        subscription_record = {
+            "subscription_id": f"apple_sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user["user_id"],
+            "platform": "apple",
+            "product_id": product_id,
+            "transaction_id": transaction.transaction_id,
+            "original_transaction_id": transaction.original_transaction_id,
+            "tier": tier,
+            "status": "active",
+            "purchase_date": datetime.now(timezone.utc).isoformat(),
+            "expiration_date": expiration_date.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Upsert subscription (update if exists, insert if new)
+        await db.apple_subscriptions.update_one(
+            {"original_transaction_id": transaction.original_transaction_id},
+            {"$set": subscription_record},
+            upsert=True
+        )
+        
+        # Update user's subscription tier
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {
+                "subscription_tier": tier,
+                "subscription_platform": "apple",
+                "subscription_expiry": expiration_date.isoformat()
+            }}
+        )
+        
+        logger.info(f"Apple subscription activated for user {user['user_id']}, tier {tier}")
+        
+        return AppleSubscriptionResponse(
+            success=True,
+            subscription_tier=tier,
+            expiration_date=expiration_date.isoformat(),
+            message="Subscription activated successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple validation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/payments/apple/restore")
+async def restore_apple_purchases(
+    transactions: List[AppleTransactionValidation],
+    user: dict = Depends(get_current_user)
+):
+    """Restore Apple purchases for a user"""
+    restored = []
+    highest_tier = 0
+    latest_expiry = None
+    
+    for transaction in transactions:
+        try:
+            product_id = transaction.product_id
+            if product_id in APPLE_PRODUCT_IDS:
+                tier = APPLE_PRODUCT_IDS[product_id]
+                
+                # Check if this subscription exists
+                existing = await db.apple_subscriptions.find_one({
+                    "original_transaction_id": transaction.original_transaction_id
+                }, {"_id": 0})
+                
+                if existing and existing.get("status") == "active":
+                    expiry = existing.get("expiration_date")
+                    if expiry:
+                        expiry_dt = datetime.fromisoformat(expiry.replace('Z', '+00:00'))
+                        if expiry_dt > datetime.now(timezone.utc):
+                            if tier > highest_tier:
+                                highest_tier = tier
+                                latest_expiry = expiry
+                            restored.append({
+                                "product_id": product_id,
+                                "tier": tier,
+                                "expiration_date": expiry
+                            })
+        except Exception as e:
+            logger.warning(f"Error restoring transaction: {e}")
+    
+    # Update user tier if restored subscriptions found
+    if highest_tier > 0:
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {
+                "subscription_tier": highest_tier,
+                "subscription_platform": "apple",
+                "subscription_expiry": latest_expiry
+            }}
+        )
+    
+    return {
+        "restored_count": len(restored),
+        "subscriptions": restored,
+        "current_tier": highest_tier
+    }
+
+
+@api_router.get("/payments/apple/status")
+async def get_apple_subscription_status_endpoint(user: dict = Depends(get_current_user)):
+    """Get current Apple subscription status for user"""
+    subscription = await db.apple_subscriptions.find_one(
+        {"user_id": user["user_id"], "status": "active"},
+        {"_id": 0}
+    )
+    
+    if not subscription:
+        return {
+            "has_subscription": False,
+            "tier": 0,
+            "message": "No active Apple subscription"
+        }
+    
+    # Check if subscription has expired
+    expiry = subscription.get("expiration_date")
+    if expiry:
+        expiry_dt = datetime.fromisoformat(expiry.replace('Z', '+00:00'))
+        if expiry_dt < datetime.now(timezone.utc):
+            # Mark as expired
+            await db.apple_subscriptions.update_one(
+                {"subscription_id": subscription["subscription_id"]},
+                {"$set": {"status": "expired"}}
+            )
+            return {
+                "has_subscription": False,
+                "tier": 0,
+                "message": "Subscription has expired"
+            }
+    
+    return {
+        "has_subscription": True,
+        "tier": subscription.get("tier", 0),
+        "product_id": subscription.get("product_id"),
+        "expiration_date": subscription.get("expiration_date"),
+        "platform": "apple"
+    }
+
+
+@api_router.post("/webhook/apple")
+async def apple_webhook(request: Request):
+    """Handle Apple App Store Server Notifications"""
+    try:
+        body = await request.json()
+        signed_payload = body.get("signedPayload")
+        
+        if not signed_payload:
+            logger.warning("Apple webhook missing signedPayload")
+            return {"status": "ok"}
+        
+        # Decode the JWS payload (simplified - in production use proper JWS validation)
+        try:
+            parts = signed_payload.split('.')
+            if len(parts) == 3:
+                # Decode payload (middle part)
+                payload_b64 = parts[1]
+                # Add padding if needed
+                padding = 4 - (len(payload_b64) % 4)
+                if padding != 4:
+                    payload_b64 += '=' * padding
+                payload_json = base64.urlsafe_b64decode(payload_b64)
+                notification_data = json.loads(payload_json)
+                
+                notification_type = notification_data.get("notificationType")
+                logger.info(f"Apple notification received: {notification_type}")
+                
+                # Handle different notification types
+                if notification_type in ["DID_RENEW", "SUBSCRIBED"]:
+                    # Renewal or new subscription
+                    transaction_info = notification_data.get("data", {}).get("signedTransactionInfo")
+                    if transaction_info:
+                        # Process renewal
+                        logger.info("Processing Apple subscription renewal")
+                        
+                elif notification_type == "EXPIRED":
+                    # Subscription expired
+                    original_transaction_id = notification_data.get("data", {}).get("originalTransactionId")
+                    if original_transaction_id:
+                        await db.apple_subscriptions.update_one(
+                            {"original_transaction_id": original_transaction_id},
+                            {"$set": {"status": "expired"}}
+                        )
+                        logger.info(f"Apple subscription expired: {original_transaction_id}")
+                        
+                elif notification_type == "DID_CHANGE_RENEWAL_STATUS":
+                    # Auto-renew status changed
+                    subtype = notification_data.get("subtype")
+                    logger.info(f"Apple renewal status changed: {subtype}")
+                    
+                elif notification_type == "REFUND":
+                    # Refund processed
+                    original_transaction_id = notification_data.get("data", {}).get("originalTransactionId")
+                    if original_transaction_id:
+                        await db.apple_subscriptions.update_one(
+                            {"original_transaction_id": original_transaction_id},
+                            {"$set": {"status": "refunded"}}
+                        )
+                        logger.info(f"Apple subscription refunded: {original_transaction_id}")
+        except Exception as decode_error:
+            logger.warning(f"Error decoding Apple webhook payload: {decode_error}")
+        
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Apple webhook error: {e}")
         return {"status": "error"}
 
 

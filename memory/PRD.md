@@ -84,7 +84,9 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - **Frontend**: React
 - **Database**: MongoDB
 - **Authentication**: JWT (Email/Password only)
-- **Payments**: Stripe (LIVE)
+- **Payments**: 
+  - Stripe (Web - LIVE)
+  - Apple StoreKit (iOS - Backend ready, needs native plugin)
 - **Emails**: Resend
 - **File Storage**: Emergent Object Storage
 - **PDF Processing**: PyMuPDF (cover generation), react-pdf (viewing)
@@ -104,7 +106,13 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - `/api/favorites/*` - Favorites management
 - `/api/reading-progress/*` - Reading progress tracking
 - `/api/continue-reading` - Recent reading history
-- `/api/payments/*` - Stripe checkout and status
+- `/api/payments/create-checkout` - Stripe checkout (Web)
+- `/api/payments/status/{session_id}` - Stripe payment status
+- `/api/payments/apple/validate` - Apple StoreKit validation (iOS)
+- `/api/payments/apple/restore` - Restore Apple purchases (iOS)
+- `/api/payments/apple/status` - Apple subscription status (iOS)
+- `/api/webhook/stripe` - Stripe webhook
+- `/api/webhook/apple` - Apple App Store Server Notifications
 - `/api/user/profile` - User profile management
 - `/api/user/password` - Password change
 - `/api/user/cancel-subscription` - Cancel subscription

@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, Apple, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
+import { isIOS } from '../services/storekit';
 
 const PricingPage = () => {
-  const { user, token } = useAuth();
+  const { user, token, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+  const [restoringPurchases, setRestoringPurchases] = useState(false);
+
+  useEffect(() => {
+    // Check if running on iOS native app
+    setIsIOSDevice(isIOS());
+  }, []);
 
   const tiers = [
     { 
@@ -100,17 +108,77 @@ const PricingPage = () => {
     }
 
     setLoading(tier);
+    
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(`${API}/payments/create-checkout`, {
-        tier,
-        origin_url: window.location.origin
-      }, { headers, withCredentials: true });
-
-      window.location.href = response.data.url;
+      if (isIOSDevice) {
+        // iOS: Use StoreKit (In-App Purchase)
+        await handleIOSPurchase(tier);
+      } else {
+        // Web: Use Stripe
+        await handleStripePurchase(tier);
+      }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to start checkout');
+      toast.error(error.message || 'Failed to process payment');
+    } finally {
       setLoading(null);
+    }
+  };
+
+  const handleStripePurchase = async (tier) => {
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await axios.post(`${API}/payments/create-checkout`, {
+      tier,
+      origin_url: window.location.origin
+    }, { headers, withCredentials: true });
+
+    window.location.href = response.data.url;
+  };
+
+  const handleIOSPurchase = async (tier) => {
+    try {
+      // Import StoreKit dynamically
+      const storeKitService = (await import('../services/storekit')).default;
+      
+      // This will trigger the native StoreKit purchase flow
+      // The actual implementation requires the Capacitor StoreKit plugin
+      toast.info('Opening App Store payment...');
+      
+      // For now, show a message that iOS purchases are handled via App Store
+      // The actual StoreKit integration will be completed in the native iOS code
+      const result = await storeKitService.purchaseSubscription(tier, token, API.replace('/api', ''));
+      
+      if (result.success) {
+        toast.success('Subscription activated!');
+        await refreshUser();
+        navigate('/library');
+      }
+    } catch (error) {
+      if (error.message?.includes('User cancelled')) {
+        toast.info('Purchase cancelled');
+      } else {
+        throw error;
+      }
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (!user || !isIOSDevice) return;
+    
+    setRestoringPurchases(true);
+    try {
+      const storeKitService = (await import('../services/storekit')).default;
+      const result = await storeKitService.restorePurchases(token, API.replace('/api', ''));
+      
+      if (result.restored_count > 0) {
+        toast.success(`Restored ${result.restored_count} subscription(s)`);
+        await refreshUser();
+      } else {
+        toast.info('No purchases to restore');
+      }
+    } catch (error) {
+      toast.error('Failed to restore purchases');
+    } finally {
+      setRestoringPurchases(false);
     }
   };
 
@@ -166,6 +234,22 @@ const PricingPage = () => {
               <span className="text-gold text-sm">
                 You're currently on <span className="font-bold">Tier {userTier}</span>
               </span>
+            </div>
+          )}
+          
+          {/* iOS Restore Purchases Button */}
+          {isIOSDevice && user && (
+            <div className="mt-6">
+              <Button
+                variant="outline"
+                onClick={handleRestorePurchases}
+                disabled={restoringPurchases}
+                className="border-gold/30 text-gold hover:bg-gold/10"
+                data-testid="restore-purchases-btn"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${restoringPurchases ? 'animate-spin' : ''}`} />
+                {restoringPurchases ? 'Restoring...' : 'Restore Purchases'}
+              </Button>
             </div>
           )}
         </div>
