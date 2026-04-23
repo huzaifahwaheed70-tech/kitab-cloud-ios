@@ -74,27 +74,31 @@ const PricingPage = () => {
 
     setLoading(tier);
 
+    // ✅ iOS Path: Use Apple In-App Purchases
     if (isIOS) {
       try {
         await buySubscription(tier);
-        setLoading(null);
       } catch (error) {
-        toast.error('Failed to initiate Apple purchase');
+        console.error(error);
+        toast.error('Apple purchase failed');
+      } finally {
         setLoading(null);
       }
-    } else {
-      try {
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const response = await axios.post(`${API}/payments/create-checkout`, {
-          tier,
-          origin_url: 'https://kitab-cloud.emergent.host'
-        }, { headers, withCredentials: true });
+      return; // 🚨 Critical: Stop here so Stripe logic is never reached on iOS
+    }
 
-        window.location.href = response.data.url;
-      } catch (error) {
-        toast.error(error.response?.data?.detail || 'Failed to start checkout');
-        setLoading(null);
-      }
+    // 🌐 Web/Android Path: Use Stripe
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.post(`${API}/payments/create-checkout`, {
+        tier,
+        origin_url: window.location.origin
+      }, { headers, withCredentials: true });
+
+      window.location.href = response.data.url;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to start checkout');
+      setLoading(null);
     }
   };
 
