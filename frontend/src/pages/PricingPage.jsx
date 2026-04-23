@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App.js';
 import axios from 'axios';
-import { BookOpen, Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
+import { BookOpen, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
@@ -14,6 +14,7 @@ const PricingPage = () => {
   const [loading, setLoading] = useState(null);
 
   const platform = Capacitor.getPlatform();
+  const isIOS = platform === 'ios';
 
   const tiers = [
     { 
@@ -73,7 +74,7 @@ const PricingPage = () => {
 
     setLoading(tier);
 
-    if (platform === 'ios') {
+    if (isIOS) {
       try {
         await buySubscription(tier);
         setLoading(null);
@@ -136,6 +137,9 @@ const PricingPage = () => {
           <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Plans</p>
           <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] mb-6">Choose Your Access Level</h1>
           <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">Subscribe monthly to read books, or buy individual PDFs.</p>
+          {isIOS && (
+            <p className="text-sm text-gold mt-4">Subscriptions are processed securely through Apple.</p>
+          )}
         </div>
       </section>
 
@@ -160,7 +164,7 @@ const PricingPage = () => {
               >
                 {loading === tier.tier ? 'Processing...' : (
                   <>
-                    {platform === 'ios' ? 'Join with Apple' : 'Subscribe'} 
+                    {isIOS ? 'Subscribe with Apple' : 'Subscribe'}
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </>
                 )}
