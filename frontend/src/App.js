@@ -263,6 +263,7 @@ const AppRouter = () => {
 };
 
 function App() {
+  // ✅ Initialize Apple Store if running on iOS
   useEffect(() => {
     if (Capacitor.getPlatform() === 'ios') {
       initStore();
