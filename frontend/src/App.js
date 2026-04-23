@@ -3,8 +3,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'r
 import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
-
-// Import the store initialization
+import { Capacitor } from '@capacitor/core';
 import { initStore } from './purchase';
 
 import LandingPage from './pages/LandingPage';
@@ -21,8 +20,6 @@ import SettingsPage from './pages/SettingsPage';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
-
-// --- Auth Context & Provider ---
 
 const AuthContext = createContext(null);
 export const useAuth = () => {
@@ -124,8 +121,6 @@ const AuthProvider = ({ children }) => {
   );
 };
 
-// --- Auth Callback Component ---
-
 const AuthCallback = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -177,8 +172,6 @@ const AuthCallback = () => {
   );
 };
 
-// --- Route Protection ---
-
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -202,10 +195,18 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
   return children;
 };
 
-// --- Router Logic ---
+const IOSCheckoutBlock = () => (
+  <div className="min-h-screen bg-dark flex items-center justify-center">
+    <div className="text-center p-8">
+      <h2 className="font-serif text-2xl font-bold text-[#FDFBF7] mb-4">Subscribe on iOS</h2>
+      <p className="text-[#B0C4BF]">Please use the in-app subscription on the pricing page.</p>
+    </div>
+  </div>
+);
 
 const AppRouter = () => {
   const location = useLocation();
+  const isIOS = Capacitor.getPlatform() === 'ios';
 
   if (location.hash?.includes('session_id=')) {
     return <AuthCallback />;
@@ -217,7 +218,8 @@ const AppRouter = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/pricing" element={<PricingPage />} />
-      <Route path="/payment-success" element={<PaymentSuccessPage />} />
+      <Route path="/payment-success" element={isIOS ? <IOSCheckoutBlock /> : <PaymentSuccessPage />} />
+      <Route path="/checkout" element={isIOS ? <IOSCheckoutBlock /> : <Navigate to="/pricing" replace />} />
       
       <Route path="/library" element={
         <ProtectedRoute>
@@ -260,12 +262,11 @@ const AppRouter = () => {
   );
 };
 
-// --- Main App Component ---
-
 function App() {
-  // Initialize the store once when the app mounts
   useEffect(() => {
-    initStore();
+    if (Capacitor.getPlatform() === 'ios') {
+      initStore();
+    }
   }, []);
 
   return (
