@@ -31,6 +31,10 @@ STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 APP_NAME = "darussalam-kitab"
 
+APPLE_VERIFY_URL = "https://buy.itunes.apple.com/verifyReceipt"
+APPLE_VERIFY_SANDBOX = "https://sandbox.itunes.apple.com/verifyReceipt"
+APPLE_SHARED_SECRET = os.getenv("APPLE_SHARED_SECRET")
+
 storage_key = None
 
 SUBSCRIPTION_TIERS = {
@@ -130,6 +134,9 @@ class BookResponse(BaseModel):
 class PaymentCreate(BaseModel):
     tier: int = Field(ge=1, le=4)
     origin_url: str
+
+class ApplePaymentVerify(BaseModel):
+    receipt: dict
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -618,7 +625,6 @@ async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_
     
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
     
-    # Updated with your requested hardcoded URLs
     success_url = f"https://kitab-cloud.emergent.host/#/book/{book_id}?purchased=true"
     cancel_url = f"https://kitab-cloud.emergent.host/#/book/{book_id}"
     
@@ -725,6 +731,63 @@ async def get_payment_status(session_id: str, user: dict = Depends(get_current_u
         "amount": status.amount_total,
         "metadata": status.metadata
     }
+
+@api_router.post("/payments/apple")
+async def verify_apple_payment(data: ApplePaymentVerify, user: dict = Depends(get_current_user)):
+    receipt = data.receipt
+
+    if not receipt:
+        raise HTTPException(status_code=400, detail="Missing receipt")
+
+    payload = {
+        "receipt-data": receipt.get("receipt"),
+        "password": APPLE_SHARED_SECRET
+    }
+
+    response = requests.post(APPLE_VERIFY_URL, json=payload)
+    result = response.json()
+
+    if result.get("status") == 21007:
+        response = requests.post(APPLE_VERIFY_SANDBOX, json=payload)
+        result = response.json()
+
+    if result.get("status") != 0:
+        raise HTTPException(status_code=400, detail=f"Invalid receipt: {result}")
+
+    latest = result.get("latest_receipt_info", [])
+    if not latest:
+        raise HTTPException(status_code=400, detail="No purchases found")
+
+    product_id = latest[-1]["product_id"]
+
+    tier_map = {
+        "kitabcloud.basic": 1,
+        "kitabcloud.standard": 2,
+        "kitabcloud.advanced": 3,
+        "kitabcloud.premium": 4
+    }
+
+    tier = tier_map.get(product_id, 0)
+
+    if tier == 0:
+        raise HTTPException(status_code=400, detail="Unknown product ID")
+
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"subscription_tier": tier}}
+    )
+
+    await db.payment_transactions.insert_one({
+        "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+        "user_id": user["user_id"],
+        "product_id": product_id,
+        "tier": tier,
+        "payment_status": "paid",
+        "platform": "apple",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True, "tier": tier}
 
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
