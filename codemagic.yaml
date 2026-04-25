@@ -30,14 +30,12 @@ workflows:
         script: |
           cd frontend
           npx cap add ios || true
-          npm install cordova-plugin-purchase
           npx cap sync ios
 
       - name: Build iOS
         script: |
           cd frontend/ios/App
-
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 12" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 13" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
@@ -126,7 +124,6 @@ workflows:
         script: |
           cd frontend
           npx cap add android || true
-          npm install cordova-plugin-purchase
           npx cap sync android
 
       - name: Decode keystore
