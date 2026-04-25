@@ -10,6 +10,8 @@ workflows:
         - appstore_credentials
       vars:
         APPLE_TEAM_ID: 6HUND32X2N
+        # ✅ Added environment variable for production build
+        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: host.emergent.kitabcloud
@@ -35,7 +37,8 @@ workflows:
       - name: Build iOS
         script: |
           cd frontend/ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 13" App/Info.plist
+          # ✅ Updated to Version 13
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 14" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
@@ -101,6 +104,7 @@ workflows:
       vars:
         PACKAGE_NAME: host.emergent.kitabcloud
         JAVA_HOME: /Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
+        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
     scripts:
       - name: Set Java 21
         script: |
@@ -148,3 +152,4 @@ workflows:
       google_play:
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
+        submit_as_draft: true
