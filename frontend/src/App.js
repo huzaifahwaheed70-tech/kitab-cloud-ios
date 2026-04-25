@@ -17,6 +17,8 @@ import PricingPage from './pages/PricingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import AdminDashboard from './pages/AdminDashboard';
 import SettingsPage from './pages/SettingsPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -49,9 +51,7 @@ const AuthProvider = ({ children }) => {
         setUser(response.data);
         setToken(storedToken);
       } else {
-        const response = await axios.get(`${API}/auth/me`, {
-          withCredentials: true
-        });
+        const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
         setUser(response.data);
       }
     } catch (error) {
@@ -134,7 +134,6 @@ const AuthCallback = () => {
     const processAuth = async () => {
       const hash = location.hash;
       const sessionIdMatch = hash.match(/session_id=([^&]+)/);
-      
       if (sessionIdMatch) {
         const sessionId = sessionIdMatch[1];
         try {
@@ -142,7 +141,6 @@ const AuthCallback = () => {
             params: { session_id: sessionId },
             withCredentials: true
           });
-          
           if (response.data.user) {
             if (response.data.token) {
               localStorage.setItem('auth_token', response.data.token);
@@ -217,53 +215,36 @@ const AppRouter = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/payment-success" element={isIOS ? <IOSCheckoutBlock /> : <PaymentSuccessPage />} />
       <Route path="/checkout" element={isIOS ? <IOSCheckoutBlock /> : <Navigate to="/pricing" replace />} />
-      
+
       <Route path="/library" element={
-        <ProtectedRoute>
-          <LibraryPage />
-        </ProtectedRoute>
+        <ProtectedRoute><LibraryPage /></ProtectedRoute>
       } />
-      
       <Route path="/book/:bookId" element={
-        <ProtectedRoute>
-          <BookDetailPage />
-        </ProtectedRoute>
+        <ProtectedRoute><BookDetailPage /></ProtectedRoute>
       } />
-      
       <Route path="/bookshelf" element={
-        <ProtectedRoute>
-          <BookshelfPage />
-        </ProtectedRoute>
+        <ProtectedRoute><BookshelfPage /></ProtectedRoute>
       } />
-      
       <Route path="/favorites" element={
-        <ProtectedRoute>
-          <FavoritesPage />
-        </ProtectedRoute>
+        <ProtectedRoute><FavoritesPage /></ProtectedRoute>
       } />
-      
       <Route path="/settings" element={
-        <ProtectedRoute>
-          <SettingsPage />
-        </ProtectedRoute>
+        <ProtectedRoute><SettingsPage /></ProtectedRoute>
       } />
-      
       <Route path="/admin" element={
-        <ProtectedRoute requireAdmin>
-          <AdminDashboard />
-        </ProtectedRoute>
+        <ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>
       } />
-      
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
 function App() {
-  // ✅ Initialize Apple Store if running on iOS
   useEffect(() => {
     if (Capacitor.getPlatform() === 'ios') {
       initStore();

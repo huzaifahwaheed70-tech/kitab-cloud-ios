@@ -1,7 +1,7 @@
 # Dar-Us-Salam Kitab Cloud - Product Requirements Document
 
 ## Original Problem Statement
-Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan-on-Demand" service featuring membership tiers. The app should have a Netflix-style book grid, tier-based access, and an admin dashboard.
+Create a high-end Digital Library App for Dar-Us-Salam Publications with membership tiers. The app should have a Netflix-style book grid, tier-based access, and an admin dashboard.
 
 ## User Personas
 1. **Pay-Per-Book User (Tier 0)** - Purchases individual PDFs without subscription
@@ -19,14 +19,16 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - In-book search for Tier 3+
 - Admin dashboard for book management
 - Stripe payment integration (LIVE)
-- Google OAuth + Email/Password authentication
+- Email/Password authentication (Google OAuth removed per user request)
 - User Settings page with subscription management
+- Password reset via email (Resend integration)
+- Welcome emails for new users
 
-## What's Been Implemented (March 2026)
+## What's Been Implemented (April 2026)
 
 ### Core Features
 - ✅ Full-stack app: React frontend + FastAPI backend + MongoDB
-- ✅ Authentication: Google OAuth + Email/Password JWT
+- ✅ Authentication: Email/Password JWT (Google OAuth removed)
 - ✅ Stripe payment integration (LIVE key active)
 - ✅ Emergent Object Storage for PDFs and book covers
 - ✅ Netflix-style library with tier-based access
@@ -41,11 +43,20 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - ✅ Tier 0 - Individual PDF purchase option
 - ✅ Admin dashboard (books, users management)
 - ✅ PWA support with service worker
+- ✅ Capacitor integration for native iOS/Android wrapping
+- ✅ Custom logo (user-provided open book icon) throughout app
 
-### User Settings (NEW)
+### Email Integration (April 2026)
+- ✅ Resend email service integration
+- ✅ Welcome emails sent to new users on registration
+- ✅ Password reset flow with email links
+- ✅ Forgot Password page (/forgot-password)
+- ✅ Reset Password page (/reset-password?token=xxx)
+- ✅ 1-hour expiry on password reset tokens
+
+### User Settings
 - ✅ Profile tab: Edit name and email
 - ✅ Security tab: Change password (for email/password users)
-- ✅ Security tab: Google OAuth message (for OAuth users)
 - ✅ Subscription tab: View current plan, price, book limit
 - ✅ Cancel subscription (end of billing period)
 - ✅ Reactivate cancelled subscription
@@ -56,6 +67,8 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - ✅ Fixed mobile PDF reader navigation (controls above Emergent badge)
 - ✅ Fixed save page functionality (correct API parameter format)
 - ✅ Fixed password form not showing for email/password users
+- ✅ Removed Google OAuth completely (was causing login bugs)
+- ✅ Updated logo throughout the app to use user's custom logo
 
 ## Subscription Tiers
 | Tier | Name | Price | Book Limit | Features |
@@ -70,13 +83,22 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - **Backend**: FastAPI (Python)
 - **Frontend**: React
 - **Database**: MongoDB
-- **Authentication**: JWT + Google OAuth (Emergent-managed)
-- **Payments**: Stripe (LIVE)
+- **Authentication**: JWT (Email/Password only)
+- **Payments**: 
+  - Stripe (Web - LIVE)
+  - Apple StoreKit (iOS - Backend ready, needs native plugin)
+- **Emails**: Resend
 - **File Storage**: Emergent Object Storage
 - **PDF Processing**: PyMuPDF (cover generation), react-pdf (viewing)
+- **Native Wrapper**: Capacitor (for iOS/Android builds)
 
 ## Key API Endpoints
-- `/api/auth/*` - Authentication (register, login, logout, session)
+- `/api/auth/register` - User registration (sends welcome email)
+- `/api/auth/login` - Email/password login
+- `/api/auth/logout` - Logout
+- `/api/auth/me` - Get current user
+- `/api/auth/forgot-password` - Request password reset email
+- `/api/auth/reset-password` - Reset password with token
 - `/api/books/*` - Book CRUD and access
 - `/api/covers/{path}` - Public cover images (no auth required)
 - `/api/files/{path}` - Protected file access (PDFs)
@@ -84,7 +106,13 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - `/api/favorites/*` - Favorites management
 - `/api/reading-progress/*` - Reading progress tracking
 - `/api/continue-reading` - Recent reading history
-- `/api/payments/*` - Stripe checkout and status
+- `/api/payments/create-checkout` - Stripe checkout (Web)
+- `/api/payments/status/{session_id}` - Stripe payment status
+- `/api/payments/apple/validate` - Apple StoreKit validation (iOS)
+- `/api/payments/apple/restore` - Restore Apple purchases (iOS)
+- `/api/payments/apple/status` - Apple subscription status (iOS)
+- `/api/webhook/stripe` - Stripe webhook
+- `/api/webhook/apple` - Apple App Store Server Notifications
 - `/api/user/profile` - User profile management
 - `/api/user/password` - Password change
 - `/api/user/cancel-subscription` - Cancel subscription
@@ -100,27 +128,33 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with a "Scan
 - ✅ User settings page
 - ✅ Cancel subscription functionality
 - ✅ Live Stripe integration
+- ✅ Password reset via email (Resend)
+- ✅ Welcome emails for new users
+- ✅ Remove Google OAuth (user requested)
 
-### P1 (High Priority)
-- Email notifications for subscription changes
-- Password reset via email
+### P1 (High Priority) - NEXT
+- Push code to GitHub via "Save to Github" button for Codemagic iOS/Android builds
+- Custom domain deployment (duskitab.com)
 
 ### P2 (Medium Priority)
+- Email notifications for subscription changes
 - Book recommendations
 - Reading statistics dashboard
 - Email receipts for purchases
 
 ### P3 (Future)
-- Native iOS/Android apps (user interested after web complete)
 - User reviews and ratings
 - Social sharing features
 
 ## Testing
-- Backend: 30+ API tests passing (pytest)
+- Backend: 43+ API tests passing (pytest)
 - Frontend: All features verified via browser automation
 - Test credentials: huzaifahwaheed70@gmail.com / admin123
+- Test reports: /app/test_reports/iteration_1.json, iteration_2.json, iteration_3.json
 
 ## Notes
 - Stripe is using LIVE key - real payments are processed
 - Offline reading NOT implemented (user decision to protect content)
 - Support email: sales@dar-us-salam.com
+- Resend emails use sandbox domain (onboarding@resend.dev) - user needs to verify duskitab.com domain in Resend for production emails
+- Capacitor configured for native mobile builds via Codemagic

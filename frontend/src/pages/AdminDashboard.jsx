@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import {
   BookOpen, Users, ArrowLeft, Plus, Edit, Trash2,
-  Search, Save
+  Search, Save, Library
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -33,9 +33,12 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [books, setBooks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userDetails, setUserDetails] = useState(null);
   const [showBookModal, setShowBookModal] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
   const [bookForm, setBookForm] = useState({
@@ -46,7 +49,8 @@ const AdminDashboard = () => {
     is_advanced: false,
     description: '',
     original_price: '',
-    pdf_price: ''
+    pdf_price: '',
+    purchase_link: ''
   });
 
   const getAuthHeaders = () => {
@@ -61,19 +65,35 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       const headers = getAuthHeaders();
-      const [statsRes, booksRes, usersRes] = await Promise.all([
+      const [statsRes, booksRes, usersRes, purchasesRes, subsRes] = await Promise.all([
         axios.get(`${API}/admin/stats`, { headers }),
         axios.get(`${API}/books/all`),
-        axios.get(`${API}/admin/users`, { headers })
+        axios.get(`${API}/admin/users`, { headers }),
+        axios.get(`${API}/admin/purchases`, { headers }),
+        axios.get(`${API}/admin/subscriptions`, { headers })
       ]);
       setStats(statsRes.data);
       setBooks(booksRes.data);
       setUsers(usersRes.data);
+      setPurchases(purchasesRes.data);
+      setSubscriptions(subsRes.data);
     } catch (error) {
       console.error('Error fetching admin data:', error);
       toast.error('Failed to load admin data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserDetails = async (userId) => {
+    try {
+      const headers = getAuthHeaders();
+      const response = await axios.get(`${API}/admin/users/${userId}/details`, { headers });
+      setUserDetails(response.data);
+      setSelectedUser(userId);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      toast.error('Failed to load user details');
     }
   };
 
@@ -88,7 +108,8 @@ const AdminDashboard = () => {
         is_advanced: bookForm.is_advanced,
         description: bookForm.description || null,
         original_price: bookForm.original_price ? parseFloat(bookForm.original_price) : null,
-        pdf_price: bookForm.pdf_price ? parseFloat(bookForm.pdf_price) : null
+        pdf_price: bookForm.pdf_price ? parseFloat(bookForm.pdf_price) : null,
+        purchase_link: bookForm.purchase_link || null
       };
       const headers = getAuthHeaders();
       if (editingBook) {
@@ -163,7 +184,8 @@ const AdminDashboard = () => {
       is_advanced: false,
       description: '',
       original_price: '',
-      pdf_price: ''
+      pdf_price: '',
+      purchase_link: ''
     });
     setEditingBook(null);
   };
@@ -178,7 +200,8 @@ const AdminDashboard = () => {
       is_advanced: book.is_advanced || false,
       description: book.description || '',
       original_price: book.original_price ? String(book.original_price) : '',
-      pdf_price: book.pdf_price ? String(book.pdf_price) : ''
+      pdf_price: book.pdf_price ? String(book.pdf_price) : '',
+      purchase_link: book.purchase_link || ''
     });
     setShowBookModal(true);
   };
@@ -230,7 +253,7 @@ const AdminDashboard = () => {
             <div className="glass-card rounded-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center">
-                  <BookOpen className="w-5 h-5 text-gold" />
+                  <Library className="w-5 h-5 text-gold" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-[#FDFBF7]">{stats.total_books}</p>
@@ -254,12 +277,10 @@ const AdminDashboard = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6">
-            <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">
-              Books
-            </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-users">
-              Users
-            </TabsTrigger>
+            <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">Books</TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-users">Users</TabsTrigger>
+            <TabsTrigger value="purchases" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-purchases">Purchases</TabsTrigger>
+            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-subscriptions">Subscriptions</TabsTrigger>
           </TabsList>
 
           <div className="relative mb-6 max-w-md">
@@ -338,6 +359,10 @@ const AdminDashboard = () => {
                         <Input type="number" step="0.01" value={bookForm.pdf_price} onChange={(e) => setBookForm(p => ({ ...p, pdf_price: e.target.value }))} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]" placeholder="For Tier 0 purchase" data-testid="book-form-pdf-price" />
                       </div>
                     </div>
+                    <div>
+                      <Label className="text-[#FDFBF7]">Purchase Link (Dar-Us-Salam.com)</Label>
+                      <Input value={bookForm.purchase_link} onChange={(e) => setBookForm(p => ({ ...p, purchase_link: e.target.value }))} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]" placeholder="https://dar-us-salam.com/product/..." data-testid="book-form-purchase-link" />
+                    </div>
                     <Button type="submit" className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]" data-testid="book-form-submit">
                       <Save className="w-5 h-5 mr-2" />
                       {editingBook ? 'Update Book' : 'Create Book'}
@@ -355,7 +380,7 @@ const AdminDashboard = () => {
                       <img src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`} alt={book.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-6 h-6 text-gold/30" />
+                        <img src="/logo.png" alt="Book" className="w-6 h-6 opacity-30" />
                       </div>
                     )}
                   </div>
@@ -417,6 +442,9 @@ const AdminDashboard = () => {
                     <p className="text-sm text-[#B0C4BF] truncate">{user.email}</p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={() => fetchUserDetails(user.user_id)} className="border-[rgba(212,175,55,0.2)] text-[#B0C4BF] hover:text-gold">
+                      Details
+                    </Button>
                     <Select value={String(user.subscription_tier)} onValueChange={(v) => handleUpdateUserTier(user.user_id, parseInt(v))}>
                       <SelectTrigger className="w-24 bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]">
                         <SelectValue />
@@ -440,6 +468,102 @@ const AdminDashboard = () => {
               ))}
               {filteredUsers.length === 0 && (
                 <div className="text-center py-12 text-[#B0C4BF]">No users found</div>
+              )}
+            </div>
+
+            {selectedUser && userDetails && (
+              <Dialog open={!!selectedUser} onOpenChange={() => { setSelectedUser(null); setUserDetails(null); }}>
+                <DialogContent className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="font-serif text-xl">User Details</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Email</p>
+                        <p className="text-[#FDFBF7]">{userDetails.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Name</p>
+                        <p className="text-[#FDFBF7]">{userDetails.name || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Tier</p>
+                        <p className="text-[#FDFBF7]">Tier {userDetails.subscription_tier}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Admin</p>
+                        <p className="text-[#FDFBF7]">{userDetails.is_admin ? 'Yes' : 'No'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#B0C4BF] mb-2">Favorite Books ({userDetails.favorites?.length || 0})</p>
+                      <div className="flex flex-wrap gap-2">
+                        {userDetails.favorites?.map(book => (
+                          <span key={book.book_id} className="px-2 py-1 bg-[#082E26] rounded text-sm">{book.title}</span>
+                        ))}
+                        {(!userDetails.favorites || userDetails.favorites.length === 0) && (
+                          <span className="text-[#B0C4BF] text-sm">No favorites</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#B0C4BF] mb-2">PDF Purchases ({userDetails.purchases?.length || 0})</p>
+                      {userDetails.purchases?.map((purchase, i) => (
+                        <div key={i} className="flex justify-between items-center py-2 border-b border-[rgba(212,175,55,0.1)]">
+                          <span className="text-sm">{purchase.book_title}</span>
+                          <span className="text-gold text-sm">${purchase.amount}</span>
+                        </div>
+                      ))}
+                      {(!userDetails.purchases || userDetails.purchases.length === 0) && (
+                        <span className="text-[#B0C4BF] text-sm">No purchases</span>
+                      )}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </TabsContent>
+
+          <TabsContent value="purchases">
+            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">PDF Purchases</h2>
+            <div className="space-y-3">
+              {purchases.map((purchase, index) => (
+                <div key={index} className="glass-card rounded-sm p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[#FDFBF7] font-medium">{purchase.book_title}</p>
+                    <p className="text-sm text-[#B0C4BF]">{purchase.user_email}</p>
+                    <p className="text-xs text-[#B0C4BF]">{new Date(purchase.purchased_at).toLocaleDateString()}</p>
+                  </div>
+                  <span className="text-gold font-medium">${purchase.amount}</span>
+                </div>
+              ))}
+              {purchases.length === 0 && (
+                <div className="text-center py-12 text-[#B0C4BF]">No purchases yet</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="subscriptions">
+            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">Subscription Payments</h2>
+            <div className="space-y-3">
+              {subscriptions.map((sub, index) => (
+                <div key={index} className="glass-card rounded-sm p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[#FDFBF7] font-medium">{sub.user_email || sub.user_name}</p>
+                    <p className="text-sm text-[#B0C4BF]">Tier {sub.tier} subscription</p>
+                    <p className="text-xs text-[#B0C4BF]">{new Date(sub.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gold font-medium">${sub.amount}</span>
+                    <p className={`text-xs ${sub.payment_status === 'paid' ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {sub.payment_status}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {subscriptions.length === 0 && (
+                <div className="text-center py-12 text-[#B0C4BF]">No subscriptions yet</div>
               )}
             </div>
           </TabsContent>

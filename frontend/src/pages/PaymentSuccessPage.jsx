@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { CheckCircle, XCircle, Loader2, BookOpen, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ArrowRight, Library } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 const PaymentSuccessPage = () => {
@@ -107,7 +107,7 @@ const PaymentSuccessPage = () => {
 
             <Link to="/library">
               <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold w-full" data-testid="go-to-library-btn">
-                <BookOpen className="w-5 h-5 mr-2" />
+                <Library className="w-5 h-5 mr-2" />
                 Go to Library
               </Button>
             </Link>

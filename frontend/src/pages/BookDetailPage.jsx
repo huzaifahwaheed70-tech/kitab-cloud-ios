@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
   BookOpen, ArrowLeft, BookMarked, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search
+  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,7 +21,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const BookDetailPage = () => {
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
-  const { user, token } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +40,7 @@ const BookDetailPage = () => {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [pageSaved, setPageSaved] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
@@ -50,31 +51,25 @@ const BookDetailPage = () => {
   };
 
   useEffect(() => {
-    fetchBook();
-    checkBookshelf();
-    checkFavorites();
-    checkPurchased();
-    loadReadingProgress();
-
+    if (!authLoading) {
+      fetchBook();
+      if (user && token) {
+        checkBookshelf();
+        checkFavorites();
+        checkPurchased();
+        loadReadingProgress();
+      }
+    }
     if (searchParams.get('purchased') === 'true') {
       toast.success('PDF purchased successfully! You can now read it.');
       setHasPurchased(true);
     }
-  }, [bookId, token]);
+  }, [bookId, authLoading, user, token]);
 
   const fetchBook = async () => {
     try {
       const response = await axios.get(`${API}/books/${bookId}`, { headers: getAuthHeaders() });
       setBook(response.data);
-
-      if (response.data.pdf_url) {
-        const pdfResponse = await axios.get(`${API}/files/${response.data.pdf_url}`, {
-          headers: getAuthHeaders(),
-          responseType: 'blob'
-        });
-        const url = URL.createObjectURL(pdfResponse.data);
-        setPdfUrl(url);
-      }
     } catch (error) {
       console.error('Error fetching book:', error);
       if (error.response?.status === 403) {
@@ -85,6 +80,35 @@ const BookDetailPage = () => {
       navigate('/library');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPdf = async () => {
+    if (!book?.pdf_url || !token) return;
+    setPdfLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const pdfResponse = await axios.get(`${API}/files/${book.pdf_url}`, {
+        headers,
+        withCredentials: true,
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(pdfResponse.data);
+      setPdfUrl(url);
+      setShowReader(true);
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      toast.error('Failed to load PDF. Please try again.');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const handleReadNow = () => {
+    if (pdfUrl) {
+      setShowReader(true);
+    } else {
+      loadPdf();
     }
   };
 
@@ -207,7 +231,6 @@ const BookDetailPage = () => {
     setSearchResults([]);
     const results = [];
     const searchTerm = searchText.toLowerCase();
-
     try {
       for (let i = 1; i <= pdfDocument.numPages; i++) {
         const page = await pdfDocument.getPage(i);
@@ -389,7 +412,8 @@ const BookDetailPage = () => {
 
           <div className="glass border-t border-[rgba(212,175,55,0.2)] flex-shrink-0 mb-12 md:mb-0">
             <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-6">
-              <Button variant="ghost" size="icon" onClick={() => handlePageChange(Math.max(1, pageNumber - 1))} disabled={pageNumber <= 1} className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-12 w-12" data-testid="prev-page-btn">
+              <Button variant="ghost" size="icon" onClick={() => handlePageChange(Math.max(1, pageNumber - 1))} disabled={pageNumber <= 1} className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-12
+              w-12" data-testid="prev-page-btn">
                 <ChevronLeft className="w-8 h-8" />
               </Button>
               <div className="flex items-center gap-3 min-w-[100px] justify-center">
@@ -420,7 +444,7 @@ const BookDetailPage = () => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#004D40] to-[#00332A]">
-                  <BookOpen className="w-20 h-20 text-gold/30" />
+                  <img src="/logo.png" alt="Book" className="w-20 h-20 opacity-30" />
                 </div>
               )}
               <div className="absolute top-3 left-3 flex flex-col gap-1">
@@ -471,9 +495,24 @@ const BookDetailPage = () => {
                   </Link>
                 ) : book.pdf_url ? (
                   canRead || hasPurchased ? (
-                    <Button size="lg" onClick={() => setShowReader(true)} className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="read-now-btn">
-                      <BookOpen className="w-5 h-5 mr-2" />
-                      Read Now
+                    <Button
+                      size="lg"
+                      onClick={handleReadNow}
+                      disabled={pdfLoading}
+                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold"
+                      data-testid="read-now-btn"
+                    >
+                      {pdfLoading ? (
+                        <>
+                          <div className="w-5 h-5 mr-2 border-2 border-[#02120F] border-t-transparent rounded-full animate-spin"></div>
+                          Loading PDF...
+                        </>
+                      ) : (
+                        <>
+                          <Library className="w-5 h-5 mr-2" />
+                          Read Now
+                        </>
+                      )}
                     </Button>
                   ) : (
                     <Link to="/pricing">
