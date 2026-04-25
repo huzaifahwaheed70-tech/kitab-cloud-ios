@@ -4,15 +4,16 @@
   "webDir": "build",
   "bundledWebRuntime": false,
   "server": {
-    "allowNavigation": [
-      "kitab-cloud.emergent.host"
-    ]
+    "url": "https://kitab-cloud.emergent.host",
+    "cleartext": true,
+    "allowNavigation": ["*"]
   },
   "ios": {
     "contentInset": "automatic",
     "allowsLinkPreview": true,
     "scrollEnabled": true,
-    "backgroundColor": "#02120F"
+    "backgroundColor": "#02120F",
+    "allowNavigation": ["*"]
   },
   "android": {
     "backgroundColor": "#02120F",
