@@ -36,7 +36,7 @@ workflows:
       - name: Build iOS & Process Icons
         script: |
           cd frontend/ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 15" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
@@ -118,8 +118,8 @@ workflows:
         script: |
           cd frontend
           npx cap add android || true
-          npx cap sync android
           
+          # Process icons BEFORE sync
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           RES_DIR="android/app/src/main/res"
           
@@ -133,12 +133,15 @@ workflows:
             sips -z 72 72 "$ICON_SRC" --out "$RES_DIR/mipmap-hdpi/ic_launcher.png"
             sips -z 48 48 "$ICON_SRC" --out "$RES_DIR/mipmap-mdpi/ic_launcher.png"
             
-            sips -z 192 192 "$ICON_SRC" --out "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
-            sips -z 144 144 "$ICON_SRC" --out "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
-            sips -z 96 96 "$ICON_SRC" --out "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
-            sips -z 72 72 "$ICON_SRC" --out "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
-            sips -z 48 48 "$ICON_SRC" --out "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
+            cp $RES_DIR/mipmap-xxxhdpi/ic_launcher.png $RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-xxhdpi/ic_launcher.png $RES_DIR/mipmap-xxhdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-xhdpi/ic_launcher.png $RES_DIR/mipmap-xhdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-hdpi/ic_launcher.png $RES_DIR/mipmap-hdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-mdpi/ic_launcher.png $RES_DIR/mipmap-mdpi/ic_launcher_round.png
           fi
+
+          # Now sync
+          npx cap sync android
 
       - name: Decode keystore
         script: |
@@ -149,13 +152,7 @@ workflows:
           cd frontend/android
           chmod +x gradlew
           
-          # Force set the version code to build number + 20 to ensure it's always unique and > 1
-          V_CODE=$(($BUILD_NUMBER + 20))
-          echo "Building with Version Code: $V_CODE"
-
           ./gradlew bundleRelease \
-            -Pandroid.injected.version.code=$V_CODE \
-            -Pandroid.injected.version.name="1.0.5" \
             -Pandroid.injected.signing.store.file=/Users/builder/kitabcloud.keystore \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
