@@ -1,18 +1,24 @@
 {
-  "appId": "com.darussalam.kitabcloud",
+  "appId": "host.emergent.kitabcloud",
   "appName": "Kitab Cloud",
   "webDir": "build",
   "bundledWebRuntime": false,
   "server": {
-    "hostname": "kitab-cloud.preview.emergentagent.com",
-    "androidScheme": "https",
-    "iosScheme": "https"
+    "allowNavigation": [
+      "kitab-cloud.emergent.host"
+    ]
   },
   "ios": {
     "contentInset": "automatic",
-    "allowsLinkPreview": false,
+    "allowsLinkPreview": true,
     "scrollEnabled": true,
     "backgroundColor": "#02120F"
+  },
+  "android": {
+    "backgroundColor": "#02120F",
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "SplashScreen": {

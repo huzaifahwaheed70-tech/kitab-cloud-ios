@@ -1,0 +1,168 @@
+workflows:
+  ios-release:
+    name: Kitab Cloud iOS Build
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: appstore_credentials
+    environment:
+      groups:
+        - appstore_credentials
+      vars:
+        APPLE_TEAM_ID: 6HUND32X2N
+        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: host.emergent.kitabcloud
+    scripts:
+      - name: Install dependencies (NPM)
+        script: |
+          cd frontend
+          rm -f yarn.lock
+          rm -rf node_modules
+          npm install
+
+      - name: Build React app
+        script: |
+          cd frontend
+          CI=false npm run build
+
+      - name: Sync Capacitor
+        script: |
+          cd frontend
+          npx cap add ios || true
+          npx cap sync ios
+
+      - name: Build iOS & Process Icons
+        script: |
+          cd frontend/ios/App
+          # Updated to version 1.0.5 build 16
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 16" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
+
+          ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
+          ICONSET="App/Assets.xcassets/AppIcon.appiconset"
+          if [ -f "$ICON_SRC" ]; then
+            echo "Processing iOS and iPad icons..."
+            sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
+            sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
+            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
+            sips -z 87 87 "$ICON_SRC" --out "$ICONSET/AppIcon-29@3x.png"
+            sips -z 58 58 "$ICON_SRC" --out "$ICONSET/AppIcon-29@2x.png"
+            sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
+            sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
+            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
+            sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
+            sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
+            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
+            sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
+            sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
+            sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
+            sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
+            cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
+          fi
+
+          sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
+          sed -i.bak2 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
+
+          PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
+          PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
+          
+          xcodebuild archive \
+            -project App.xcodeproj \
+            -scheme App \
+            -archivePath /Users/builder/archive.xcarchive \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE="$PROV_UUID" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
+
+      - name: Export IPA
+        script: |
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportOptionsPlist /Users/builder/clone/export_options.plist \
+            -exportPath /Users/builder/export
+
+    artifacts:
+      - /Users/builder/export/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+
+  android-release:
+    name: Kitab Cloud Android Build
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - android_credentials
+      vars:
+        PACKAGE_NAME: host.emergent.kitabcloud
+        JAVA_HOME: /Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
+        REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
+    scripts:
+      - name: Set Java 21
+        script: |
+          export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
+          export PATH=$JAVA_HOME/bin:$PATH
+
+      - name: Install and Build React
+        script: |
+          cd frontend
+          npm install
+          CI=false npm run build
+
+      - name: Sync Capacitor Android & Process Icons
+        script: |
+          cd frontend
+          npx cap add android || true
+          
+          # Process icons BEFORE sync to prevent overwrite
+          ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
+          RES_DIR="android/app/src/main/res"
+          
+          if [ -f "$ICON_SRC" ]; then
+            echo "Processing Android icons..."
+            mkdir -p $RES_DIR/mipmap-xxxhdpi $RES_DIR/mipmap-xxhdpi $RES_DIR/mipmap-xhdpi $RES_DIR/mipmap-hdpi $RES_DIR/mipmap-mdpi
+            
+            sips -z 192 192 "$ICON_SRC" --out "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"
+            sips -z 144 144 "$ICON_SRC" --out "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"
+            sips -z 96 96 "$ICON_SRC" --out "$RES_DIR/mipmap-xhdpi/ic_launcher.png"
+            sips -z 72 72 "$ICON_SRC" --out "$RES_DIR/mipmap-hdpi/ic_launcher.png"
+            sips -z 48 48 "$ICON_SRC" --out "$RES_DIR/mipmap-mdpi/ic_launcher.png"
+            
+            cp $RES_DIR/mipmap-xxxhdpi/ic_launcher.png $RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-xxhdpi/ic_launcher.png $RES_DIR/mipmap-xxhdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-xhdpi/ic_launcher.png $RES_DIR/mipmap-xhdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-hdpi/ic_launcher.png $RES_DIR/mipmap-hdpi/ic_launcher_round.png
+            cp $RES_DIR/mipmap-mdpi/ic_launcher.png $RES_DIR/mipmap-mdpi/ic_launcher_round.png
+          fi
+          
+          npx cap sync android
+
+      - name: Decode keystore
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > /Users/builder/kitabcloud.keystore
+
+      - name: Build Android AAB
+        script: |
+          cd frontend/android
+          chmod +x gradlew
+          
+          # Cleaned up: removed injected version code as it's now handled in build.gradle
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=/Users/builder/kitabcloud.keystore \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+
+    artifacts:
+      - frontend/android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: false
