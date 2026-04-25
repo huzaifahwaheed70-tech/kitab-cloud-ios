@@ -36,7 +36,7 @@ workflows:
       - name: Build iOS & Process Icons
         script: |
           cd frontend/ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 16" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 15" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
@@ -149,11 +149,12 @@ workflows:
           cd frontend/android
           chmod +x gradlew
           
-          UPDATED_VERSION_CODE=$(($BUILD_NUMBER + 5))
+          UPDATED_VERSION_CODE=$(($BUILD_NUMBER + 10))
           echo "Setting Android Version Code to: $UPDATED_VERSION_CODE"
 
           ./gradlew bundleRelease \
             -Pandroid.injected.version.code=$UPDATED_VERSION_CODE \
+            -Pandroid.injected.version.name="1.0.5" \
             -Pandroid.injected.signing.store.file=/Users/builder/kitabcloud.keystore \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
