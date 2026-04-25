@@ -3,6 +3,11 @@
   "appName": "Kitab Cloud",
   "webDir": "build",
   "bundledWebRuntime": false,
+  "server": {
+    "allowNavigation": [
+      "kitab-cloud.emergent.host"
+    ]
+  },
   "ios": {
     "contentInset": "automatic",
     "allowsLinkPreview": true,
