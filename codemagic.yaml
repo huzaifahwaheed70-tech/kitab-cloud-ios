@@ -10,7 +10,6 @@ workflows:
         - appstore_credentials
       vars:
         APPLE_TEAM_ID: 6HUND32X2N
-        # ✅ Added environment variable for production build
         REACT_APP_BACKEND_URL: "https://kitab-cloud.emergent.host"
       ios_signing:
         distribution_type: app_store
@@ -34,17 +33,16 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
-      - name: Build iOS
+      - name: Build iOS & Process Icons
         script: |
           cd frontend/ios/App
-          # ✅ Updated to Version 13
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 14" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 15" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
           ICONSET="App/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
-            echo "Processing icons..."
+            echo "Processing iOS icons..."
             sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/AppIcon-1024@1x.png"
             sips -z 180 180 "$ICON_SRC" --out "$ICONSET/AppIcon-60@3x.png"
             sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-60@2x.png"
@@ -53,12 +51,6 @@ workflows:
             sips -z 80 80 "$ICON_SRC" --out "$ICONSET/AppIcon-40@2x.png"
             sips -z 120 120 "$ICON_SRC" --out "$ICONSET/AppIcon-40@3x.png"
             sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-40@1x.png"
-            sips -z 20 20 "$ICON_SRC" --out "$ICONSET/AppIcon-20@1x.png"
-            sips -z 40 40 "$ICON_SRC" --out "$ICONSET/AppIcon-20@2x.png"
-            sips -z 60 60 "$ICON_SRC" --out "$ICONSET/AppIcon-20@3x.png"
-            sips -z 76 76 "$ICON_SRC" --out "$ICONSET/AppIcon-76@1x.png"
-            sips -z 152 152 "$ICON_SRC" --out "$ICONSET/AppIcon-76@2x.png"
-            sips -z 167 167 "$ICON_SRC" --out "$ICONSET/AppIcon-83.5@2x.png"
             sips -z 29 29 "$ICON_SRC" --out "$ICONSET/AppIcon-29@1x.png"
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
@@ -69,8 +61,7 @@ workflows:
           PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
           security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
           PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
-          echo "Using Provisioning Profile UUID: $PROV_UUID"
-
+          
           xcodebuild archive \
             -project App.xcodeproj \
             -scheme App \
@@ -110,25 +101,35 @@ workflows:
         script: |
           export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
           export PATH=$JAVA_HOME/bin:$PATH
-          java -version
 
-      - name: Install dependencies
+      - name: Install and Build React
         script: |
           cd frontend
-          rm -f yarn.lock
-          rm -rf node_modules
           npm install
-
-      - name: Build React app
-        script: |
-          cd frontend
           CI=false npm run build
 
-      - name: Add and Sync Capacitor Android
+      - name: Sync Capacitor Android & Process Icons
         script: |
           cd frontend
           npx cap add android || true
           npx cap sync android
+          
+          ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
+          RES_DIR="android/app/src/main/res"
+          if [ -f "$ICON_SRC" ]; then
+            echo "Processing Android icons..."
+            sips -z 192 192 "$ICON_SRC" --out "$RES_DIR/mipmap-xxxhdpi/ic_launcher.png"
+            sips -z 144 144 "$ICON_SRC" --out "$RES_DIR/mipmap-xxhdpi/ic_launcher.png"
+            sips -z 96 96 "$ICON_SRC" --out "$RES_DIR/mipmap-xhdpi/ic_launcher.png"
+            sips -z 72 72 "$ICON_SRC" --out "$RES_DIR/mipmap-hdpi/ic_launcher.png"
+            sips -z 48 48 "$ICON_SRC" --out "$RES_DIR/mipmap-mdpi/ic_launcher.png"
+            # Round icons
+            sips -z 192 192 "$ICON_SRC" --out "$RES_DIR/mipmap-xxxhdpi/ic_launcher_round.png"
+            sips -z 144 144 "$ICON_SRC" --out "$RES_DIR/mipmap-xxhdpi/ic_launcher_round.png"
+            sips -z 96 96 "$ICON_SRC" --out "$RES_DIR/mipmap-xhdpi/ic_launcher_round.png"
+            sips -z 72 72 "$ICON_SRC" --out "$RES_DIR/mipmap-hdpi/ic_launcher_round.png"
+            sips -z 48 48 "$RES_DIR/mipmap-mdpi/ic_launcher_round.png"
+          fi
 
       - name: Decode keystore
         script: |
@@ -136,8 +137,6 @@ workflows:
 
       - name: Build Android AAB
         script: |
-          export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home
-          export PATH=$JAVA_HOME/bin:$PATH
           cd frontend/android
           chmod +x gradlew
           ./gradlew bundleRelease \
@@ -152,4 +151,4 @@ workflows:
       google_play:
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
-        submit_as_draft: true
+        submit_as_draft: false
