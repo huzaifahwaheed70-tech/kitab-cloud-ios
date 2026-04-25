@@ -133,7 +133,7 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Remove Google OAuth (user requested)
 
 ### P1 (High Priority) - NEXT
-- Push code to GitHub via "Save to Github" button for Codemagic iOS/Android builds
+- Test and deploy StoreKit on iOS (native plugin files created, need Xcode integration)
 - Custom domain deployment (duskitab.com)
 
 ### P2 (Medium Priority)

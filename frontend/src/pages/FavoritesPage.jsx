@@ -92,7 +92,7 @@ const FavoritesPage = () => {
                   <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover">
                     {book.cover_url ? (
                       <img 
-                        src={`${process.env.REACT_APP_BACKEND_URL}/api/files/${book.cover_url}`}
+                        src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
                         alt={book.title}
                         className="w-full h-full object-cover"
                       />

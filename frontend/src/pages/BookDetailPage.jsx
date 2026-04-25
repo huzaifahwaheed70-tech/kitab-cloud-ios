@@ -358,12 +358,10 @@ const BookDetailPage = () => {
       {showReader && pdfUrl && (
         <div 
           className="fixed inset-0 z-50 bg-[#02120F] flex flex-col"
-          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           onContextMenu={(e) => e.preventDefault()}
-          onCopy={(e) => e.preventDefault()}
         >
-          {/* Reader Header */}
-          <div className="glass border-b border-[rgba(212,175,55,0.2)] flex-shrink-0">
+          {/* Reader Header - Mobile: move to bottom, Desktop: keep at top */}
+          <div className="glass border-b border-[rgba(212,175,55,0.2)] flex-shrink-0 order-first md:order-first">
             <div className="max-w-7xl mx-auto px-3 py-2 md:px-4 md:py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Button
@@ -443,8 +441,12 @@ const BookDetailPage = () => {
                     placeholder="Search in book..."
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && searchInBook()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') searchInBook();
+                      e.stopPropagation();
+                    }}
                     className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] text-sm pr-10"
+                    style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
                     data-testid="in-book-search"
                   />
                   {isSearching && (
@@ -492,10 +494,11 @@ const BookDetailPage = () => {
             </div>
           )}
 
-          {/* PDF Content - copy protected */}
+          {/* PDF Content */}
           <div 
             className="flex-1 overflow-auto pdf-container"
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+            onCopy={(e) => e.preventDefault()}
           >
             <Document
               file={pdfUrl}
@@ -510,13 +513,44 @@ const BookDetailPage = () => {
                 pageNumber={pageNumber} 
                 scale={scale}
                 className="mx-auto"
-                renderTextLayer={false}
+                renderTextLayer={canSearch}
               />
             </Document>
           </div>
 
-          {/* Reader Footer with navigation - positioned above Emergent badge */}
-          <div className="glass border-t border-[rgba(212,175,55,0.2)] flex-shrink-0 mb-12 md:mb-0">
+          {/* Reader Footer with navigation - Floating at bottom right on mobile */}
+          <div className="md:hidden fixed bottom-20 right-4 z-50">
+            <div className="glass rounded-full border border-[rgba(212,175,55,0.3)] px-3 py-2 flex items-center gap-3 shadow-lg">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
+                disabled={pageNumber <= 1}
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10"
+                data-testid="prev-page-btn-mobile"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </Button>
+              
+              <span className="text-[#FDFBF7] font-mono text-sm min-w-[60px] text-center">
+                {pageNumber}/{numPages || '?'}
+              </span>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handlePageChange(Math.min(numPages || pageNumber, pageNumber + 1))}
+                disabled={pageNumber >= (numPages || 1)}
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10"
+                data-testid="next-page-btn-mobile"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Desktop footer */}
+          <div className="hidden md:block glass border-t border-[rgba(212,175,55,0.2)] flex-shrink-0">
             <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-6">
               <Button
                 variant="ghost"
