@@ -139,12 +139,13 @@ const PricingPage = () => {
       // Import StoreKit dynamically
       const storeKitService = (await import('../services/storekit')).default;
       
-      // This will trigger the native StoreKit purchase flow
-      // The actual implementation requires the Capacitor StoreKit plugin
+      // Initialize StoreKit if not already done
+      if (!storeKitService.isInitialized) {
+        await storeKitService.initialize();
+      }
+      
       toast.info('Opening App Store payment...');
       
-      // For now, show a message that iOS purchases are handled via App Store
-      // The actual StoreKit integration will be completed in the native iOS code
       const result = await storeKitService.purchaseSubscription(tier, token, API.replace('/api', ''));
       
       if (result.success) {
@@ -153,10 +154,13 @@ const PricingPage = () => {
         navigate('/library');
       }
     } catch (error) {
-      if (error.message?.includes('User cancelled')) {
+      console.error('iOS purchase error:', error);
+      if (error.message?.includes('User cancelled') || error.message?.includes('cancel')) {
         toast.info('Purchase cancelled');
+      } else if (error.message?.includes('not available')) {
+        toast.error('In-App Purchase is not available. Please ensure you are using the iOS app from the App Store.');
       } else {
-        throw error;
+        toast.error(error.message || 'Purchase failed. Please try again.');
       }
     }
   };

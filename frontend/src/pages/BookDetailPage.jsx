@@ -10,6 +10,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
+import { isIOS } from '../services/storekit';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -18,7 +19,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 const BookDetailPage = () => {
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,9 +39,16 @@ const BookDetailPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [pageSaved, setPageSaved] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
+
+  useEffect(() => {
+    // Check if on iOS
+    setIsIOSDevice(isIOS());
+  }, []);
 
   useEffect(() => {
     // Only fetch once auth is fully resolved
@@ -100,7 +108,20 @@ const BookDetailPage = () => {
       setShowReader(true);
     } catch (error) {
       console.error('Error loading PDF:', error);
-      toast.error('Failed to load PDF. Please try again.');
+      if (error.response?.status === 403) {
+        const detail = error.response?.data?.detail || 'Access denied';
+        if (detail.includes('Monthly reading limit')) {
+          toast.error(detail);
+        } else if (detail.includes('Purchase')) {
+          toast.error('Please purchase this PDF or subscribe to read.');
+        } else {
+          toast.error(detail);
+        }
+      } else if (error.response?.status === 401) {
+        toast.error('Please log in to read this book');
+      } else {
+        toast.error('Failed to load PDF. Please try again.');
+      }
     } finally {
       setPdfLoading(false);
     }
@@ -251,16 +272,56 @@ const BookDetailPage = () => {
       return;
     }
     
+    setPurchaseLoading(true);
+    
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
-        headers, 
-        withCredentials: true 
-      });
-      
-      window.location.href = response.data.url;
+      if (isIOSDevice) {
+        // iOS: Use StoreKit for PDF purchase
+        await handleIOSPdfPurchase();
+      } else {
+        // Web: Use Stripe
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
+          headers, 
+          withCredentials: true 
+        });
+        window.location.href = response.data.url;
+      }
     } catch (error) {
-      toast.error('Failed to initiate purchase');
+      if (error.message?.includes('User cancelled')) {
+        toast.info('Purchase cancelled');
+      } else {
+        toast.error(error.message || 'Failed to initiate purchase');
+      }
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const handleIOSPdfPurchase = async () => {
+    try {
+      const storeKitService = (await import('../services/storekit')).default;
+      
+      // For PDF purchases, use the book's Apple product ID
+      // The product ID should be stored in the book data or derived from book ID
+      const productId = book.apple_product_id || `com.darussalam.kitabcloud.book.${bookId}`;
+      
+      toast.info('Opening App Store payment...');
+      
+      const result = await storeKitService.purchasePDF(
+        bookId, 
+        productId, 
+        token, 
+        API.replace('/api', '')
+      );
+      
+      if (result.success) {
+        toast.success('PDF purchased successfully!');
+        setHasPurchased(true);
+        await refreshUser();
+      }
+    } catch (error) {
+      throw error;
     }
   };
 
