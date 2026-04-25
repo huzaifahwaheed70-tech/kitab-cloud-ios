@@ -504,6 +504,62 @@ async def get_cover_image(path: str):
 
 @api_router.get("/files/{path:path}")
 async def get_file(path: str, user: dict = Depends(get_current_user)):
+    user_id = user["user_id"]
+    user_tier = user.get("subscription_tier", 0)
+    
+    # Check if this is a PDF file access (reading a book)
+    if path.endswith('.pdf'):
+        # Extract book_id from path if possible
+        # Track monthly unique book reads for tier limits
+        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+        
+        # Get or create monthly reading record
+        monthly_reads = await db.monthly_reads.find_one(
+            {"user_id": user_id, "month": current_month},
+            {"_id": 0}
+        )
+        
+        # Tier limits for reading: 1=10, 2=20, 3=30, 4=unlimited, 0=purchased only
+        tier_read_limits = {0: 0, 1: 10, 2: 20, 3: 30, 4: None}
+        read_limit = tier_read_limits.get(user_tier)
+        
+        # Check if user has purchased this specific PDF (Tier 0 users can read purchased PDFs)
+        book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
+        has_purchased = await db.pdf_purchases.find_one({
+            "user_id": user_id,
+            "book_id": book_id_from_path
+        })
+        
+        if has_purchased:
+            # User purchased this PDF, allow access regardless of tier
+            pass
+        elif user_tier == 0:
+            # Tier 0 without purchase
+            raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
+        elif read_limit is not None:
+            # Check monthly read limit for Tier 1-3
+            read_book_ids = monthly_reads.get("book_ids", []) if monthly_reads else []
+            
+            # If this book is already in their reads, allow (re-reading)
+            if book_id_from_path not in read_book_ids:
+                # New book this month
+                if len(read_book_ids) >= read_limit:
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"Monthly reading limit reached ({read_limit} books). Wait until next billing cycle or upgrade your subscription."
+                    )
+                
+                # Add this book to monthly reads
+                await db.monthly_reads.update_one(
+                    {"user_id": user_id, "month": current_month},
+                    {
+                        "$addToSet": {"book_ids": book_id_from_path},
+                        "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+                        "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
+                    },
+                    upsert=True
+                )
+    
     try:
         data, content_type = get_object(path)
         return Response(content=data, media_type=content_type)

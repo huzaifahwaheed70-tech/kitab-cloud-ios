@@ -301,9 +301,7 @@ const BookDetailPage = () => {
       {showReader && pdfUrl && (
         <div
           className="fixed inset-0 z-50 bg-[#02120F] flex flex-col"
-          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           onContextMenu={(e) => e.preventDefault()}
-          onCopy={(e) => e.preventDefault()}
         >
           <div className="glass border-b border-[rgba(212,175,55,0.2)] flex-shrink-0">
             <div className="max-w-7xl mx-auto px-3 py-2 md:px-4 md:py-3 flex items-center justify-between">
@@ -361,8 +359,12 @@ const BookDetailPage = () => {
                     placeholder="Search in book..."
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && searchInBook()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') searchInBook();
+                      e.stopPropagation();
+                    }}
                     className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] text-sm pr-10"
+                    style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
                     data-testid="in-book-search"
                   />
                   {isSearching && (

@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 // Apple Product IDs matching backend
 export const APPLE_PRODUCT_IDS = {
@@ -6,6 +6,14 @@ export const APPLE_PRODUCT_IDS = {
   2: 'com.darussalam.kitabcloud.standard.monthly',
   3: 'com.darussalam.kitabcloud.advanced.monthly',
   4: 'com.darussalam.kitabcloud.premium.monthly',
+};
+
+// Reverse lookup
+export const TIER_FROM_PRODUCT_ID = {
+  'com.darussalam.kitabcloud.basic.monthly': 1,
+  'com.darussalam.kitabcloud.standard.monthly': 2,
+  'com.darussalam.kitabcloud.advanced.monthly': 3,
+  'com.darussalam.kitabcloud.premium.monthly': 4,
 };
 
 // Check if running on iOS native app
@@ -18,6 +26,16 @@ export const isNative = () => {
   return Capacitor.isNativePlatform();
 };
 
+// Register the native StoreKit plugin
+let StoreKitNative = null;
+if (isIOS()) {
+  try {
+    StoreKitNative = registerPlugin('StoreKit');
+  } catch (e) {
+    console.warn('StoreKit plugin not available:', e);
+  }
+}
+
 // StoreKit service for iOS in-app purchases
 class StoreKitService {
   constructor() {
@@ -27,21 +45,15 @@ class StoreKitService {
 
   // Initialize StoreKit (called when app starts on iOS)
   async initialize() {
-    if (!isIOS()) {
-      console.log('StoreKit: Not on iOS, skipping initialization');
+    if (!isIOS() || !StoreKitNative) {
+      console.log('StoreKit: Not on iOS or plugin not available');
       return false;
     }
 
     try {
-      // Check if StoreKit plugin is available
-      const { StoreKit } = await import('@capacitor/core').then(m => m.registerPlugin('StoreKit'));
-      this.storeKit = StoreKit;
-      
-      // Load products
-      const result = await this.storeKit.loadProducts();
+      const result = await StoreKitNative.loadProducts();
       this.products = result.products || [];
       this.isInitialized = true;
-      
       console.log('StoreKit initialized with products:', this.products);
       return true;
     } catch (error) {
@@ -63,7 +75,7 @@ class StoreKitService {
 
   // Purchase a subscription
   async purchaseSubscription(tier, authToken, apiUrl) {
-    if (!isIOS()) {
+    if (!isIOS() || !StoreKitNative) {
       throw new Error('StoreKit purchases only available on iOS');
     }
 
@@ -74,17 +86,25 @@ class StoreKitService {
 
     try {
       // Initiate purchase through native StoreKit
-      const result = await this.storeKit.purchaseProduct({ productId });
+      const result = await StoreKitNative.purchaseProduct({ productId });
       
-      if (result.success) {
+      if (result.success || result.transactionId) {
         // Validate purchase with backend
-        const validation = await this.validatePurchase(result, authToken, apiUrl);
+        const validation = await this.validatePurchase({
+          transactionId: result.transactionId,
+          originalTransactionId: result.originalTransactionId,
+          productId: result.productId || productId
+        }, authToken, apiUrl);
         return validation;
       } else {
         throw new Error(result.error || 'Purchase failed');
       }
     } catch (error) {
       console.error('StoreKit purchase error:', error);
+      // Check for user cancellation
+      if (error.code === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+        throw new Error('User cancelled');
+      }
       throw error;
     }
   }
@@ -100,8 +120,7 @@ class StoreKitService {
       body: JSON.stringify({
         transaction_id: purchaseResult.transactionId,
         original_transaction_id: purchaseResult.originalTransactionId,
-        product_id: purchaseResult.productId || APPLE_PRODUCT_IDS[purchaseResult.tier],
-        signed_data: purchaseResult.signedData
+        product_id: purchaseResult.productId
       })
     });
 
@@ -115,12 +134,12 @@ class StoreKitService {
 
   // Restore purchases
   async restorePurchases(authToken, apiUrl) {
-    if (!isIOS()) {
+    if (!isIOS() || !StoreKitNative) {
       throw new Error('StoreKit restore only available on iOS');
     }
 
     try {
-      const result = await this.storeKit.restorePurchases();
+      const result = await StoreKitNative.restorePurchases();
       
       if (result.transactions && result.transactions.length > 0) {
         // Send restored transactions to backend
@@ -151,7 +170,21 @@ class StoreKitService {
     }
   }
 
-  // Get subscription status
+  // Get subscription status from native
+  async getNativeSubscriptionStatus() {
+    if (!isIOS() || !StoreKitNative) {
+      return { hasActiveSubscription: false, subscriptions: [] };
+    }
+
+    try {
+      return await StoreKitNative.getSubscriptionStatus();
+    } catch (error) {
+      console.error('StoreKit status error:', error);
+      return { hasActiveSubscription: false, subscriptions: [] };
+    }
+  }
+
+  // Get subscription status from backend
   async getSubscriptionStatus(authToken, apiUrl) {
     try {
       const response = await fetch(`${apiUrl}/api/payments/apple/status`, {
