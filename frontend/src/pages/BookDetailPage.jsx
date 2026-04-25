@@ -302,11 +302,15 @@ const BookDetailPage = () => {
     try {
       const storeKitService = (await import('../services/storekit')).default;
       
-      // For PDF purchases, use the book's Apple product ID
-      // The product ID should be stored in the book data or derived from book ID
+      // Initialize if needed
+      if (!storeKitService.isInitialized) {
+        await storeKitService.initialize();
+      }
+      
+      // Use the book's Apple product ID
       const productId = book.apple_product_id || `com.darussalam.kitabcloud.book.${bookId}`;
       
-      toast.info('Opening App Store payment...');
+      toast.info('Processing purchase...');
       
       const result = await storeKitService.purchasePDF(
         bookId, 
@@ -321,7 +325,12 @@ const BookDetailPage = () => {
         await refreshUser();
       }
     } catch (error) {
-      throw error;
+      console.error('iOS PDF purchase error:', error);
+      if (error.message?.includes('cancelled') || error.message?.includes('cancel')) {
+        toast.info('Purchase cancelled');
+      } else {
+        toast.error(error.message || 'Purchase failed. Please try again.');
+      }
     }
   };
 

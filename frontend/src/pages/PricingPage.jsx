@@ -136,15 +136,20 @@ const PricingPage = () => {
 
   const handleIOSPurchase = async (tier) => {
     try {
-      // Import StoreKit dynamically
       const storeKitService = (await import('../services/storekit')).default;
       
-      // Initialize StoreKit if not already done
+      // Initialize if needed
       if (!storeKitService.isInitialized) {
-        await storeKitService.initialize();
+        toast.info('Connecting to App Store...');
+        const initialized = await storeKitService.initialize();
+        if (!initialized) {
+          toast.error('Could not connect to App Store. Please check your internet connection.');
+          setLoading(null);
+          return;
+        }
       }
       
-      toast.info('Opening App Store payment...');
+      toast.info('Processing purchase...');
       
       const result = await storeKitService.purchaseSubscription(tier, token, API.replace('/api', ''));
       
@@ -155,13 +160,13 @@ const PricingPage = () => {
       }
     } catch (error) {
       console.error('iOS purchase error:', error);
-      if (error.message?.includes('User cancelled') || error.message?.includes('cancel')) {
+      if (error.message?.includes('cancelled') || error.message?.includes('cancel')) {
         toast.info('Purchase cancelled');
-      } else if (error.message?.includes('not available')) {
-        toast.error('In-App Purchase is not available. Please ensure you are using the iOS app from the App Store.');
       } else {
         toast.error(error.message || 'Purchase failed. Please try again.');
       }
+    } finally {
+      setLoading(null);
     }
   };
 
