@@ -98,7 +98,20 @@ const BookDetailPage = () => {
       setShowReader(true);
     } catch (error) {
       console.error('Error loading PDF:', error);
-      toast.error('Failed to load PDF. Please try again.');
+      if (error.response?.status === 403) {
+        const detail = error.response?.data?.detail || 'Access denied';
+        if (detail.includes('Monthly reading limit')) {
+          toast.error(detail);
+        } else if (detail.includes('Purchase')) {
+          toast.error('Please purchase this PDF or subscribe to read.');
+        } else {
+          toast.error(detail);
+        }
+      } else if (error.response?.status === 401) {
+        toast.error('Please log in to read this book');
+      } else {
+        toast.error('Failed to load PDF. Please try again.');
+      }
     } finally {
       setPdfLoading(false);
     }

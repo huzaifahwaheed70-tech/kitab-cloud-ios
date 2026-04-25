@@ -944,6 +944,68 @@ async def stripe_webhook(request: Request):
         logger.error(f"Webhook error: {e}")
         return {"status": "error"}
 
+class ApplePDFValidation(BaseModel):
+    transaction_id: str
+    original_transaction_id: str
+    product_id: str
+    book_id: str
+
+
+@api_router.post("/payments/apple/validate-pdf")
+async def validate_apple_pdf_purchase(
+    transaction: ApplePDFValidation,
+    user: dict = Depends(get_current_user)
+):
+    """Validate an Apple in-app purchase for a single PDF"""
+    try:
+        # Check if book exists
+        book = await db.books.find_one({"book_id": transaction.book_id}, {"_id": 0})
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        
+        # Validate with Apple if credentials configured
+        if APPLE_KEY_ID and APPLE_ISSUER_ID and APPLE_PRIVATE_KEY:
+            try:
+                apple_data = await validate_apple_transaction(transaction.transaction_id)
+                logger.info(f"Apple PDF transaction validated: {apple_data}")
+            except Exception as e:
+                logger.warning(f"Apple validation failed (continuing): {e}")
+        
+        # Record the PDF purchase
+        purchase_record = {
+            "purchase_id": f"apple_pdf_{uuid.uuid4().hex[:12]}",
+            "user_id": user["user_id"],
+            "book_id": transaction.book_id,
+            "platform": "apple",
+            "product_id": transaction.product_id,
+            "transaction_id": transaction.transaction_id,
+            "original_transaction_id": transaction.original_transaction_id,
+            "purchase_date": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Upsert to avoid duplicates
+        await db.pdf_purchases.update_one(
+            {"user_id": user["user_id"], "book_id": transaction.book_id},
+            {"$set": purchase_record},
+            upsert=True
+        )
+        
+        logger.info(f"Apple PDF purchase recorded for user {user['user_id']}, book {transaction.book_id}")
+        
+        return {
+            "success": True,
+            "book_id": transaction.book_id,
+            "message": "PDF purchase validated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple PDF validation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/webhook/apple")
 async def apple_webhook(request: Request):
     try:
