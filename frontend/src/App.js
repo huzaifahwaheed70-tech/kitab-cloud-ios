@@ -20,8 +20,11 @@ import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// ✅ Fix: Added hardcoded fallback to prevent "undefined/api" blank screen
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://kitab-cloud.emergent.host";
 const API = `${BACKEND_URL}/api`;
+
+console.log("App Initialized. Backend URL:", BACKEND_URL);
 
 const AuthContext = createContext(null);
 export const useAuth = () => {
