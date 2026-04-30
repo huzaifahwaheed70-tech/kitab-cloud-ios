@@ -69,6 +69,7 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Fixed password form not showing for email/password users
 - ✅ Removed Google OAuth completely (was causing login bugs)
 - ✅ Updated logo throughout the app to use user's custom logo
+- ✅ Mobile UI improvements: larger tap targets (44-48px minimum), centered PDF navigation, better spacing (April 2026)
 
 ## Subscription Tiers
 | Tier | Name | Price | Book Limit | Features |
@@ -133,8 +134,9 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Remove Google OAuth (user requested)
 
 ### P1 (High Priority) - NEXT
-- Test and deploy StoreKit on iOS (native plugin files created, need Xcode integration)
+- Test and deploy StoreKit on iOS (native plugin files created, need Xcode integration + pod install)
 - Custom domain deployment (duskitab.com)
+- Configure Resend with verified domain for production emails (currently using sandbox which only sends to verified account email)
 
 ### P2 (Medium Priority)
 - Email notifications for subscription changes
