@@ -87,20 +87,20 @@ const LandingPage = () => {
     <div className="min-h-screen bg-dark relative noise-overlay">
       {/* Navigation */}
       <nav className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3" data-testid="nav-logo">
-            <img src="/logo.png" alt="Kitab Cloud" className="w-10 h-10 rounded-sm object-cover" />
-            <span className="font-serif text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 md:gap-3 min-h-[44px]" data-testid="nav-logo">
+            <img src="/logo.png" alt="Kitab Cloud" className="w-9 h-9 md:w-10 md:h-10 rounded-sm object-cover" />
+            <span className="font-serif text-lg md:text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
           </Link>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <Link to="/login">
-              <Button variant="ghost" className="text-[#FDFBF7] hover:bg-[#082E26]" data-testid="login-btn">
+              <Button variant="ghost" className="text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px] px-3 md:px-4" data-testid="login-btn">
                 Sign In
               </Button>
             </Link>
             <Link to="/register">
-              <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-medium" data-testid="register-btn">
+              <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-medium min-h-[44px] px-3 md:px-4" data-testid="register-btn">
                 Get Started
               </Button>
             </Link>
@@ -109,24 +109,24 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative py-20 px-6">
+      <section className="relative py-16 md:py-20 px-4 md:px-6">
         <div className="max-w-7xl mx-auto text-center">
-          <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#FDFBF7] mb-6">
+          <h1 className="font-serif text-3xl sm:text-4xl lg:text-6xl font-bold text-[#FDFBF7] mb-6">
             Your Digital Islamic
             <span className="text-gold block">Library</span>
           </h1>
-          <p className="text-lg text-[#B0C4BF] max-w-2xl mx-auto mb-8">
+          <p className="text-base md:text-lg text-[#B0C4BF] max-w-2xl mx-auto mb-8 px-2">
             Access the complete Dar-Us-Salam digital collection. Subscribe monthly or buy individual books.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
             <Link to="/register">
-              <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8" data-testid="hero-cta">
+              <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8 min-h-[48px] w-full sm:w-auto" data-testid="hero-cta">
                 Start Reading
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
             <a href="#browse-books">
-              <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8">
+              <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 min-h-[48px] w-full sm:w-auto">
                 Browse Books
               </Button>
             </a>
@@ -135,10 +135,10 @@ const LandingPage = () => {
       </section>
 
       {/* Browse Books Section */}
-      <section id="browse-books" className="py-16 px-6 bg-[#082E26]/30">
+      <section id="browse-books" className="py-16 px-4 md:px-6 bg-[#082E26]/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] mb-4">Browse Our Collection</h2>
+            <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#FDFBF7] mb-4">Browse Our Collection</h2>
             <p className="text-[#B0C4BF]">Preview our library. Sign up to start reading!</p>
           </div>
           
@@ -147,7 +147,7 @@ const LandingPage = () => {
               <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
               {books.map((book) => (
                 <div 
                   key={book.book_id} 
@@ -179,7 +179,7 @@ const LandingPage = () => {
                     {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#02120F] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
                       <Link to="/register">
-                        <Button size="sm" className="bg-gold text-[#02120F] hover:bg-[#E9C85C]">
+                        <Button size="sm" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] min-h-[44px]">
                           Sign Up to Read
                         </Button>
                       </Link>

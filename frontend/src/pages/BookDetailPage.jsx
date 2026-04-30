@@ -430,10 +430,10 @@ const BookDetailPage = () => {
           className="fixed inset-0 z-50 bg-[#02120F] flex flex-col"
           onContextMenu={(e) => e.preventDefault()}
         >
-          {/* Reader Header - Mobile: move to bottom, Desktop: keep at top */}
+          {/* Reader Header - Larger tap targets on mobile */}
           <div className="glass border-b border-[rgba(212,175,55,0.2)] flex-shrink-0 order-first md:order-first">
-            <div className="max-w-7xl mx-auto px-3 py-2 md:px-4 md:py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="max-w-7xl mx-auto px-4 py-3 md:px-4 md:py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -441,36 +441,36 @@ const BookDetailPage = () => {
                     saveReadingProgress(pageNumber, true);
                     setShowReader(false);
                   }}
-                  className="text-[#FDFBF7] hover:bg-[#082E26] h-8 w-8"
+                  className="text-[#FDFBF7] hover:bg-[#082E26] h-11 w-11 min-h-[44px] min-w-[44px]"
                   data-testid="close-reader-btn"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-6 h-6" />
                 </Button>
-                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[100px] md:max-w-[300px]">
+                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[120px] md:max-w-[300px]">
                   {book.title}
                 </h1>
               </div>
               
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 {/* Save Page Button */}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => saveReadingProgress(pageNumber, true)}
-                  className={`h-8 w-8 ${pageSaved ? 'text-gold' : 'text-[#B0C4BF] hover:text-gold'}`}
+                  className={`h-11 w-11 min-h-[44px] min-w-[44px] ${pageSaved ? 'text-gold bg-gold/10' : 'text-[#B0C4BF] hover:text-gold'}`}
                   data-testid="save-page-btn"
                 >
-                  <Bookmark className={`w-4 h-4 ${pageSaved ? 'fill-gold' : ''}`} />
+                  <Bookmark className={`w-5 h-5 ${pageSaved ? 'fill-gold' : ''}`} />
                 </Button>
                 
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8"
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-11 w-11 min-h-[44px] min-w-[44px]"
                   data-testid="zoom-out-btn"
                 >
-                  <ZoomOut className="w-4 h-4" />
+                  <ZoomOut className="w-5 h-5" />
                 </Button>
                 <span className="text-[#B0C4BF] text-xs min-w-[35px] text-center hidden md:inline">
                   {Math.round(scale * 100)}%
@@ -479,10 +479,10 @@ const BookDetailPage = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => setScale(s => Math.min(2, s + 0.25))}
-                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8"
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] h-11 w-11 min-h-[44px] min-w-[44px]"
                   data-testid="zoom-in-btn"
                 >
-                  <ZoomIn className="w-4 h-4" />
+                  <ZoomIn className="w-5 h-5" />
                 </Button>
                 
                 {/* Search Toggle for Mobile */}
@@ -491,10 +491,10 @@ const BookDetailPage = () => {
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowSearch(!showSearch)}
-                    className={`h-8 w-8 ${showSearch ? 'text-gold' : 'text-[#B0C4BF] hover:text-gold'}`}
+                    className={`h-11 w-11 min-h-[44px] min-w-[44px] ${showSearch ? 'text-gold bg-gold/10' : 'text-[#B0C4BF] hover:text-gold'}`}
                     data-testid="toggle-search-btn"
                   >
-                    <Search className="w-4 h-4" />
+                    <Search className="w-5 h-5" />
                   </Button>
                 )}
               </div>
@@ -588,21 +588,21 @@ const BookDetailPage = () => {
             </Document>
           </div>
 
-          {/* Reader Footer with navigation - Floating at bottom right on mobile */}
-          <div className="md:hidden fixed bottom-20 right-4 z-50">
-            <div className="glass rounded-full border border-[rgba(212,175,55,0.3)] px-3 py-2 flex items-center gap-3 shadow-lg">
+          {/* Reader Footer with navigation - Centered at bottom on mobile for better accessibility */}
+          <div className="md:hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+            <div className="glass rounded-full border-2 border-gold/50 px-4 py-3 flex items-center gap-4 shadow-xl bg-[#02120F]/95">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
                 disabled={pageNumber <= 1}
-                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10"
+                className="text-gold hover:text-[#FDFBF7] hover:bg-gold/20 disabled:opacity-30 h-12 w-12 min-h-[48px] min-w-[48px]"
                 data-testid="prev-page-btn-mobile"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-7 h-7" />
               </Button>
               
-              <span className="text-[#FDFBF7] font-mono text-sm min-w-[60px] text-center">
+              <span className="text-[#FDFBF7] font-mono text-base min-w-[70px] text-center font-semibold">
                 {pageNumber}/{numPages || '?'}
               </span>
               
@@ -611,10 +611,10 @@ const BookDetailPage = () => {
                 size="icon"
                 onClick={() => handlePageChange(Math.min(numPages || pageNumber, pageNumber + 1))}
                 disabled={pageNumber >= (numPages || 1)}
-                className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-10 w-10"
+                className="text-gold hover:text-[#FDFBF7] hover:bg-gold/20 disabled:opacity-30 h-12 w-12 min-h-[48px] min-w-[48px]"
                 data-testid="next-page-btn-mobile"
               >
-                <ChevronRight className="w-6 h-6" />
+                <ChevronRight className="w-7 h-7" />
               </Button>
             </div>
           </div>
