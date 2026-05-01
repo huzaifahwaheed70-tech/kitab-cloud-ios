@@ -10,7 +10,6 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
-import { isIOS } from '../services/storekit';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -19,7 +18,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 const BookDetailPage = () => {
   const { bookId } = useParams();
   const [searchParams] = useSearchParams();
-  const { user, token, loading: authLoading, refreshUser } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,16 +38,10 @@ const BookDetailPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [pageSaved, setPageSaved] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
-
-  useEffect(() => {
-    // Check if on iOS
-    setIsIOSDevice(isIOS());
-  }, []);
 
   useEffect(() => {
     // Only fetch once auth is fully resolved
@@ -275,62 +268,16 @@ const BookDetailPage = () => {
     setPurchaseLoading(true);
     
     try {
-      if (isIOSDevice) {
-        // iOS: Use StoreKit for PDF purchase
-        await handleIOSPdfPurchase();
-      } else {
-        // Web: Use Stripe
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
-          headers, 
-          withCredentials: true 
-        });
-        window.location.href = response.data.url;
-      }
+      // Use Stripe for all platforms (iOS, Android, Web)
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
+        headers, 
+        withCredentials: true 
+      });
+      window.location.href = response.data.url;
     } catch (error) {
-      if (error.message?.includes('User cancelled')) {
-        toast.info('Purchase cancelled');
-      } else {
-        toast.error(error.message || 'Failed to initiate purchase');
-      }
-    } finally {
+      toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
       setPurchaseLoading(false);
-    }
-  };
-
-  const handleIOSPdfPurchase = async () => {
-    try {
-      const storeKitService = (await import('../services/storekit')).default;
-      
-      // Initialize if needed
-      if (!storeKitService.isInitialized) {
-        await storeKitService.initialize();
-      }
-      
-      // Use the book's Apple product ID
-      const productId = book.apple_product_id || `com.darussalam.kitabcloud.book.${bookId}`;
-      
-      toast.info('Processing purchase...');
-      
-      const result = await storeKitService.purchasePDF(
-        bookId, 
-        productId, 
-        token, 
-        API.replace('/api', '')
-      );
-      
-      if (result.success) {
-        toast.success('PDF purchased successfully!');
-        setHasPurchased(true);
-        await refreshUser();
-      }
-    } catch (error) {
-      console.error('iOS PDF purchase error:', error);
-      if (error.message?.includes('cancelled') || error.message?.includes('cancel')) {
-        toast.info('Purchase cancelled');
-      } else {
-        toast.error(error.message || 'Purchase failed. Please try again.');
-      }
     }
   };
 

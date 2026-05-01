@@ -207,6 +207,113 @@ async def send_password_reset_email(email: str, reset_token: str):
         return False
 
 
+async def send_pdf_purchase_email(email: str, book_title: str, pdf_url: str, user_name: str = None):
+    """Send PDF purchase confirmation with download link"""
+    try:
+        name = user_name if user_name else email.split('@')[0]
+        # Create a direct link to the book (users can read after login)
+        params = {
+            "from": RESEND_FROM_EMAIL,
+            "to": [email],
+            "subject": f"Your PDF Purchase: {book_title} - Kitab Cloud",
+            "html": f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
+                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
+                </div>
+                <div style="padding: 30px 0;">
+                    <h2 style="color: #FDFBF7; margin-bottom: 10px;">Thank You for Your Purchase!</h2>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Dear {name},
+                    </p>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Your purchase of <strong style="color: #D4AF37;">{book_title}</strong> is complete. 
+                        You now have permanent access to this book in your library.
+                    </p>
+                    <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center;">
+                        <p style="color: #FDFBF7; margin-bottom: 15px;">Access your book anytime:</p>
+                        <a href="https://kitab-cloud.preview.emergentagent.com/library" 
+                           style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                            Go to My Library
+                        </a>
+                    </div>
+                    <p style="color: #B0C4BF; line-height: 1.6; font-size: 14px;">
+                        Your purchased PDFs are always available in your library under "Purchased Books".
+                    </p>
+                </div>
+                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
+                    <p>Questions? Contact us at sales@dar-us-salam.com</p>
+                    <p>© Dar-Us-Salam Publications</p>
+                </div>
+            </div>
+            """
+        }
+        resend.Emails.send(params)
+        logger.info(f"PDF purchase email sent to {email} for book: {book_title}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send PDF purchase email: {e}")
+        return False
+
+
+async def send_subscription_confirmation_email(email: str, tier: int, user_name: str = None):
+    """Send subscription confirmation email"""
+    try:
+        name = user_name if user_name else email.split('@')[0]
+        tier_names = {1: "Basic", 2: "Standard", 3: "Advanced", 4: "Premium"}
+        tier_limits = {1: "10", 2: "20", 3: "30", 4: "Unlimited"}
+        tier_name = tier_names.get(tier, f"Tier {tier}")
+        book_limit = tier_limits.get(tier, "N/A")
+        
+        params = {
+            "from": RESEND_FROM_EMAIL,
+            "to": [email],
+            "subject": f"Welcome to {tier_name} - Kitab Cloud",
+            "html": f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
+                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
+                </div>
+                <div style="padding: 30px 0;">
+                    <h2 style="color: #FDFBF7; margin-bottom: 10px;">Your {tier_name} Subscription is Active!</h2>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Dear {name},
+                    </p>
+                    <p style="color: #B0C4BF; line-height: 1.6;">
+                        Thank you for subscribing to Kitab Cloud. Your <strong style="color: #D4AF37;">{tier_name}</strong> plan is now active.
+                    </p>
+                    <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                        <h3 style="color: #D4AF37; margin-top: 0;">Your Plan Details:</h3>
+                        <ul style="color: #B0C4BF; line-height: 1.8; padding-left: 20px;">
+                            <li><strong>Plan:</strong> {tier_name}</li>
+                            <li><strong>Monthly Book Limit:</strong> {book_limit} books</li>
+                            {"<li><strong>Volume Books:</strong> Included</li>" if tier >= 3 else ""}
+                            {"<li><strong>In-Book Search:</strong> Enabled</li>" if tier >= 3 else ""}
+                            {"<li><strong>Advanced Books:</strong> Full Access</li>" if tier >= 4 else ""}
+                        </ul>
+                    </div>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="https://kitab-cloud.preview.emergentagent.com/library" 
+                           style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                            Start Reading Now
+                        </a>
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
+                    <p>Questions? Contact us at sales@dar-us-salam.com</p>
+                    <p>© Dar-Us-Salam Publications</p>
+                </div>
+            </div>
+            """
+        }
+        resend.Emails.send(params)
+        logger.info(f"Subscription confirmation email sent to {email} for tier {tier}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send subscription confirmation email: {e}")
+        return False
+
+
 # Apple StoreKit Helper Functions
 def generate_apple_jwt():
     """Generate JWT token for Apple App Store Server API"""
@@ -1011,7 +1118,8 @@ async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
     
     origin_url = request.headers.get("origin", "")
-    success_url = f"{origin_url}/book/{book_id}?purchased=true"
+    # Redirect to payment success page for consistent handling
+    success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin_url}/book/{book_id}"
     
     checkout_request = CheckoutSessionRequest(
@@ -1110,13 +1218,58 @@ async def get_payment_status(session_id: str, user: dict = Depends(get_current_u
             {"$set": {"payment_status": new_status}}
         )
         
-        # If paid, upgrade user tier
+        # If paid, handle based on payment type
         if new_status == "paid":
-            tier = int(status.metadata.get("tier", 0))
-            await db.users.update_one(
-                {"user_id": user["user_id"]},
-                {"$set": {"subscription_tier": tier}}
-            )
+            payment_type = status.metadata.get("type", "subscription")
+            
+            if payment_type == "pdf_purchase":
+                # Handle PDF purchase
+                book_id = status.metadata.get("book_id")
+                if book_id:
+                    # Check if already recorded
+                    existing = await db.pdf_purchases.find_one({
+                        "user_id": user["user_id"],
+                        "book_id": book_id
+                    })
+                    if not existing:
+                        purchase_record = {
+                            "purchase_id": f"purchase_{uuid.uuid4().hex[:12]}",
+                            "user_id": user["user_id"],
+                            "book_id": book_id,
+                            "session_id": session_id,
+                            "purchased_at": datetime.now(timezone.utc).isoformat(),
+                            "platform": "stripe"
+                        }
+                        await db.pdf_purchases.insert_one(purchase_record)
+                        logger.info(f"PDF purchase recorded via status poll: user {user['user_id']}, book {book_id}")
+                        
+                        # Send email
+                        book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
+                        if book:
+                            await send_pdf_purchase_email(
+                                user.get("email"),
+                                book.get("title", "Your Book"),
+                                book.get("pdf_url", ""),
+                                user.get("name")
+                            )
+            else:
+                # Handle subscription
+                tier = int(status.metadata.get("tier", 0))
+                if tier:
+                    current_tier = user.get("subscription_tier", 0)
+                    if current_tier != tier:
+                        await db.users.update_one(
+                            {"user_id": user["user_id"]},
+                            {"$set": {"subscription_tier": tier}}
+                        )
+                        logger.info(f"Subscription upgraded via status poll: user {user['user_id']} to tier {tier}")
+                        
+                        # Send email
+                        await send_subscription_confirmation_email(
+                            user.get("email"),
+                            tier,
+                            user.get("name")
+                        )
     
     return {
         "status": status.status,
@@ -1139,8 +1292,8 @@ async def stripe_webhook(request: Request):
         
         if webhook_response.payment_status == "paid":
             session_id = webhook_response.session_id
-            tier = int(webhook_response.metadata.get("tier", 0))
             user_id = webhook_response.metadata.get("user_id")
+            payment_type = webhook_response.metadata.get("type", "subscription")
             
             # Update transaction
             await db.payment_transactions.update_one(
@@ -1148,12 +1301,52 @@ async def stripe_webhook(request: Request):
                 {"$set": {"payment_status": "paid"}}
             )
             
-            # Upgrade user
-            if user_id and tier:
-                await db.users.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"subscription_tier": tier}}
-                )
+            # Get user for email
+            user = await db.users.find_one({"user_id": user_id}, {"_id": 0}) if user_id else None
+            
+            if payment_type == "pdf_purchase":
+                # Handle PDF purchase
+                book_id = webhook_response.metadata.get("book_id")
+                if user_id and book_id:
+                    # Record the purchase
+                    purchase_record = {
+                        "purchase_id": f"purchase_{uuid.uuid4().hex[:12]}",
+                        "user_id": user_id,
+                        "book_id": book_id,
+                        "session_id": session_id,
+                        "purchased_at": datetime.now(timezone.utc).isoformat(),
+                        "platform": "stripe"
+                    }
+                    await db.pdf_purchases.insert_one(purchase_record)
+                    logger.info(f"PDF purchase recorded: user {user_id}, book {book_id}")
+                    
+                    # Get book info and send email
+                    if user:
+                        book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
+                        if book:
+                            await send_pdf_purchase_email(
+                                user.get("email"),
+                                book.get("title", "Your Book"),
+                                book.get("pdf_url", ""),
+                                user.get("name")
+                            )
+            else:
+                # Handle subscription purchase
+                tier = int(webhook_response.metadata.get("tier", 0))
+                if user_id and tier:
+                    await db.users.update_one(
+                        {"user_id": user_id},
+                        {"$set": {"subscription_tier": tier}}
+                    )
+                    logger.info(f"Subscription upgraded: user {user_id} to tier {tier}")
+                    
+                    # Send confirmation email
+                    if user:
+                        await send_subscription_confirmation_email(
+                            user.get("email"),
+                            tier,
+                            user.get("name")
+                        )
         
         return {"status": "ok"}
     except Exception as e:
