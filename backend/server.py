@@ -378,7 +378,9 @@ async def get_session(request: Request, session_id: str = Query(...)):
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    return UserResponse(**user).model_dump()
+    response = UserResponse(**user).model_dump()
+    response["is_guest"] = user.get("is_guest", False)
+    return response
 
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):

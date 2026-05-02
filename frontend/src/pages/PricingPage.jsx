@@ -67,6 +67,12 @@ const PricingPage = () => {
       return;
     }
 
+    if (user.is_guest) {
+      toast.error('Please create an account to subscribe');
+      navigate('/register');
+      return;
+    }
+
     if (user.subscription_tier >= tier) {
       toast.info(`You already have Tier ${user.subscription_tier} or higher`);
       return;

@@ -234,6 +234,26 @@ const LibraryPage = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-5 md:px-6 py-8">
+        {/* Guest Banner */}
+        {user?.is_guest && (
+          <div className="mb-8 glass-card rounded-lg p-4 border border-gold/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                <User className="w-5 h-5 text-gold" />
+              </div>
+              <div>
+                <p className="text-[#FDFBF7] font-medium">You're browsing as a guest</p>
+                <p className="text-sm text-[#B0C4BF]">Create an account to read books and save your progress</p>
+              </div>
+            </div>
+            <Link to="/register">
+              <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] min-h-[44px]" data-testid="guest-signup-btn">
+                Create Account
+              </Button>
+            </Link>
+          </div>
+        )}
+        
         {/* Continue Reading Section */}
         {continueReading.length > 0 && (
           <section className="mb-12">
