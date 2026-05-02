@@ -72,6 +72,8 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Mobile UI improvements: larger tap targets (44-48px minimum), centered PDF navigation, better spacing (April 2026)
 - ✅ Unified Stripe payments for all platforms (iOS, Android, Web) - removed StoreKit (May 2026)
 - ✅ Email confirmations for PDF purchases and subscription activations (May 2026)
+- ✅ Guest mode: Users can browse library without signing up, but cannot read books (May 2026)
+- ✅ iOS external browser: Stripe payment opens in Safari on iOS (Apple compliance) (May 2026)
 
 ## Subscription Tiers
 | Tier | Name | Price | Book Limit | Features |
