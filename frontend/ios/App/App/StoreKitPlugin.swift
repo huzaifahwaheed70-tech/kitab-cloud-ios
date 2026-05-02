@@ -1,11 +1,12 @@
 // StoreKitPlugin.swift
-// This file should be added to your Xcode project after `npx cap sync ios`
-// Location: ios/App/App/StoreKitPlugin.swift
+// Native StoreKit 2 plugin for Capacitor
+// Add this file to ios/App/App/ in Xcode
 
 import Foundation
 import Capacitor
 import StoreKit
 
+@available(iOS 15.0, *)
 @objc(StoreKitPlugin)
 public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "StoreKitPlugin"
@@ -17,20 +18,53 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getSubscriptionStatus", returnType: CAPPluginReturnPromise)
     ]
     
-    // Product IDs - must match App Store Connect
-    private let productIds = [
+    // Product IDs - these should match your App Store Connect products
+    private let subscriptionIds = [
         "com.darussalam.kitabcloud.basic.monthly",
-        "com.darussalam.kitabcloud.standard.monthly", 
+        "com.darussalam.kitabcloud.standard.monthly",
         "com.darussalam.kitabcloud.advanced.monthly",
         "com.darussalam.kitabcloud.premium.monthly"
     ]
     
     private var products: [Product] = []
+    private var purchasedProductIDs: Set<String> = []
+    
+    public override func load() {
+        // Start listening for transactions
+        Task {
+            await listenForTransactions()
+        }
+    }
+    
+    // Listen for transaction updates
+    private func listenForTransactions() async {
+        for await result in Transaction.updates {
+            if case .verified(let transaction) = result {
+                await transaction.finish()
+                await updatePurchasedProducts()
+            }
+        }
+    }
+    
+    // Update list of purchased products
+    private func updatePurchasedProducts() async {
+        var purchased: Set<String> = []
+        for await result in Transaction.currentEntitlements {
+            if case .verified(let transaction) = result {
+                purchased.insert(transaction.productID)
+            }
+        }
+        purchasedProductIDs = purchased
+    }
     
     @objc func loadProducts(_ call: CAPPluginCall) {
         Task {
             do {
-                let storeProducts = try await Product.products(for: productIds)
+                // Get all product IDs (subscriptions + any book products)
+                var allProductIds = Set(subscriptionIds)
+                
+                // Load products from App Store
+                let storeProducts = try await Product.products(for: allProductIds)
                 self.products = storeProducts
                 
                 let productData = storeProducts.map { product -> [String: Any] in
@@ -38,13 +72,15 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                         "id": product.id,
                         "displayName": product.displayName,
                         "description": product.description,
-                        "price": product.price.description,
-                        "displayPrice": product.displayPrice
+                        "price": NSDecimalNumber(decimal: product.price).doubleValue,
+                        "displayPrice": product.displayPrice,
+                        "type": product.type.rawValue
                     ]
                 }
                 
-                call.resolve(["products": productData])
+                call.resolve(["products": productData, "count": productData.count])
             } catch {
+                print("StoreKit loadProducts error: \(error)")
                 call.reject("Failed to load products: \(error.localizedDescription)")
             }
         }
@@ -56,88 +92,115 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         
+        print("StoreKit: Starting purchase for \(productId)")
+        
         Task {
             do {
-                guard let product = products.first(where: { $0.id == productId }) else {
-                    // Try to fetch the product if not loaded
+                // Find product in cache or fetch it
+                var product = products.first(where: { $0.id == productId })
+                
+                if product == nil {
+                    print("StoreKit: Product not in cache, fetching...")
                     let storeProducts = try await Product.products(for: [productId])
-                    guard let product = storeProducts.first else {
-                        call.reject("Product not found")
-                        return
-                    }
-                    await purchase(product: product, call: call)
+                    product = storeProducts.first
+                }
+                
+                guard let productToPurchase = product else {
+                    print("StoreKit: Product not found: \(productId)")
+                    call.reject("Product not found in App Store: \(productId)")
                     return
                 }
                 
-                await purchase(product: product, call: call)
-            } catch {
-                call.reject("Purchase failed: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func purchase(product: Product, call: CAPPluginCall) async {
-        do {
-            let result = try await product.purchase()
-            
-            switch result {
-            case .success(let verification):
-                switch verification {
-                case .verified(let transaction):
-                    // Transaction is verified by Apple
-                    await transaction.finish()
+                print("StoreKit: Initiating purchase...")
+                let result = try await productToPurchase.purchase()
+                
+                switch result {
+                case .success(let verification):
+                    print("StoreKit: Purchase successful, verifying...")
+                    switch verification {
+                    case .verified(let transaction):
+                        print("StoreKit: Transaction verified")
+                        await transaction.finish()
+                        
+                        call.resolve([
+                            "success": true,
+                            "transactionId": String(transaction.id),
+                            "originalTransactionId": String(transaction.originalID),
+                            "productId": transaction.productID,
+                            "purchaseDate": ISO8601DateFormatter().string(from: transaction.purchaseDate)
+                        ])
+                        
+                    case .unverified(let transaction, let error):
+                        print("StoreKit: Transaction unverified: \(error)")
+                        // Still return the transaction but note it's unverified
+                        call.resolve([
+                            "success": true,
+                            "transactionId": String(transaction.id),
+                            "originalTransactionId": String(transaction.originalID),
+                            "productId": transaction.productID,
+                            "unverified": true,
+                            "error": error.localizedDescription
+                        ])
+                    }
                     
-                    call.resolve([
-                        "success": true,
-                        "transactionId": String(transaction.id),
-                        "originalTransactionId": String(transaction.originalID),
-                        "productId": transaction.productID,
-                        "purchaseDate": ISO8601DateFormatter().string(from: transaction.purchaseDate)
-                    ])
+                case .userCancelled:
+                    print("StoreKit: User cancelled")
+                    call.reject("User cancelled", "USER_CANCELLED")
                     
-                case .unverified(_, let error):
-                    call.reject("Transaction verification failed: \(error.localizedDescription)")
+                case .pending:
+                    print("StoreKit: Purchase pending")
+                    call.reject("Purchase pending approval", "PENDING")
+                    
+                @unknown default:
+                    print("StoreKit: Unknown result")
+                    call.reject("Unknown purchase result")
                 }
-                
-            case .userCancelled:
+            } catch StoreKitError.userCancelled {
+                print("StoreKit: User cancelled (error)")
                 call.reject("User cancelled", "USER_CANCELLED")
-                
-            case .pending:
-                call.reject("Transaction pending approval", "PENDING")
-                
-            @unknown default:
-                call.reject("Unknown purchase result")
+            } catch {
+                print("StoreKit: Purchase error: \(error)")
+                call.reject("Purchase error: \(error.localizedDescription)")
             }
-        } catch {
-            call.reject("Purchase error: \(error.localizedDescription)")
         }
     }
     
     @objc func restorePurchases(_ call: CAPPluginCall) {
+        print("StoreKit: Restoring purchases...")
+        
         Task {
             var restoredTransactions: [[String: Any]] = []
             
             for await result in Transaction.currentEntitlements {
                 switch result {
                 case .verified(let transaction):
-                    restoredTransactions.append([
+                    print("StoreKit: Found entitlement: \(transaction.productID)")
+                    var transactionData: [String: Any] = [
                         "transactionId": String(transaction.id),
                         "originalTransactionId": String(transaction.originalID),
                         "productId": transaction.productID,
-                        "purchaseDate": ISO8601DateFormatter().string(from: transaction.purchaseDate),
-                        "expirationDate": transaction.expirationDate != nil ? 
-                            ISO8601DateFormatter().string(from: transaction.expirationDate!) : NSNull()
-                    ])
+                        "purchaseDate": ISO8601DateFormatter().string(from: transaction.purchaseDate)
+                    ]
+                    
+                    if let expirationDate = transaction.expirationDate {
+                        transactionData["expirationDate"] = ISO8601DateFormatter().string(from: expirationDate)
+                    }
+                    
+                    restoredTransactions.append(transactionData)
+                    
                 case .unverified(_, _):
                     continue
                 }
             }
             
-            call.resolve(["transactions": restoredTransactions])
+            print("StoreKit: Restored \(restoredTransactions.count) transactions")
+            call.resolve(["transactions": restoredTransactions, "count": restoredTransactions.count])
         }
     }
     
     @objc func getSubscriptionStatus(_ call: CAPPluginCall) {
+        print("StoreKit: Getting subscription status...")
+        
         Task {
             var activeSubscriptions: [[String: Any]] = []
             
@@ -149,14 +212,18 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                                        transaction.expirationDate! > Date()
                         
                         if isActive {
-                            activeSubscriptions.append([
+                            var subData: [String: Any] = [
                                 "productId": transaction.productID,
                                 "transactionId": String(transaction.id),
                                 "originalTransactionId": String(transaction.originalID),
-                                "expirationDate": transaction.expirationDate != nil ?
-                                    ISO8601DateFormatter().string(from: transaction.expirationDate!) : NSNull(),
                                 "isActive": true
-                            ])
+                            ]
+                            
+                            if let expirationDate = transaction.expirationDate {
+                                subData["expirationDate"] = ISO8601DateFormatter().string(from: expirationDate)
+                            }
+                            
+                            activeSubscriptions.append(subData)
                         }
                     }
                 case .unverified(_, _):
@@ -164,10 +231,32 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
             
+            print("StoreKit: Found \(activeSubscriptions.count) active subscriptions")
             call.resolve([
                 "hasActiveSubscription": !activeSubscriptions.isEmpty,
                 "subscriptions": activeSubscriptions
             ])
         }
+    }
+}
+
+// Fallback for iOS < 15
+@available(iOS, deprecated: 15.0, message: "Use StoreKitPlugin instead")
+@objc(StoreKitPluginLegacy)
+public class StoreKitPluginLegacy: CAPPlugin {
+    @objc func loadProducts(_ call: CAPPluginCall) {
+        call.reject("StoreKit 2 requires iOS 15 or later")
+    }
+    
+    @objc func purchaseProduct(_ call: CAPPluginCall) {
+        call.reject("StoreKit 2 requires iOS 15 or later")
+    }
+    
+    @objc func restorePurchases(_ call: CAPPluginCall) {
+        call.reject("StoreKit 2 requires iOS 15 or later")
+    }
+    
+    @objc func getSubscriptionStatus(_ call: CAPPluginCall) {
+        call.reject("StoreKit 2 requires iOS 15 or later")
     }
 }
