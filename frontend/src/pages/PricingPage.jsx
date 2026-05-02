@@ -6,7 +6,7 @@ import { Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
-import { openPaymentUrl, isIOS } from '../utils/browser';
+import { openPaymentUrl } from '../utils/browser';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -116,15 +116,8 @@ const PricingPage = () => {
         origin_url: window.location.origin
       }, { headers, withCredentials: true });
 
-      // On iOS, open in external Safari browser (Apple requirement)
-      // On other platforms, navigate normally
+      // Open payment URL (external browser on iOS, normal redirect elsewhere)
       await openPaymentUrl(response.data.url);
-      
-      // If iOS, show a toast since we opened external browser
-      if (isIOS()) {
-        toast.info('Opening payment in Safari...');
-        setLoading(null);
-      }
     } catch (error) {
       toast.error(error.message || 'Failed to process payment');
       setLoading(null);

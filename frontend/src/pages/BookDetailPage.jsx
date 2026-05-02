@@ -10,7 +10,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
-import { openPaymentUrl, isIOS } from '../utils/browser';
+import { openPaymentUrl } from '../utils/browser';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -289,13 +289,8 @@ const BookDetailPage = () => {
         withCredentials: true 
       });
       
-      // On iOS, open in external Safari browser (Apple requirement)
+      // Open payment URL (external browser on iOS, normal redirect elsewhere)
       await openPaymentUrl(response.data.url);
-      
-      if (isIOS()) {
-        toast.info('Opening payment in Safari...');
-        setPurchaseLoading(false);
-      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
       setPurchaseLoading(false);

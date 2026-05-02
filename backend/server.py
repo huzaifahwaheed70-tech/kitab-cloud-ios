@@ -1154,7 +1154,12 @@ async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_
     
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
     
+    # Get origin from header or use base_url
     origin_url = request.headers.get("origin", "")
+    if not origin_url:
+        # Fallback to base_url without trailing slash
+        origin_url = str(request.base_url).rstrip('/')
+    
     # Redirect to payment success page for consistent handling
     success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin_url}/book/{book_id}"
