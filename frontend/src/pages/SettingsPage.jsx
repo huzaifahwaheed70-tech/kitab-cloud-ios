@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { 
+import {
   User, ArrowLeft, Mail, Lock, CreditCard, AlertTriangle,
   CheckCircle, XCircle, Calendar, Library, Crown
 } from 'lucide-react';
@@ -25,33 +25,32 @@ const SettingsPage = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
-  
-  // Profile form
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
-  
-  // Password form
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
-  
-  // Cancel subscription dialog
+
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
+  const getAuthHeaders = () => {
+    const storedToken = localStorage.getItem('auth_token') || token;
+    return storedToken ? { Authorization: `Bearer ${storedToken}` } : {};
+  };
+
   const fetchProfile = async () => {
-    if (!token) {
+    const storedToken = localStorage.getItem('auth_token') || token;
+    if (!storedToken) {
       setProfileLoading(false);
       return;
     }
     try {
-      const authHeaders = { Authorization: `Bearer ${token}` };
-      const response = await axios.get(`${API}/user/profile`, { 
-        headers: authHeaders, 
-        withCredentials: true 
-      });
+      const response = await axios.get(`${API}/user/profile`, { headers: getAuthHeaders() });
       setProfile(response.data);
       setName(response.data.name || '');
       setEmail(response.data.email || '');
@@ -68,29 +67,18 @@ const SettingsPage = () => {
   };
 
   useEffect(() => {
-    // Fetch profile when user/token are available
-    if (user && token) {
+    if (!authLoading) {
       fetchProfile();
-    } else if (!authLoading && !user) {
-      // Auth check complete but no user - will be redirected by ProtectedRoute
-      setProfileLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, token, authLoading]);
+  }, [token, authLoading]);
 
-  // Show loading while auth is checking or profile is loading
   const loading = authLoading || profileLoading;
 
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setSavingProfile(true);
-    
     try {
-      await axios.put(`${API}/user/profile`, 
-        { name, email },
-        { headers, withCredentials: true }
-      );
+      await axios.put(`${API}/user/profile`, { name, email }, { headers: getAuthHeaders() });
       toast.success('Profile updated successfully');
       fetchProfile();
     } catch (error) {
@@ -102,24 +90,17 @@ const SettingsPage = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
     if (newPassword !== confirmPassword) {
       toast.error('New passwords do not match');
       return;
     }
-    
     if (newPassword.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
-    
     setChangingPassword(true);
-    
     try {
-      await axios.put(`${API}/user/password`, 
-        { current_password: currentPassword, new_password: newPassword },
-        { headers, withCredentials: true }
-      );
+      await axios.put(`${API}/user/password`, { current_password: currentPassword, new_password: newPassword }, { headers: getAuthHeaders() });
       toast.success('Password changed successfully');
       setCurrentPassword('');
       setNewPassword('');
@@ -133,12 +114,8 @@ const SettingsPage = () => {
 
   const handleCancelSubscription = async () => {
     setCancelling(true);
-    
     try {
-      const response = await axios.post(`${API}/user/cancel-subscription`, {}, { 
-        headers, 
-        withCredentials: true 
-      });
+      const response = await axios.post(`${API}/user/cancel-subscription`, {}, { headers: getAuthHeaders() });
       toast.success(response.data.message);
       setShowCancelDialog(false);
       fetchProfile();
@@ -151,10 +128,7 @@ const SettingsPage = () => {
 
   const handleReactivate = async () => {
     try {
-      await axios.post(`${API}/user/reactivate-subscription`, {}, { 
-        headers, 
-        withCredentials: true 
-      });
+      await axios.post(`${API}/user/reactivate-subscription`, {}, { headers: getAuthHeaders() });
       toast.success('Subscription reactivated!');
       fetchProfile();
     } catch (error) {
@@ -164,11 +138,7 @@ const SettingsPage = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const getTierBadgeClass = (tier) => {
@@ -192,7 +162,6 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-dark">
-      {/* Header */}
       <header className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -205,7 +174,6 @@ const SettingsPage = () => {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 md:px-6 py-8">
-        {/* Tabs */}
         <div className="flex gap-2 mb-8 border-b border-[rgba(212,175,55,0.2)]">
           {[
             { id: 'profile', label: 'Profile', icon: User },
@@ -215,11 +183,7 @@ const SettingsPage = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
-                activeTab === tab.id 
-                  ? 'border-gold text-gold' 
-                  : 'border-transparent text-[#B0C4BF] hover:text-[#FDFBF7]'
-              }`}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${activeTab === tab.id ? 'border-gold text-gold' : 'border-transparent text-[#B0C4BF] hover:text-[#FDFBF7]'}`}
               data-testid={`tab-${tab.id}`}
             >
               <tab.icon className="w-4 h-4" />
@@ -228,42 +192,20 @@ const SettingsPage = () => {
           ))}
         </div>
 
-        {/* Profile Tab */}
         {activeTab === 'profile' && (
           <div className="glass-card rounded-sm p-6">
             <h2 className="font-serif text-xl text-[#FDFBF7] mb-6">Profile Information</h2>
-            
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
                 <Label className="text-[#FDFBF7]">Name</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                  placeholder="Your name"
-                  data-testid="profile-name"
-                />
+                <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1" placeholder="Your name" data-testid="profile-name" />
               </div>
-              
               <div>
                 <Label className="text-[#FDFBF7]">Email</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                  placeholder="your@email.com"
-                  data-testid="profile-email"
-                />
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1" placeholder="your@email.com" data-testid="profile-email" />
               </div>
-              
               <div className="pt-4">
-                <Button 
-                  type="submit" 
-                  disabled={savingProfile}
-                  className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                  data-testid="save-profile-btn"
-                >
+                <Button type="submit" disabled={savingProfile} className="bg-gold text-[#02120F] hover:bg-[#E9C85C]" data-testid="save-profile-btn">
                   {savingProfile ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
@@ -271,11 +213,9 @@ const SettingsPage = () => {
           </div>
         )}
 
-        {/* Security Tab */}
         {activeTab === 'security' && (
           <div className="glass-card rounded-sm p-6">
             <h2 className="font-serif text-xl text-[#FDFBF7] mb-6">Change Password</h2>
-            
             {!profile?.has_password ? (
               <div className="flex items-center gap-3 text-[#B0C4BF] bg-[#082E26] rounded-sm p-4">
                 <Mail className="w-5 h-5 text-gold" />
@@ -285,48 +225,18 @@ const SettingsPage = () => {
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div>
                   <Label className="text-[#FDFBF7]">Current Password</Label>
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                    required
-                    data-testid="current-password"
-                  />
+                  <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1" required data-testid="current-password" />
                 </div>
-                
                 <div>
                   <Label className="text-[#FDFBF7]">New Password</Label>
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                    required
-                    minLength={6}
-                    data-testid="new-password"
-                  />
+                  <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1" required minLength={6} data-testid="new-password" />
                 </div>
-                
                 <div>
                   <Label className="text-[#FDFBF7]">Confirm New Password</Label>
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                    required
-                    data-testid="confirm-password"
-                  />
+                  <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1" required data-testid="confirm-password" />
                 </div>
-                
                 <div className="pt-4">
-                  <Button 
-                    type="submit" 
-                    disabled={changingPassword}
-                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                    data-testid="change-password-btn"
-                  >
+                  <Button type="submit" disabled={changingPassword} className="bg-gold text-[#02120F] hover:bg-[#E9C85C]" data-testid="change-password-btn">
                     {changingPassword ? 'Changing...' : 'Change Password'}
                   </Button>
                 </div>
@@ -335,10 +245,8 @@ const SettingsPage = () => {
           </div>
         )}
 
-        {/* Subscription Tab */}
         {activeTab === 'subscription' && (
           <div className="space-y-6">
-            {/* Current Plan Card */}
             <div className="glass-card rounded-sm p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
@@ -349,13 +257,10 @@ const SettingsPage = () => {
                       {profile?.tier_info?.name || 'Free'}
                     </span>
                     {profile?.cancellation_pending && (
-                      <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-500/20 text-red-400">
-                        Cancelling
-                      </span>
+                      <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-500/20 text-red-400">Cancelling</span>
                     )}
                   </div>
                 </div>
-                
                 {profile?.subscription_tier > 0 && (
                   <div className="text-right">
                     <p className="text-2xl font-bold text-gold">${profile?.tier_info?.price || 0}</p>
@@ -363,8 +268,7 @@ const SettingsPage = () => {
                   </div>
                 )}
               </div>
-              
-              {/* Plan Details */}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div className="bg-[#082E26] rounded-sm p-4">
                   <div className="flex items-center gap-2 text-[#B0C4BF] mb-1">
@@ -372,19 +276,14 @@ const SettingsPage = () => {
                     <span className="text-sm">Book Limit</span>
                   </div>
                   <p className="text-[#FDFBF7] font-medium">
-                    {profile?.tier_info?.book_limit === null 
-                      ? 'Unlimited' 
-                      : `${profile?.tier_info?.book_limit || 0} books/month`}
+                    {profile?.tier_info?.book_limit === null ? 'Unlimited' : `${profile?.tier_info?.book_limit || 0} books/month`}
                   </p>
                 </div>
-                
                 {profile?.subscription_tier > 0 && (
                   <div className="bg-[#082E26] rounded-sm p-4">
                     <div className="flex items-center gap-2 text-[#B0C4BF] mb-1">
                       <Calendar className="w-4 h-4" />
-                      <span className="text-sm">
-                        {profile?.cancellation_pending ? 'Access Until' : 'Renews On'}
-                      </span>
+                      <span className="text-sm">{profile?.cancellation_pending ? 'Access Until' : 'Renews On'}</span>
                     </div>
                     <p className="text-[#FDFBF7] font-medium">
                       {formatDate(profile?.cancellation_effective_date || profile?.subscription_end)}
@@ -392,42 +291,23 @@ const SettingsPage = () => {
                   </div>
                 )}
               </div>
-              
-              {/* Actions */}
+
               <div className="flex flex-wrap gap-3">
                 {profile?.subscription_tier === 0 ? (
-                  <Button 
-                    onClick={() => navigate('/pricing')}
-                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                    data-testid="subscribe-btn"
-                  >
+                  <Button onClick={() => navigate('/pricing')} className="bg-gold text-[#02120F] hover:bg-[#E9C85C]" data-testid="subscribe-btn">
                     Subscribe Now
                   </Button>
                 ) : profile?.cancellation_pending ? (
-                  <Button 
-                    onClick={handleReactivate}
-                    className="bg-green-600 text-white hover:bg-green-500"
-                    data-testid="reactivate-btn"
-                  >
+                  <Button onClick={handleReactivate} className="bg-green-600 text-white hover:bg-green-500" data-testid="reactivate-btn">
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Reactivate Subscription
                   </Button>
                 ) : (
                   <>
-                    <Button 
-                      onClick={() => navigate('/pricing')}
-                      variant="outline"
-                      className="border-gold text-gold hover:bg-gold/10"
-                      data-testid="change-plan-btn"
-                    >
+                    <Button onClick={() => navigate('/pricing')} variant="outline" className="border-gold text-gold hover:bg-gold/10" data-testid="change-plan-btn">
                       Change Plan
                     </Button>
-                    <Button 
-                      onClick={() => setShowCancelDialog(true)}
-                      variant="outline"
-                      className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                      data-testid="cancel-subscription-btn"
-                    >
+                    <Button onClick={() => setShowCancelDialog(true)} variant="outline" className="border-red-500/50 text-red-400 hover:bg-red-500/10" data-testid="cancel-subscription-btn">
                       <XCircle className="w-4 h-4 mr-2" />
                       Cancel Subscription
                     </Button>
@@ -435,8 +315,7 @@ const SettingsPage = () => {
                 )}
               </div>
             </div>
-            
-            {/* Cancellation Warning */}
+
             {profile?.cancellation_pending && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-sm p-4">
                 <div className="flex items-start gap-3">
@@ -444,15 +323,14 @@ const SettingsPage = () => {
                   <div>
                     <h3 className="text-red-400 font-medium mb-1">Subscription Cancellation Pending</h3>
                     <p className="text-[#B0C4BF] text-sm">
-                      Your subscription will end on {formatDate(profile?.cancellation_effective_date)}. 
-                      You'll continue to have access until then. After that, you'll be moved to the free tier.
+                      Your subscription will end on {formatDate(profile?.cancellation_effective_date)}.
+                      You'll continue to have access until then.
                     </p>
                   </div>
                 </div>
               </div>
             )}
-            
-            {/* Tier Features */}
+
             {profile?.subscription_tier > 0 && (
               <div className="glass-card rounded-sm p-6">
                 <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Your Benefits</h3>
@@ -486,7 +364,6 @@ const SettingsPage = () => {
         )}
       </main>
 
-      {/* Cancel Subscription Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent className="bg-surface border-[rgba(212,175,55,0.2)]">
           <DialogHeader>
@@ -498,11 +375,8 @@ const SettingsPage = () => {
               Are you sure you want to cancel your subscription? You'll continue to have access until the end of your billing period.
             </DialogDescription>
           </DialogHeader>
-          
           <div className="bg-[#082E26] rounded-sm p-4 my-4">
-            <p className="text-sm text-[#B0C4BF]">
-              <strong className="text-[#FDFBF7]">What happens next:</strong>
-            </p>
+            <p className="text-sm text-[#B0C4BF]"><strong className="text-[#FDFBF7]">What happens next:</strong></p>
             <ul className="mt-2 space-y-1 text-sm text-[#B0C4BF]">
               <li>• You keep access until end of billing period</li>
               <li>• Your reading progress and favorites are saved</li>
@@ -510,21 +384,11 @@ const SettingsPage = () => {
               <li>• After cancellation, you'll move to the free tier</li>
             </ul>
           </div>
-          
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowCancelDialog(false)}
-              className="border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
-            >
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="border-[rgba(212,175,55,0.2)] text-[#FDFBF7]">
               Keep Subscription
             </Button>
-            <Button 
-              onClick={handleCancelSubscription}
-              disabled={cancelling}
-              className="bg-red-600 text-white hover:bg-red-500"
-              data-testid="confirm-cancel-btn"
-            >
+            <Button onClick={handleCancelSubscription} disabled={cancelling} className="bg-red-600 text-white hover:bg-red-500" data-testid="confirm-cancel-btn">
               {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
             </Button>
           </DialogFooter>
