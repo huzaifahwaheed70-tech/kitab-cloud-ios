@@ -1,54 +1,54 @@
+import { Capacitor } from '@capacitor/core';
+
 /**
- * Check if running on iOS (native app or Safari)
+ * Check if running on iOS
  */
 export const isIOS = () => {
-  // Check user agent for iOS
   const ua = navigator.userAgent || navigator.vendor || window.opera;
   return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
 };
 
 /**
- * Check if running inside a WebView (Capacitor/Cordova app)
+ * Check if running in a native Capacitor app
  */
-export const isWebView = () => {
-  const ua = navigator.userAgent || '';
-  // Check for common WebView indicators
-  return (
-    ua.includes('wv') || // Android WebView
-    (isIOS() && !ua.includes('Safari')) || // iOS WebView (no Safari in UA)
-    window.webkit?.messageHandlers || // iOS WKWebView
-    window.ReactNativeWebView || // React Native
-    document.documentElement.classList.contains('capacitor') // Capacitor
-  );
+export const isNativeApp = () => {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch (e) {
+    return false;
+  }
 };
 
 /**
- * Open URL in external browser on iOS WebView
- * On other platforms, uses normal navigation
+ * Open URL in EXTERNAL browser (actual Safari app, not in-app browser)
+ * On iOS native app: Opens in Safari app using Capacitor App plugin
+ * On web: Normal redirect
  */
 export const openPaymentUrl = async (url) => {
-  // For iOS (both native and WebView), open in external browser
-  if (isIOS()) {
-    // Try multiple methods to ensure it opens in Safari
-    
-    // Method 1: Try Capacitor Browser plugin if available
+  // For iOS native app, use Capacitor App plugin to open in external Safari
+  if (isIOS() && isNativeApp()) {
     try {
-      const { Browser } = await import('@capacitor/browser');
-      await Browser.open({ url, presentationStyle: 'popover' });
+      // Import and use the App plugin to open URL in external browser
+      const { App } = await import('@capacitor/app');
+      
+      // This opens the URL in the actual Safari app (external browser)
+      await App.openUrl({ url: url });
       return { opened: true, external: true };
-    } catch (e) {
-      // Capacitor not available, continue to fallbacks
+    } catch (error) {
+      console.error('Capacitor App.openUrl failed:', error);
+      
+      // Fallback: try using the Browser plugin
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: url });
+        return { opened: true, external: true };
+      } catch (e2) {
+        console.error('Browser.open also failed:', e2);
+        // Last resort fallback
+        window.location.href = url;
+        return { opened: true, external: false };
+      }
     }
-    
-    // Method 2: Use window.open with _blank (often opens Safari on iOS)
-    const newWindow = window.open(url, '_blank');
-    if (newWindow) {
-      return { opened: true, external: true };
-    }
-    
-    // Method 3: Direct location change as last resort
-    window.location.href = url;
-    return { opened: true, external: false };
   }
   
   // For web and Android, just navigate normally
