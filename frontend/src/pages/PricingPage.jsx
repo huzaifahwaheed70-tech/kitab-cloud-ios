@@ -6,6 +6,7 @@ import { Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
+import { openPaymentUrl, isIOS } from '../utils/browser';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -94,6 +95,12 @@ const PricingPage = () => {
       return;
     }
 
+    if (user.is_guest) {
+      toast.error('Please create an account to subscribe');
+      navigate('/register');
+      return;
+    }
+
     if (user.subscription_tier >= tier) {
       toast.info(`You already have Tier ${user.subscription_tier} or higher`);
       return;
@@ -102,14 +109,22 @@ const PricingPage = () => {
     setLoading(tier);
     
     try {
-      // Use Stripe for all platforms (iOS, Android, Web)
+      // Use Stripe for all platforms
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.post(`${API}/payments/create-checkout`, {
         tier,
         origin_url: window.location.origin
       }, { headers, withCredentials: true });
 
-      window.location.href = response.data.url;
+      // On iOS, open in external Safari browser (Apple requirement)
+      // On other platforms, navigate normally
+      await openPaymentUrl(response.data.url);
+      
+      // If iOS, show a toast since we opened external browser
+      if (isIOS()) {
+        toast.info('Opening payment in Safari...');
+        setLoading(null);
+      }
     } catch (error) {
       toast.error(error.message || 'Failed to process payment');
       setLoading(null);

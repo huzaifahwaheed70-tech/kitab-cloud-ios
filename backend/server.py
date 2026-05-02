@@ -601,6 +601,40 @@ async def login(user_data: UserLogin):
     return {"token": token, "user": UserResponse(**user).model_dump()}
 
 
+@api_router.post("/auth/guest")
+async def guest_login():
+    """Create a guest account for browsing without signing up"""
+    guest_id = f"guest_{uuid.uuid4().hex[:12]}"
+    guest_doc = {
+        "user_id": guest_id,
+        "email": f"{guest_id}@guest.kitabcloud.com",
+        "name": "Guest User",
+        "password_hash": None,
+        "picture": None,
+        "subscription_tier": 0,
+        "is_admin": False,
+        "is_guest": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(guest_doc)
+    
+    token = create_jwt_token(guest_id)
+    
+    # Add is_guest to response
+    response_data = {
+        "user_id": guest_id,
+        "email": guest_doc["email"],
+        "name": "Guest User",
+        "picture": None,
+        "subscription_tier": 0,
+        "is_admin": False,
+        "is_guest": True,
+        "created_at": guest_doc["created_at"]
+    }
+    
+    return {"token": token, "user": response_data}
+
+
 # Password Reset Models
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -679,7 +713,10 @@ async def reset_password(request: ResetPasswordRequest):
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    return UserResponse(**user).model_dump()
+    # Include is_guest flag in response
+    response = UserResponse(**user).model_dump()
+    response["is_guest"] = user.get("is_guest", False)
+    return response
 
 
 @api_router.post("/auth/logout")
@@ -732,9 +769,9 @@ async def get_book(book_id: str, user: dict = Depends(get_current_user)):
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    user_tier = user.get("subscription_tier", 0)
-    if book["tier_level"] > user_tier:
-        raise HTTPException(status_code=403, detail="Upgrade required to access this book")
+    # Allow all authenticated users (including guests) to view book details
+    # Reading restrictions are enforced at the PDF access level (/api/files/)
+    # This allows guests to browse and see what books are available
     
     return book
 

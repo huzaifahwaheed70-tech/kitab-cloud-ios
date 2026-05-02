@@ -10,6 +10,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
+import { openPaymentUrl, isIOS } from '../utils/browser';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -121,6 +122,13 @@ const BookDetailPage = () => {
   };
 
   const handleReadNow = () => {
+    // Block guest users from reading
+    if (user?.is_guest) {
+      toast.error('Please create an account to read books');
+      navigate('/register');
+      return;
+    }
+    
     if (pdfUrl) {
       setShowReader(true);
     } else {
@@ -264,17 +272,30 @@ const BookDetailPage = () => {
       toast.error('This book is not available for purchase');
       return;
     }
+
+    if (user?.is_guest) {
+      toast.error('Please create an account to purchase');
+      navigate('/register');
+      return;
+    }
     
     setPurchaseLoading(true);
     
     try {
-      // Use Stripe for all platforms (iOS, Android, Web)
+      // Use Stripe for all platforms
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
         headers, 
         withCredentials: true 
       });
-      window.location.href = response.data.url;
+      
+      // On iOS, open in external Safari browser (Apple requirement)
+      await openPaymentUrl(response.data.url);
+      
+      if (isIOS()) {
+        toast.info('Opening payment in Safari...');
+        setPurchaseLoading(false);
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
       setPurchaseLoading(false);

@@ -14,8 +14,22 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const [guestLoading, setGuestLoading] = useState(false);
+  const { register, guestLogin } = useAuth();
   const navigate = useNavigate();
+
+  const handleGuestMode = async () => {
+    setGuestLoading(true);
+    try {
+      await guestLogin();
+      toast.success('Browsing as Guest');
+      navigate('/library');
+    } catch (error) {
+      toast.error('Failed to start guest mode');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,6 +144,27 @@ const RegisterPage = () => {
               data-testid="register-submit-btn"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
+            </Button>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[rgba(212,175,55,0.2)]"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-dark text-[#B0C4BF]">or</span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGuestMode}
+              className="w-full border-[rgba(212,175,55,0.3)] text-[#FDFBF7] hover:bg-[#082E26] py-6"
+              disabled={guestLoading}
+              data-testid="guest-mode-btn"
+            >
+              <User className="w-5 h-5 mr-2" />
+              {guestLoading ? 'Starting...' : 'Continue as Guest'}
             </Button>
           </form>
 

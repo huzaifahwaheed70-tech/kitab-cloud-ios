@@ -80,6 +80,15 @@ const AuthProvider = ({ children }) => {
     return userData;
   };
 
+  const guestLogin = async () => {
+    const response = await axios.post(`${API}/auth/guest`);
+    const { token: newToken, user: userData } = response.data;
+    localStorage.setItem('auth_token', newToken);
+    setToken(newToken);
+    setUser(userData);
+    return userData;
+  };
+
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {});
@@ -106,7 +115,7 @@ const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, guestLogin, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
