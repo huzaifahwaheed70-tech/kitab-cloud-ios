@@ -13,15 +13,16 @@ const FavoritesPage = () => {
 
   useEffect(() => {
     fetchFavorites();
-  }, []);
+  }, [token]);
+
+  const getAuthHeaders = () => {
+    const storedToken = localStorage.getItem('auth_token') || token;
+    return storedToken ? { Authorization: `Bearer ${storedToken}` } : {};
+  };
 
   const fetchFavorites = async () => {
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.get(`${API}/favorites`, { 
-        headers,
-        withCredentials: true 
-      });
+      const response = await axios.get(`${API}/favorites`, { headers: getAuthHeaders() });
       setFavorites(response.data.books || []);
     } catch (error) {
       console.error('Error fetching favorites:', error);
@@ -33,11 +34,7 @@ const FavoritesPage = () => {
 
   const handleRemove = async (bookId) => {
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      await axios.delete(`${API}/favorites/${bookId}`, { 
-        headers,
-        withCredentials: true 
-      });
+      await axios.delete(`${API}/favorites/${bookId}`, { headers: getAuthHeaders() });
       setFavorites(prev => prev.filter(b => b.book_id !== bookId));
       toast.success('Removed from favorites');
     } catch (error) {
@@ -47,25 +44,20 @@ const FavoritesPage = () => {
 
   return (
     <div className="min-h-screen bg-dark">
-      {/* Header */}
       <div className="glass border-b border-[rgba(212,175,55,0.2)]">
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
           <Link to="/library" className="inline-flex items-center gap-2 text-[#B0C4BF] hover:text-gold mb-4" data-testid="back-to-library">
             <ArrowLeft className="w-5 h-5" />
             Back to Library
           </Link>
-          
           <h1 className="font-serif text-3xl md:text-4xl text-[#FDFBF7] font-bold flex items-center gap-3">
             <Heart className="w-8 h-8 text-gold fill-gold" />
             Favorite Books
           </h1>
-          <p className="text-[#B0C4BF] mt-1">
-            Your collection of favorite books
-          </p>
+          <p className="text-[#B0C4BF] mt-1">Your collection of favorite books</p>
         </div>
       </div>
 
-      {/* Content */}
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -75,9 +67,7 @@ const FavoritesPage = () => {
           <div className="text-center py-20">
             <Heart className="w-16 h-16 text-[#B0C4BF] mx-auto mb-4" />
             <h3 className="font-serif text-2xl text-[#FDFBF7] mb-2">No favorites yet</h3>
-            <p className="text-[#B0C4BF] mb-6">
-              Mark books as favorites to find them easily
-            </p>
+            <p className="text-[#B0C4BF] mb-6">Mark books as favorites to find them easily</p>
             <Link to="/library">
               <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C]" data-testid="browse-library-btn">
                 Browse Library
@@ -91,8 +81,8 @@ const FavoritesPage = () => {
                 <Link to={`/book/${book.book_id}`}>
                   <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover">
                     {book.cover_url ? (
-                      <img 
-                        src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
+                      <img
+                        src={`${process.env.REACT_APP_BACKEND_URL}/api/files/${book.cover_url}`}
                         alt={book.title}
                         className="w-full h-full object-cover"
                       />
@@ -112,8 +102,6 @@ const FavoritesPage = () => {
                     </h3>
                   </div>
                 </Link>
-                
-                {/* Remove Button */}
                 <Button
                   variant="ghost"
                   size="icon"
