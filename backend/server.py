@@ -169,6 +169,12 @@ class AppleSubscriptionResponse(BaseModel):
     expiration_date: Optional[str] = None
     message: str
 
+class ApplePDFValidation(BaseModel):
+    transaction_id: str
+    original_transaction_id: str
+    product_id: str
+    book_id: str
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
@@ -315,7 +321,6 @@ async def reset_password(request: ResetPasswordRequest):
         {"$set": {"password_hash": new_hash}}
     )
     await db.password_resets.delete_one({"token": request.token})
-
     return {"message": "Password has been reset successfully"}
 
 @api_router.get("/auth/session")
@@ -504,62 +509,6 @@ async def get_cover_image(path: str):
 
 @api_router.get("/files/{path:path}")
 async def get_file(path: str, user: dict = Depends(get_current_user)):
-    user_id = user["user_id"]
-    user_tier = user.get("subscription_tier", 0)
-    
-    # Check if this is a PDF file access (reading a book)
-    if path.endswith('.pdf'):
-        # Extract book_id from path if possible
-        # Track monthly unique book reads for tier limits
-        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
-        
-        # Get or create monthly reading record
-        monthly_reads = await db.monthly_reads.find_one(
-            {"user_id": user_id, "month": current_month},
-            {"_id": 0}
-        )
-        
-        # Tier limits for reading: 1=10, 2=20, 3=30, 4=unlimited, 0=purchased only
-        tier_read_limits = {0: 0, 1: 10, 2: 20, 3: 30, 4: None}
-        read_limit = tier_read_limits.get(user_tier)
-        
-        # Check if user has purchased this specific PDF (Tier 0 users can read purchased PDFs)
-        book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
-        has_purchased = await db.pdf_purchases.find_one({
-            "user_id": user_id,
-            "book_id": book_id_from_path
-        })
-        
-        if has_purchased:
-            # User purchased this PDF, allow access regardless of tier
-            pass
-        elif user_tier == 0:
-            # Tier 0 without purchase
-            raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
-        elif read_limit is not None:
-            # Check monthly read limit for Tier 1-3
-            read_book_ids = monthly_reads.get("book_ids", []) if monthly_reads else []
-            
-            # If this book is already in their reads, allow (re-reading)
-            if book_id_from_path not in read_book_ids:
-                # New book this month
-                if len(read_book_ids) >= read_limit:
-                    raise HTTPException(
-                        status_code=403, 
-                        detail=f"Monthly reading limit reached ({read_limit} books). Wait until next billing cycle or upgrade your subscription."
-                    )
-                
-                # Add this book to monthly reads
-                await db.monthly_reads.update_one(
-                    {"user_id": user_id, "month": current_month},
-                    {
-                        "$addToSet": {"book_ids": book_id_from_path},
-                        "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
-                        "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
-                    },
-                    upsert=True
-                )
-    
     try:
         data, content_type = get_object(path)
         return Response(content=data, media_type=content_type)
@@ -924,6 +873,38 @@ async def get_apple_subscription_status_endpoint(user: dict = Depends(get_curren
         "platform": "apple"
     }
 
+@api_router.post("/payments/apple/validate-pdf")
+async def validate_apple_pdf_purchase(transaction: ApplePDFValidation, user: dict = Depends(get_current_user)):
+    try:
+        book = await db.books.find_one({"book_id": transaction.book_id}, {"_id": 0})
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+
+        purchase_record = {
+            "purchase_id": f"apple_pdf_{uuid.uuid4().hex[:12]}",
+            "user_id": user["user_id"],
+            "book_id": transaction.book_id,
+            "platform": "apple",
+            "product_id": transaction.product_id,
+            "transaction_id": transaction.transaction_id,
+            "original_transaction_id": transaction.original_transaction_id,
+            "purchase_date": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        await db.pdf_purchases.update_one(
+            {"user_id": user["user_id"], "book_id": transaction.book_id},
+            {"$set": purchase_record},
+            upsert=True
+        )
+
+        return {"success": True, "book_id": transaction.book_id, "message": "PDF purchase validated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple PDF validation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
     body = await request.body()
@@ -936,75 +917,29 @@ async def stripe_webhook(request: Request):
             session_id = webhook_response.session_id
             tier = int(webhook_response.metadata.get("tier", 0))
             user_id = webhook_response.metadata.get("user_id")
+            payment_type = webhook_response.metadata.get("type", "subscription")
             await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_status": "paid"}})
-            if user_id and tier:
+            if payment_type == "pdf_purchase":
+                book_id = webhook_response.metadata.get("book_id")
+                if user_id and book_id:
+                    await db.pdf_purchases.update_one(
+                        {"user_id": user_id, "book_id": book_id},
+                        {"$set": {
+                            "purchase_id": f"purchase_{uuid.uuid4().hex[:12]}",
+                            "user_id": user_id,
+                            "book_id": book_id,
+                            "session_id": session_id,
+                            "purchased_at": datetime.now(timezone.utc).isoformat(),
+                            "platform": "stripe"
+                        }},
+                        upsert=True
+                    )
+            elif user_id and tier:
                 await db.users.update_one({"user_id": user_id}, {"$set": {"subscription_tier": tier}})
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return {"status": "error"}
-
-class ApplePDFValidation(BaseModel):
-    transaction_id: str
-    original_transaction_id: str
-    product_id: str
-    book_id: str
-
-
-@api_router.post("/payments/apple/validate-pdf")
-async def validate_apple_pdf_purchase(
-    transaction: ApplePDFValidation,
-    user: dict = Depends(get_current_user)
-):
-    """Validate an Apple in-app purchase for a single PDF"""
-    try:
-        # Check if book exists
-        book = await db.books.find_one({"book_id": transaction.book_id}, {"_id": 0})
-        if not book:
-            raise HTTPException(status_code=404, detail="Book not found")
-        
-        # Validate with Apple if credentials configured
-        if APPLE_KEY_ID and APPLE_ISSUER_ID and APPLE_PRIVATE_KEY:
-            try:
-                apple_data = await validate_apple_transaction(transaction.transaction_id)
-                logger.info(f"Apple PDF transaction validated: {apple_data}")
-            except Exception as e:
-                logger.warning(f"Apple validation failed (continuing): {e}")
-        
-        # Record the PDF purchase
-        purchase_record = {
-            "purchase_id": f"apple_pdf_{uuid.uuid4().hex[:12]}",
-            "user_id": user["user_id"],
-            "book_id": transaction.book_id,
-            "platform": "apple",
-            "product_id": transaction.product_id,
-            "transaction_id": transaction.transaction_id,
-            "original_transaction_id": transaction.original_transaction_id,
-            "purchase_date": datetime.now(timezone.utc).isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        # Upsert to avoid duplicates
-        await db.pdf_purchases.update_one(
-            {"user_id": user["user_id"], "book_id": transaction.book_id},
-            {"$set": purchase_record},
-            upsert=True
-        )
-        
-        logger.info(f"Apple PDF purchase recorded for user {user['user_id']}, book {transaction.book_id}")
-        
-        return {
-            "success": True,
-            "book_id": transaction.book_id,
-            "message": "PDF purchase validated successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Apple PDF validation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @api_router.post("/webhook/apple")
 async def apple_webhook(request: Request):

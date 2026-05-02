@@ -75,42 +75,82 @@ const PaymentSuccessPage = () => {
             <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-12 h-12 text-green-500" />
             </div>
-            <h1 className="font-serif text-3xl text-[#FDFBF7] mb-4">Payment Successful!</h1>
-            <p className="text-[#B0C4BF] mb-8">
-              Welcome to {tierNames[parseInt(paymentInfo?.metadata?.tier) || user?.subscription_tier || 1]}! 
-              Your subscription has been activated.
-            </p>
+            
+            {paymentInfo?.metadata?.type === 'pdf_purchase' ? (
+              // PDF Purchase Success
+              <>
+                <h1 className="font-serif text-3xl text-[#FDFBF7] mb-4">PDF Purchase Complete!</h1>
+                <p className="text-[#B0C4BF] mb-8">
+                  Your book has been added to your library. You can access it anytime from "My Purchases".
+                  A confirmation email has been sent to you.
+                </p>
 
-            <div className="glass-card rounded-sm p-6 mb-8 text-left">
-              <h3 className="text-[#FDFBF7] font-medium mb-4">What's Next?</h3>
-              <ul className="space-y-3 text-[#B0C4BF]">
-                <li className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
-                  Browse your expanded library collection
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
-                  Add books to your personal bookshelf
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
-                  Request new books to be digitized
-                </li>
-                {(parseInt(paymentInfo?.metadata?.tier) === 5 || user?.subscription_tier === 5) && (
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
-                    Access your exclusive Ship-to-Scan portal
-                  </li>
-                )}
-              </ul>
-            </div>
+                <div className="glass-card rounded-sm p-6 mb-8 text-left">
+                  <h3 className="text-[#FDFBF7] font-medium mb-4">What's Next?</h3>
+                  <ul className="space-y-3 text-[#B0C4BF]">
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                      Your PDF is now permanently available in your library
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                      Read it anytime on any device
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                      Check your email for purchase confirmation
+                    </li>
+                  </ul>
+                </div>
 
-            <Link to="/library">
-              <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold w-full" data-testid="go-to-library-btn">
-                <Library className="w-5 h-5 mr-2" />
-                Go to Library
-              </Button>
-            </Link>
+                <Link to={`/book/${paymentInfo?.metadata?.book_id}`}>
+                  <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold w-full" data-testid="read-now-btn">
+                    <Library className="w-5 h-5 mr-2" />
+                    Read Now
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              // Subscription Success
+              <>
+                <h1 className="font-serif text-3xl text-[#FDFBF7] mb-4">Payment Successful!</h1>
+                <p className="text-[#B0C4BF] mb-8">
+                  Welcome to {tierNames[parseInt(paymentInfo?.metadata?.tier) || user?.subscription_tier || 1]}! 
+                  Your subscription has been activated. A confirmation email has been sent to you.
+                </p>
+
+                <div className="glass-card rounded-sm p-6 mb-8 text-left">
+                  <h3 className="text-[#FDFBF7] font-medium mb-4">What's Next?</h3>
+                  <ul className="space-y-3 text-[#B0C4BF]">
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                      Browse your expanded library collection
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                      Add books to your monthly reading list
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                      Save favorites and track your progress
+                    </li>
+                    {(parseInt(paymentInfo?.metadata?.tier) >= 3 || user?.subscription_tier >= 3) && (
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gold mt-2"></span>
+                        Use in-book search to find passages
+                      </li>
+                    )}
+                  </ul>
+                </div>
+
+                <Link to="/library">
+                  <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold w-full" data-testid="go-to-library-btn">
+                    <Library className="w-5 h-5 mr-2" />
+                    Go to Library
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         )}
 

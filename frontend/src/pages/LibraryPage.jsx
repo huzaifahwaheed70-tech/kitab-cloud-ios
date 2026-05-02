@@ -97,13 +97,13 @@ const LibraryPage = () => {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-2">
               <Link to="/bookshelf">
-                <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]" data-testid="nav-bookshelf">
+                <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" data-testid="nav-bookshelf">
                   <BookMarked className="w-5 h-5 mr-2" />
                   My Books
                 </Button>
               </Link>
               <Link to="/favorites">
-                <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26]" data-testid="nav-favorites">
+                <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" data-testid="nav-favorites">
                   <Heart className="w-5 h-5 mr-2" />
                   Favorites
                 </Button>
@@ -111,7 +111,7 @@ const LibraryPage = () => {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] gap-2" data-testid="user-menu-trigger">
+                  <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] gap-2 min-h-[44px]" data-testid="user-menu-trigger">
                     <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center">
                       {user?.picture ? (
                         <img src={user.picture} alt="" className="w-8 h-8 rounded-full" />
@@ -164,7 +164,7 @@ const LibraryPage = () => {
             {/* Mobile Menu Button */}
             <Button 
               variant="ghost" 
-              className="md:hidden text-[#FDFBF7]"
+              className="md:hidden text-[#FDFBF7] min-h-[44px] min-w-[44px]"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="mobile-menu-btn"
             >
@@ -181,7 +181,7 @@ const LibraryPage = () => {
                 placeholder="Search by title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] focus:ring-1 focus:ring-gold"
+                className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] focus:ring-1 focus:ring-gold min-h-[44px]"
                 data-testid="mobile-book-search"
               />
             </div>
@@ -191,7 +191,7 @@ const LibraryPage = () => {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-[rgba(212,175,55,0.2)] bg-surface">
-            <div className="px-4 py-4 space-y-2">
+            <div className="px-4 py-4 space-y-1">
               <div className="pb-3 border-b border-[rgba(212,175,55,0.2)]">
                 <p className="font-medium text-[#FDFBF7]">{user?.name}</p>
                 <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
@@ -199,31 +199,31 @@ const LibraryPage = () => {
                   {tierNames[userTier]}
                 </div>
               </div>
-              <Link to="/bookshelf" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
+              <Link to="/bookshelf" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
                 <BookMarked className="w-5 h-5" />
                 My Books
               </Link>
-              <Link to="/favorites" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
+              <Link to="/favorites" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
                 <Heart className="w-5 h-5" />
                 Favorites
               </Link>
               {userTier < 4 && (
-                <Link to="/pricing" className="flex items-center gap-3 py-2 text-gold" onClick={() => setMobileMenuOpen(false)}>
+                <Link to="/pricing" className="flex items-center gap-3 py-3 text-gold min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
                   <ChevronRight className="w-5 h-5" />
                   Upgrade Plan
                 </Link>
               )}
-              <Link to="/settings" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
+              <Link to="/settings" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
                 <Settings className="w-5 h-5" />
                 Settings
               </Link>
               {user?.is_admin && (
-                <Link to="/admin" className="flex items-center gap-3 py-2 text-[#FDFBF7]" onClick={() => setMobileMenuOpen(false)}>
+                <Link to="/admin" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
                   <User className="w-5 h-5" />
                   Admin Dashboard
                 </Link>
               )}
-              <button onClick={handleLogout} className="flex items-center gap-3 py-2 text-red-400 w-full">
+              <button onClick={handleLogout} className="flex items-center gap-3 py-3 text-red-400 w-full min-h-[48px]">
                 <LogOut className="w-5 h-5" />
                 Sign Out
               </button>
@@ -233,7 +233,7 @@ const LibraryPage = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-5 md:px-6 py-8">
         {/* Continue Reading Section */}
         {continueReading.length > 0 && (
           <section className="mb-12">
@@ -241,12 +241,12 @@ const LibraryPage = () => {
               <PlayCircle className="w-6 h-6 text-gold" />
               Continue Reading
             </h2>
-            <div className="flex gap-6 overflow-x-auto pb-4 hide-scrollbar">
+            <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 hide-scrollbar px-1">
               {continueReading.map((book) => (
                 <Link 
                   key={book.book_id}
                   to={`/book/${book.book_id}`}
-                  className="flex-shrink-0 w-40"
+                  className="flex-shrink-0 w-36 md:w-40 min-h-[44px]"
                   data-testid={`continue-${book.book_id}`}
                 >
                   <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-gold/50 book-card-hover">
@@ -261,11 +261,11 @@ const LibraryPage = () => {
                         <img src="/logo.png" alt="Book" className="w-10 h-10 opacity-30" />
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#02120F] to-transparent p-2">
-                      <p className="text-xs text-gold">Page {book.current_page}</p>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#02120F] to-transparent p-3">
+                      <p className="text-xs text-gold font-medium">Page {book.current_page}</p>
                     </div>
                   </div>
-                  <p className="mt-2 text-sm text-[#FDFBF7] line-clamp-1">{book.title}</p>
+                  <p className="mt-2 text-sm text-[#FDFBF7] line-clamp-2">{book.title}</p>
                 </Link>
               ))}
             </div>
@@ -332,7 +332,7 @@ const LibraryPage = () => {
             </p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
             {books.map((book) => (
               <BookCard key={book.book_id} book={book} userTier={userTier} />
             ))}
@@ -359,7 +359,7 @@ const BookCard = ({ book, userTier }) => {
   return (
     <Link 
       to={`/book/${book.book_id}`}
-      className="group flex-shrink-0 w-full"
+      className="group flex-shrink-0 w-full min-h-[44px]"
       data-testid={`book-card-${book.book_id}`}
     >
       <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover">
@@ -421,8 +421,8 @@ const BookCard = ({ book, userTier }) => {
         )}
       </div>
       
-      <div className="mt-3">
-        <h3 className="font-serif text-[#FDFBF7] line-clamp-2 group-hover:text-gold transition-colors">
+      <div className="mt-3 px-1">
+        <h3 className="font-serif text-[#FDFBF7] text-sm md:text-base line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
         </h3>
         {book.original_price && (

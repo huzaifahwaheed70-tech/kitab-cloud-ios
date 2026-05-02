@@ -99,16 +99,7 @@ const BookDetailPage = () => {
     } catch (error) {
       console.error('Error loading PDF:', error);
       if (error.response?.status === 403) {
-        const detail = error.response?.data?.detail || 'Access denied';
-        if (detail.includes('Monthly reading limit')) {
-          toast.error(detail);
-        } else if (detail.includes('Purchase')) {
-          toast.error('Please purchase this PDF or subscribe to read.');
-        } else {
-          toast.error(detail);
-        }
-      } else if (error.response?.status === 401) {
-        toast.error('Please log in to read this book');
+        toast.error(error.response?.data?.detail || 'Access denied');
       } else {
         toast.error('Failed to load PDF. Please try again.');
       }
@@ -314,7 +305,9 @@ const BookDetailPage = () => {
       {showReader && pdfUrl && (
         <div
           className="fixed inset-0 z-50 bg-[#02120F] flex flex-col"
+          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           onContextMenu={(e) => e.preventDefault()}
+          onCopy={(e) => e.preventDefault()}
         >
           <div className="glass border-b border-[rgba(212,175,55,0.2)] flex-shrink-0">
             <div className="max-w-7xl mx-auto px-3 py-2 md:px-4 md:py-3 flex items-center justify-between">
@@ -326,12 +319,12 @@ const BookDetailPage = () => {
                     saveReadingProgress(pageNumber, true);
                     setShowReader(false);
                   }}
-                  className="text-[#FDFBF7] hover:bg-[#082E26] h-8 w-8"
+                  className="text-[#FDFBF7] hover:bg-[#082E26] h-11 w-11"
                   data-testid="close-reader-btn"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-6 h-6" />
                 </Button>
-                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[100px] md:max-w-[300px]">
+                <h1 className="font-serif text-sm md:text-lg text-[#FDFBF7] truncate max-w-[120px] md:max-w-[300px]">
                   {book.title}
                 </h1>
               </div>
@@ -340,23 +333,23 @@ const BookDetailPage = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => saveReadingProgress(pageNumber, true)}
-                  className={`h-8 w-8 ${pageSaved ? 'text-gold' : 'text-[#B0C4BF] hover:text-gold'}`}
+                  className={`h-11 w-11 ${pageSaved ? 'text-gold bg-gold/10' : 'text-[#B0C4BF] hover:text-gold'}`}
                   data-testid="save-page-btn"
                 >
-                  <Bookmark className={`w-4 h-4 ${pageSaved ? 'fill-gold' : ''}`} />
+                  <Bookmark className={`w-5 h-5 ${pageSaved ? 'fill-gold' : ''}`} />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8" data-testid="zoom-out-btn">
-                  <ZoomOut className="w-4 h-4" />
+                <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className="text-[#B0C4BF] hover:text-[#FDFBF7] h-11 w-11" data-testid="zoom-out-btn">
+                  <ZoomOut className="w-5 h-5" />
                 </Button>
                 <span className="text-[#B0C4BF] text-xs min-w-[35px] text-center hidden md:inline">
                   {Math.round(scale * 100)}%
                 </span>
-                <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.min(2, s + 0.25))} className="text-[#B0C4BF] hover:text-[#FDFBF7] h-8 w-8" data-testid="zoom-in-btn">
-                  <ZoomIn className="w-4 h-4" />
+                <Button variant="ghost" size="icon" onClick={() => setScale(s => Math.min(2, s + 0.25))} className="text-[#B0C4BF] hover:text-[#FDFBF7] h-11 w-11" data-testid="zoom-in-btn">
+                  <ZoomIn className="w-5 h-5" />
                 </Button>
                 {canSearch && (
-                  <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} className={`h-8 w-8 ${showSearch ? 'text-gold' : 'text-[#B0C4BF] hover:text-gold'}`} data-testid="toggle-search-btn">
-                    <Search className="w-4 h-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} className={`h-11 w-11 ${showSearch ? 'text-gold bg-gold/10' : 'text-[#B0C4BF] hover:text-gold'}`} data-testid="toggle-search-btn">
+                    <Search className="w-5 h-5" />
                   </Button>
                 )}
               </div>
@@ -372,10 +365,7 @@ const BookDetailPage = () => {
                     placeholder="Search in book..."
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') searchInBook();
-                      e.stopPropagation();
-                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && searchInBook()}
                     className="bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7] text-sm pr-10"
                     style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
                     data-testid="in-book-search"
@@ -427,8 +417,7 @@ const BookDetailPage = () => {
 
           <div className="glass border-t border-[rgba(212,175,55,0.2)] flex-shrink-0 mb-12 md:mb-0">
             <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-6">
-              <Button variant="ghost" size="icon" onClick={() => handlePageChange(Math.max(1, pageNumber - 1))} disabled={pageNumber <= 1} className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-12
-              w-12" data-testid="prev-page-btn">
+              <Button variant="ghost" size="icon" onClick={() => handlePageChange(Math.max(1, pageNumber - 1))} disabled={pageNumber <= 1} className="text-[#B0C4BF] hover:text-[#FDFBF7] disabled:opacity-30 h-12 w-12" data-testid="prev-page-btn">
                 <ChevronLeft className="w-8 h-8" />
               </Button>
               <div className="flex items-center gap-3 min-w-[100px] justify-center">
