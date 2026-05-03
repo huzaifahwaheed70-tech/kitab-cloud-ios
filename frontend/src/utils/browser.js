@@ -1,4 +1,7 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+// Register the custom native plugin
+const ExternalBrowser = registerPlugin('ExternalBrowser');
 
 /**
  * Check if running on iOS
@@ -20,34 +23,31 @@ export const isNativeApp = () => {
 };
 
 /**
- * Open URL in EXTERNAL browser (actual Safari app, not in-app browser)
- * On iOS native app: Opens in Safari app using Capacitor App plugin
+ * Open URL in the device's DEFAULT external browser
+ * On iOS: Uses native UIApplication.shared.open() to open in Safari/Brave/Chrome
  * On web: Normal redirect
  */
 export const openPaymentUrl = async (url) => {
-  // For iOS native app, use Capacitor App plugin to open in external Safari
+  // For iOS native app, use our custom native plugin
   if (isIOS() && isNativeApp()) {
     try {
-      // Import and use the App plugin to open URL in external browser
-      const { App } = await import('@capacitor/app');
-      
-      // This opens the URL in the actual Safari app (external browser)
-      await App.openUrl({ url: url });
+      // Call native Swift code that uses UIApplication.shared.open()
+      // This opens in the user's default browser (Safari, Brave, Chrome, etc.)
+      await ExternalBrowser.openUrl({ url: url });
       return { opened: true, external: true };
     } catch (error) {
-      console.error('Capacitor App.openUrl failed:', error);
+      console.error('Native ExternalBrowser failed:', error);
       
-      // Fallback: try using the Browser plugin
-      try {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: url });
-        return { opened: true, external: true };
-      } catch (e2) {
-        console.error('Browser.open also failed:', e2);
-        // Last resort fallback
-        window.location.href = url;
-        return { opened: true, external: false };
-      }
+      // Fallback: try anchor click method
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      setTimeout(() => document.body.removeChild(anchor), 100);
+      return { opened: true, external: true };
     }
   }
   
