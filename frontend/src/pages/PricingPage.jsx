@@ -6,7 +6,6 @@ import { BookOpen, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser'; // ✅ ADDED
 import { buySubscription } from '../purchase';
 
 const PricingPage = () => {
@@ -81,7 +80,7 @@ const PricingPage = () => {
 
     setLoading(tier);
 
-    // ✅ iOS → Apple IAP
+    // ✅ iOS → Apple IAP (Keep this for Guideline 3.1.1 compliance later)
     if (isIOS) {
       try {
         await buySubscription(tier);
@@ -103,11 +102,10 @@ const PricingPage = () => {
 
       const checkoutUrl = response.data.url;
 
-      // ✅ FIX: open Stripe in real browser (NOT inside app)
-      if (Capacitor.isNativePlatform()) {
-        await Browser.open({
-          url: checkoutUrl
-        });
+      // ✅ FIX: Using window.open with '_system' to force external browser
+      // This removes the need for the @capacitor/browser plugin
+      if (Capacitor.getPlatform() !== 'web') {
+        window.open(checkoutUrl, '_system');
       } else {
         window.location.href = checkoutUrl;
       }
