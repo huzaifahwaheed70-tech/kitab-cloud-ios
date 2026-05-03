@@ -6,6 +6,7 @@ import { BookOpen, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser'; // ✅ ADDED
 import { buySubscription } from '../purchase';
 
 const PricingPage = () => {
@@ -80,6 +81,7 @@ const PricingPage = () => {
 
     setLoading(tier);
 
+    // ✅ iOS → Apple IAP
     if (isIOS) {
       try {
         await buySubscription(tier);
@@ -93,11 +95,23 @@ const PricingPage = () => {
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
       const response = await axios.post(`${API}/payments/create-checkout`, {
         tier,
         origin_url: 'https://kitab-cloud.emergent.host'
       }, { headers, withCredentials: true });
-      window.location.href = response.data.url;
+
+      const checkoutUrl = response.data.url;
+
+      // ✅ FIX: open Stripe in real browser (NOT inside app)
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({
+          url: checkoutUrl
+        });
+      } else {
+        window.location.href = checkoutUrl;
+      }
+
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to start checkout');
       setLoading(null);
