@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { 
   ArrowLeft, BookMarked, ChevronLeft, ChevronRight, 
-  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library
+  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library, ExternalLink
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -40,6 +40,7 @@ const BookDetailPage = () => {
   const [pageSaved, setPageSaved] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
@@ -289,10 +290,16 @@ const BookDetailPage = () => {
         withCredentials: true 
       });
       
-      // Open payment URL (external browser on iOS, normal redirect elsewhere)
-      await openPaymentUrl(response.data.url);
+      // Open payment URL
+      const result = await openPaymentUrl(response.data.url);
+      
+      // On iOS, show modal with tappable link
+      if (result.showModal) {
+        setPaymentModal({ show: true, url: result.url });
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
+    } finally {
       setPurchaseLoading(false);
     }
   };
@@ -812,6 +819,47 @@ const BookDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* iOS Payment Modal - Shows tappable link to open in external browser */}
+      {paymentModal.show && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
+            <button 
+              onClick={() => setPaymentModal({ show: false, url: null })}
+              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
+                <ExternalLink className="w-8 h-8 text-gold" />
+              </div>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Payment</h3>
+              <p className="text-[#B0C4BF] mb-6">
+                Tap the button below to open secure checkout in your browser.
+              </p>
+              
+              {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
+              <a 
+                href={paymentModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
+                onClick={() => setPaymentModal({ show: false, url: null })}
+                data-testid="external-payment-link"
+              >
+                <ExternalLink className="w-5 h-5" />
+                Open Secure Checkout
+              </a>
+              
+              <p className="text-xs text-[#B0C4BF] mt-4">
+                You'll be redirected to Stripe's secure payment page
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

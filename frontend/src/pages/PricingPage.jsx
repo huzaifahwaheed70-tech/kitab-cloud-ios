@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
@@ -12,6 +12,7 @@ const PricingPage = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
+  const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
 
   const tiers = [
     { 
@@ -116,8 +117,14 @@ const PricingPage = () => {
         origin_url: window.location.origin
       }, { headers, withCredentials: true });
 
-      // Open payment URL (external browser on iOS, normal redirect elsewhere)
-      await openPaymentUrl(response.data.url);
+      // Open payment URL
+      const result = await openPaymentUrl(response.data.url);
+      
+      // On iOS, show modal with tappable link
+      if (result.showModal) {
+        setPaymentModal({ show: true, url: result.url });
+        setLoading(null);
+      }
     } catch (error) {
       toast.error(error.message || 'Failed to process payment');
       setLoading(null);
@@ -318,6 +325,47 @@ const PricingPage = () => {
           </div>
         </div>
       </footer>
+
+      {/* iOS Payment Modal - Shows tappable link to open in external browser */}
+      {paymentModal.show && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
+            <button 
+              onClick={() => setPaymentModal({ show: false, url: null })}
+              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
+                <ExternalLink className="w-8 h-8 text-gold" />
+              </div>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Payment</h3>
+              <p className="text-[#B0C4BF] mb-6">
+                Tap the button below to open secure checkout in your browser.
+              </p>
+              
+              {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
+              <a 
+                href={paymentModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
+                onClick={() => setPaymentModal({ show: false, url: null })}
+                data-testid="external-payment-link"
+              >
+                <ExternalLink className="w-5 h-5" />
+                Open Secure Checkout
+              </a>
+              
+              <p className="text-xs text-[#B0C4BF] mt-4">
+                You'll be redirected to Stripe's secure payment page
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
