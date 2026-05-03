@@ -6,13 +6,15 @@
   "server": {
     "hostname": "kitab-cloud.preview.emergentagent.com",
     "androidScheme": "https",
-    "iosScheme": "https"
+    "iosScheme": "https",
+    "allowNavigation": ["checkout.stripe.com", "*.stripe.com"]
   },
   "ios": {
     "contentInset": "automatic",
     "allowsLinkPreview": false,
     "scrollEnabled": true,
-    "backgroundColor": "#02120F"
+    "backgroundColor": "#02120F",
+    "appendUserAgent": "KitabCloudApp"
   },
   "plugins": {
     "SplashScreen": {
@@ -23,6 +25,9 @@
     "StatusBar": {
       "style": "DARK",
       "backgroundColor": "#02120F"
+    },
+    "CapacitorHttp": {
+      "enabled": true
     }
   }
 }
