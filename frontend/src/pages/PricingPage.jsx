@@ -80,7 +80,6 @@ const PricingPage = () => {
 
     setLoading(tier);
 
-    // ✅ iOS → Apple IAP (Keep this for Guideline 3.1.1 compliance later)
     if (isIOS) {
       try {
         await buySubscription(tier);
@@ -102,8 +101,6 @@ const PricingPage = () => {
 
       const checkoutUrl = response.data.url;
 
-      // ✅ FIX: Using window.open with '_system' to force external browser
-      // This removes the need for the @capacitor/browser plugin
       if (Capacitor.getPlatform() !== 'web') {
         window.open(checkoutUrl, '_system');
       } else {
