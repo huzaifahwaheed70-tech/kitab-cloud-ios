@@ -69,7 +69,7 @@ APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
 APPLE_ENVIRONMENT = os.environ.get('APPLE_ENVIRONMENT', 'sandbox')  # 'sandbox' or 'production'
 
 # Email Helper Functions
-RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <onboarding@resend.dev>')
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <kitabcloud@dar-us-salam.com>')
 
 async def send_welcome_email(email: str, name: str = None):
     """Send welcome email to new users"""
@@ -559,8 +559,106 @@ async def root():
 
 
 # Auth Routes
+
+# Models for email verification
+class SendVerificationRequest(BaseModel):
+    email: EmailStr
+    name: str
+    password: str
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+    name: str
+    password: str
+
+
+@api_router.post("/auth/send-verification")
+async def send_verification_code(request: SendVerificationRequest):
+    """Send verification code to email before creating account"""
+    # Check if email already registered
+    existing = await db.users.find_one({"email": request.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Generate 6-digit verification code
+    code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    
+    # Store verification code
+    await db.email_verifications.delete_many({"email": request.email})  # Remove old codes
+    await db.email_verifications.insert_one({
+        "email": request.email,
+        "code": code,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Send verification email
+    email_sent = await send_verification_email(request.email, code)
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Failed to send verification email")
+    
+    return {"message": "Verification code sent to your email"}
+
+
+@api_router.post("/auth/verify-and-register")
+async def verify_and_register(request: VerifyEmailRequest):
+    """Verify email code and create account"""
+    # Check if email already registered
+    existing = await db.users.find_one({"email": request.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Find verification record
+    verification = await db.email_verifications.find_one({"email": request.email})
+    if not verification:
+        raise HTTPException(status_code=400, detail="No verification code found. Please request a new one.")
+    
+    # Check if code matches
+    if verification["code"] != request.code:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    # Check if code expired
+    expires_at = datetime.fromisoformat(verification["expires_at"])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        await db.email_verifications.delete_one({"email": request.email})
+        raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
+    
+    # Create user account
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    user_doc = {
+        "user_id": user_id,
+        "email": request.email,
+        "name": request.name,
+        "password_hash": hash_password(request.password),
+        "picture": None,
+        "subscription_tier": 0,
+        "is_admin": False,
+        "email_verified": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user_doc)
+    
+    # Delete verification code
+    await db.email_verifications.delete_one({"email": request.email})
+    
+    # Send welcome email
+    try:
+        await send_welcome_email(request.email, request.name)
+    except Exception as e:
+        logger.warning(f"Failed to send welcome email to {request.email}: {e}")
+    
+    token = create_jwt_token(user_id)
+    return {"token": token, "user": UserResponse(**user_doc).model_dump()}
+
+
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
+    """Direct registration (backwards compatible, but now requires verification)"""
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
