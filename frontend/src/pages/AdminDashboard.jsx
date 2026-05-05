@@ -63,11 +63,16 @@ const AdminDashboard = () => {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (token) {
+      fetchData();
+      // Also fetch tier settings on initial load
+      fetchTierSettings();
+    }
+  }, [token]);
 
   useEffect(() => {
-    if (activeTab === 'settings') {
+    // Re-fetch tier settings when switching to settings tab (in case data changed)
+    if (activeTab === 'settings' && token && Object.keys(tierSettings).length === 0) {
       fetchTierSettings();
     }
   }, [activeTab]);
@@ -99,7 +104,10 @@ const AdminDashboard = () => {
     setTierLoading(true);
     try {
       const response = await axios.get(`${API}/admin/tiers`, { headers, withCredentials: true });
-      setTierSettings(response.data.tiers);
+      console.log('Tier settings response:', response.data);
+      if (response.data && response.data.tiers) {
+        setTierSettings(response.data.tiers);
+      }
     } catch (error) {
       console.error('Error fetching tier settings:', error);
       toast.error('Failed to load tier settings');
@@ -804,6 +812,17 @@ const AdminDashboard = () => {
               {tierLoading ? (
                 <div className="flex justify-center py-12">
                   <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : Object.keys(tierSettings).length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-[#B0C4BF] mb-4">No tier settings loaded. Click below to load defaults.</p>
+                  <Button
+                    onClick={fetchTierSettings}
+                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Load Tier Settings
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
