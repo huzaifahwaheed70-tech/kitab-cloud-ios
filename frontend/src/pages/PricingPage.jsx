@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
@@ -13,76 +13,65 @@ const PricingPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
+  const [tiers, setTiers] = useState([]);
+  const [tiersLoading, setTiersLoading] = useState(true);
 
-  const tiers = [
-    { 
-      tier: 0, 
-      name: "Pay Per Book", 
-      price: 0, 
-      features: [
-        "Buy individual PDFs",
-        "Own books forever",
-        "No monthly commitment",
-        "Access anytime",
-        "Email support"
-      ],
-      color: "tier-0",
-      perBook: true
-    },
-    { 
-      tier: 1, 
-      name: "Basic", 
-      price: 20, 
-      features: [
-        "10 books per month",
-        "Standard library access",
-        "Bookmarks & progress tracking",
-        "Favorites list",
-        "Email support"
-      ],
-      color: "tier-1"
-    },
-    { 
-      tier: 2, 
-      name: "Standard", 
-      price: 40, 
-      features: [
-        "20 books per month",
-        "Standard library access",
-        "Bookmarks & progress tracking",
-        "Favorites list",
-        "Email support"
-      ],
-      color: "tier-2"
-    },
-    { 
-      tier: 3, 
-      name: "Advanced", 
-      price: 60, 
-      features: [
-        "30 books per month",
-        "Volume books included",
-        "In-book text search",
-        "Bookmarks & progress tracking",
-        "Email support"
-      ],
-      color: "tier-3"
-    },
-    { 
-      tier: 4, 
-      name: "Premium", 
-      price: 80, 
-      features: [
-        "Unlimited books",
-        "All books including advanced",
-        "Volume books included",
-        "In-book text search",
-        "Email support"
-      ],
-      color: "tier-4",
-      featured: true
+  // Default features for each tier
+  const tierFeatures = {
+    0: ["Buy individual PDFs", "Own books forever", "No monthly commitment", "Access anytime", "Email support"],
+    1: ["books per month", "Standard library access", "Bookmarks & progress tracking", "Favorites list", "Email support"],
+    2: ["books per month", "Standard library access", "Bookmarks & progress tracking", "Favorites list", "Email support"],
+    3: ["books per month", "Volume books included", "In-book text search", "Bookmarks & progress tracking", "Email support"],
+    4: ["Unlimited books", "All books including advanced", "Volume books included", "In-book text search", "Email support"]
+  };
+
+  useEffect(() => {
+    fetchTiers();
+  }, []);
+
+  const fetchTiers = async () => {
+    try {
+      const response = await axios.get(`${API}/tiers`);
+      const tiersData = response.data;
+      
+      // Convert to array format with features
+      const tiersArray = Object.entries(tiersData).map(([tierNum, tierInfo]) => {
+        const tier = parseInt(tierNum);
+        const bookLimit = tierInfo.book_limit;
+        let features = [...(tierFeatures[tier] || tierFeatures[1])];
+        
+        // Update book limit in features
+        if (tier > 0 && tier < 4 && bookLimit) {
+          features[0] = `${bookLimit} books per month`;
+        }
+        
+        return {
+          tier,
+          name: tierInfo.name,
+          price: tierInfo.price,
+          bookLimit: tierInfo.book_limit,
+          features,
+          color: `tier-${tier}`,
+          perBook: tier === 0,
+          featured: tier === 4
+        };
+      }).sort((a, b) => a.tier - b.tier);
+      
+      setTiers(tiersArray);
+    } catch (error) {
+      console.error('Error fetching tiers:', error);
+      // Fallback to defaults
+      setTiers([
+        { tier: 0, name: "Pay Per Book", price: 0, features: tierFeatures[0], color: "tier-0", perBook: true },
+        { tier: 1, name: "Basic", price: 20, features: ["10 books per month", ...tierFeatures[1].slice(1)], color: "tier-1" },
+        { tier: 2, name: "Standard", price: 40, features: ["20 books per month", ...tierFeatures[2].slice(1)], color: "tier-2" },
+        { tier: 3, name: "Advanced", price: 60, features: ["30 books per month", ...tierFeatures[3].slice(1)], color: "tier-3" },
+        { tier: 4, name: "Premium", price: 80, features: tierFeatures[4], color: "tier-4", featured: true }
+      ]);
+    } finally {
+      setTiersLoading(false);
     }
-  ];
+  };
 
   const handleSubscribe = async (tier) => {
     if (tier === 0) {
@@ -191,6 +180,11 @@ const PricingPage = () => {
       {/* Pricing Cards */}
       <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6">
+          {tiersLoading ? (
+            <div className="flex justify-center py-20">
+              <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
           <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
             {tiers.map((tier) => (
               <div 
@@ -265,6 +259,7 @@ const PricingPage = () => {
               </div>
             ))}
           </div>
+          )}
         </div>
       </section>
 

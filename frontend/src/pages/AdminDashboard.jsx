@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
-  Search, Save
+  Search, Save, Settings, DollarSign, RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,6 +39,11 @@ const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [userDetails, setUserDetails] = useState(null);
+  
+  // Tier Settings State
+  const [tierSettings, setTierSettings] = useState({});
+  const [tierLoading, setTierLoading] = useState(false);
+  const [tierSaving, setTierSaving] = useState(false);
 
   // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -61,6 +66,12 @@ const AdminDashboard = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      fetchTierSettings();
+    }
+  }, [activeTab]);
+
   const fetchData = async () => {
     try {
       const [statsRes, booksRes, usersRes, purchasesRes, subsRes] = await Promise.all([
@@ -81,6 +92,60 @@ const AdminDashboard = () => {
       toast.error('Failed to load admin data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTierSettings = async () => {
+    setTierLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/tiers`, { headers, withCredentials: true });
+      setTierSettings(response.data.tiers);
+    } catch (error) {
+      console.error('Error fetching tier settings:', error);
+      toast.error('Failed to load tier settings');
+    } finally {
+      setTierLoading(false);
+    }
+  };
+
+  const handleTierChange = (tierId, field, value) => {
+    setTierSettings(prev => ({
+      ...prev,
+      [tierId]: {
+        ...prev[tierId],
+        [field]: field === 'price' ? parseFloat(value) || 0 : 
+                 field === 'book_limit' ? (value === '' ? null : parseInt(value)) : 
+                 value
+      }
+    }));
+  };
+
+  const saveTierSettings = async () => {
+    setTierSaving(true);
+    try {
+      await axios.put(`${API}/admin/tiers`, { tiers: tierSettings }, { headers, withCredentials: true });
+      toast.success('Tier settings saved! Changes will reflect across the app.');
+    } catch (error) {
+      console.error('Error saving tier settings:', error);
+      toast.error('Failed to save tier settings');
+    } finally {
+      setTierSaving(false);
+    }
+  };
+
+  const resetTierSettings = async () => {
+    if (!window.confirm('Are you sure you want to reset all tier settings to defaults?')) return;
+    
+    setTierSaving(true);
+    try {
+      const response = await axios.post(`${API}/admin/tiers/reset`, {}, { headers, withCredentials: true });
+      setTierSettings(response.data.tiers);
+      toast.success('Tier settings reset to defaults!');
+    } catch (error) {
+      console.error('Error resetting tier settings:', error);
+      toast.error('Failed to reset tier settings');
+    } finally {
+      setTierSaving(false);
     }
   };
 
@@ -296,9 +361,14 @@ const AdminDashboard = () => {
             <TabsTrigger value="subscriptions" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-subscriptions">
               Subscriptions
             </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
+              <Settings className="w-4 h-4 mr-1" />
+              Settings
+            </TabsTrigger>
           </TabsList>
 
-          {/* Search */}
+          {/* Search (hidden on settings tab) */}
+          {activeTab !== 'settings' && (
           <div className="relative mb-6 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
             <Input
@@ -310,6 +380,7 @@ const AdminDashboard = () => {
               data-testid="admin-search"
             />
           </div>
+          )}
 
           {/* Books Tab */}
           <TabsContent value="books">
@@ -687,6 +758,138 @@ const AdminDashboard = () => {
               {subscriptions.length === 0 && (
                 <div className="text-center py-12 text-[#B0C4BF]">No subscriptions yet</div>
               )}
+            </div>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings">
+            <div className="max-w-4xl">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-serif text-2xl text-[#FDFBF7]">Subscription Tiers & Pricing</h2>
+                  <p className="text-[#B0C4BF] text-sm mt-1">Changes will update across the entire app and website</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={resetTierSettings}
+                    disabled={tierSaving}
+                    className="border-[rgba(212,175,55,0.3)] text-[#B0C4BF] hover:bg-surface"
+                    data-testid="reset-tiers-btn"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset to Defaults
+                  </Button>
+                  <Button
+                    onClick={saveTierSettings}
+                    disabled={tierSaving}
+                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                    data-testid="save-tiers-btn"
+                  >
+                    {tierSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-[#02120F] border-t-transparent rounded-full animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {tierLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(tierSettings).sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([tierId, tierInfo]) => (
+                    <div 
+                      key={tierId} 
+                      className={`glass-card rounded-sm p-6 border ${parseInt(tierId) === 4 ? 'border-gold' : 'border-[rgba(212,175,55,0.2)]'}`}
+                      data-testid={`tier-setting-${tierId}`}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className={`w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center`}>
+                          <DollarSign className="w-5 h-5 text-gold" />
+                        </div>
+                        <div>
+                          <span className={`tier-badge tier-${tierId} text-xs mb-1`}>Tier {tierId}</span>
+                          <p className="text-[#B0C4BF] text-xs">
+                            {parseInt(tierId) === 0 ? 'Pay per book option' : 
+                             parseInt(tierId) === 4 ? 'Premium unlimited plan' : 
+                             'Monthly subscription'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label className="text-[#FDFBF7] text-sm">Tier Name</Label>
+                          <Input
+                            value={tierInfo.name || ''}
+                            onChange={(e) => handleTierChange(tierId, 'name', e.target.value)}
+                            className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
+                            placeholder="e.g. Basic, Premium"
+                            data-testid={`tier-${tierId}-name`}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[#FDFBF7] text-sm">Price (USD/month)</Label>
+                          <div className="relative mt-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0C4BF]">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={tierInfo.price || 0}
+                              onChange={(e) => handleTierChange(tierId, 'price', e.target.value)}
+                              className="pl-7 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+                              placeholder="0.00"
+                              data-testid={`tier-${tierId}-price`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-[#FDFBF7] text-sm">Monthly Book Limit</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={tierInfo.book_limit ?? ''}
+                            onChange={(e) => handleTierChange(tierId, 'book_limit', e.target.value)}
+                            className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
+                            placeholder="Empty = Unlimited"
+                            data-testid={`tier-${tierId}-limit`}
+                          />
+                          <p className="text-xs text-[#B0C4BF] mt-1">Leave empty for unlimited</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-8 glass-card rounded-sm p-6 border border-[rgba(212,175,55,0.2)]">
+                <h3 className="font-serif text-lg text-[#FDFBF7] mb-3">How Tier Changes Work</h3>
+                <ul className="space-y-2 text-sm text-[#B0C4BF]">
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 flex-shrink-0"></span>
+                    Price changes apply to new subscriptions only. Existing subscribers keep their current rate until renewal.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 flex-shrink-0"></span>
+                    Book limit changes apply immediately to all users of that tier.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 flex-shrink-0"></span>
+                    Tier 0 (Pay Per Book) price is always $0 as users buy individual books.
+                  </li>
+                </ul>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

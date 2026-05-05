@@ -987,9 +987,14 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
             {"_id": 0}
         )
         
-        # Tier limits for reading: 1=10, 2=20, 3=30, 4=unlimited, 0=purchased only
-        tier_read_limits = {0: 0, 1: 10, 2: 20, 3: 30, 4: None}
-        read_limit = tier_read_limits.get(user_tier)
+        # Get tier limits from database or use defaults
+        custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
+        tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
+        
+        # Get read limit for user's tier
+        tier_key = str(user_tier) if str(user_tier) in tiers else user_tier
+        tier_info = tiers.get(tier_key) or tiers.get(str(tier_key)) or SUBSCRIPTION_TIERS.get(user_tier, {})
+        read_limit = tier_info.get("book_limit")
         
         # Check if user has purchased this specific PDF (Tier 0 users can read purchased PDFs)
         book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
@@ -1004,7 +1009,7 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
         elif user_tier == 0:
             # Tier 0 without purchase
             raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
-        elif read_limit is not None:
+        elif read_limit is not None and read_limit > 0:
             # Check monthly read limit for Tier 1-3
             read_book_ids = monthly_reads.get("book_ids", []) if monthly_reads else []
             
@@ -1298,10 +1303,18 @@ async def get_purchased_books(user: dict = Depends(get_current_user)):
 @api_router.post("/payments/create-checkout")
 async def create_checkout(payment: PaymentCreate, request: Request, user: dict = Depends(get_current_user)):
     tier = payment.tier
-    if tier not in SUBSCRIPTION_TIERS:
+    
+    # Get tier info from database or use defaults
+    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
+    tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
+    
+    # Convert tier to string key if needed (MongoDB stores dict keys as strings)
+    tier_key = str(tier) if str(tier) in tiers else tier
+    
+    if tier_key not in tiers and str(tier_key) not in tiers:
         raise HTTPException(status_code=400, detail="Invalid tier")
     
-    tier_info = SUBSCRIPTION_TIERS[tier]
+    tier_info = tiers.get(tier_key) or tiers.get(str(tier_key))
     amount = tier_info["price"]
     
     success_url = f"{payment.origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
@@ -1935,7 +1948,73 @@ async def get_user_details(user_id: str, admin: dict = Depends(get_admin_user)):
 # Tiers info endpoint (public)
 @api_router.get("/tiers")
 async def get_tiers():
+    # Try to get custom tiers from database first
+    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
+    if custom_tiers and custom_tiers.get("tiers"):
+        return custom_tiers["tiers"]
     return SUBSCRIPTION_TIERS
+
+
+# Admin endpoint to get tier settings
+@api_router.get("/admin/tiers")
+async def get_admin_tiers(user: dict = Depends(get_current_user)):
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get custom tiers from database or return defaults
+    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
+    if custom_tiers and custom_tiers.get("tiers"):
+        return {"tiers": custom_tiers["tiers"], "is_custom": True}
+    return {"tiers": SUBSCRIPTION_TIERS, "is_custom": False}
+
+
+# Admin endpoint to update tier settings
+class TierUpdate(BaseModel):
+    tier_id: int
+    name: str
+    price: float
+    book_limit: Optional[int] = None
+
+class TiersUpdateRequest(BaseModel):
+    tiers: dict
+
+@api_router.put("/admin/tiers")
+async def update_tiers(request: TiersUpdateRequest, user: dict = Depends(get_current_user)):
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Validate tiers
+    for tier_id, tier_info in request.tiers.items():
+        if not isinstance(tier_info, dict):
+            raise HTTPException(status_code=400, detail=f"Invalid tier format for tier {tier_id}")
+        if "name" not in tier_info or "price" not in tier_info:
+            raise HTTPException(status_code=400, detail=f"Tier {tier_id} missing name or price")
+    
+    # Save to database
+    await db.settings.update_one(
+        {"setting_id": "subscription_tiers"},
+        {"$set": {
+            "setting_id": "subscription_tiers",
+            "tiers": request.tiers,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": user["user_id"]
+        }},
+        upsert=True
+    )
+    
+    logger.info(f"Tier settings updated by {user['user_id']}")
+    return {"message": "Tier settings updated successfully"}
+
+
+# Admin endpoint to reset tiers to defaults
+@api_router.post("/admin/tiers/reset")
+async def reset_tiers(user: dict = Depends(get_current_user)):
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    await db.settings.delete_one({"setting_id": "subscription_tiers"})
+    logger.info(f"Tier settings reset to defaults by {user['user_id']}")
+    return {"message": "Tier settings reset to defaults", "tiers": SUBSCRIPTION_TIERS}
 
 
 # ============== User Settings Endpoints ==============
