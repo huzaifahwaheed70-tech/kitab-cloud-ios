@@ -58,7 +58,11 @@ const LibraryPage = () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
 
-      const response = await axios.get(`${API}/books/all?${params}`);
+      const apiUrl = `${API}/books/all?${params}`;
+      console.log('[LibraryPage] Fetching books from:', apiUrl);
+      console.log('[LibraryPage] API base:', API);
+      
+      const response = await axios.get(apiUrl);
       console.log('[LibraryPage] Books fetched successfully:', response.data?.length || 0);
       setBooks(response.data || []);
     } catch (error) {
