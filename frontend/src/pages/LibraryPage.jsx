@@ -27,22 +27,49 @@ const LibraryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [tierSettings, setTierSettings] = useState(null);
 
   useEffect(() => {
     fetchBooks();
     fetchContinueReading();
+    fetchTierSettings();
   }, [searchQuery]);
+
+  const fetchTierSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/tiers`);
+      setTierSettings(response.data);
+    } catch (error) {
+      console.error('Error fetching tier settings:', error);
+      // Fallback to defaults if API fails
+      setTierSettings({
+        0: { name: 'Pay Per Book', book_limit: 0 },
+        1: { name: 'Basic', book_limit: 10 },
+        2: { name: 'Standard', book_limit: 20 },
+        3: { name: 'Advanced', book_limit: 30 },
+        4: { name: 'Premium', book_limit: 'Unlimited' }
+      });
+    }
+  };
 
   const fetchBooks = async () => {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
 
       const response = await axios.get(`${API}/books/all?${params}`);
-      setBooks(response.data);
+      console.log('[LibraryPage] Books fetched successfully:', response.data?.length || 0);
+      setBooks(response.data || []);
     } catch (error) {
-      console.error('Error fetching books:', error);
-      toast.error('Failed to load books');
+      console.error('[LibraryPage] Error fetching books:', error);
+      console.error('[LibraryPage] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      toast.error('Failed to load books. Please refresh the page.');
+      setBooks([]);
     } finally {
       setLoading(false);
     }
@@ -68,8 +95,30 @@ const LibraryPage = () => {
   };
 
   const userTier = user?.subscription_tier || 0;
-  const tierNames = ['Pay Per Book', 'Basic', 'Standard', 'Advanced', 'Premium'];
-  const tierLimits = {0: 0, 1: 10, 2: 20, 3: 30, 4: 'Unlimited'};
+  
+  // Get dynamic tier name and limit from API settings
+  const getTierName = (tier) => {
+    if (tierSettings && tierSettings[tier]) {
+      return tierSettings[tier].name;
+    }
+    // Fallback
+    const defaultNames = ['Pay Per Book', 'Basic', 'Standard', 'Advanced', 'Premium'];
+    return defaultNames[tier] || 'Unknown';
+  };
+
+  const getTierLimit = (tier) => {
+    if (tierSettings && tierSettings[tier]) {
+      const limit = tierSettings[tier].book_limit;
+      return limit === 0 || limit === 'Unlimited' ? 'Unlimited' : limit;
+    }
+    // Fallback
+    const defaultLimits = { 0: 0, 1: 10, 2: 20, 3: 30, 4: 'Unlimited' };
+    return defaultLimits[tier] || 0;
+  };
+
+  const tierDisplayText = userTier === 4 
+    ? `${getTierName(userTier)} • Unlimited` 
+    : `${getTierName(userTier)} • ${getTierLimit(userTier)} books/mo`;
 
   return (
     <div className="min-h-screen bg-dark">
@@ -111,23 +160,27 @@ const LibraryPage = () => {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] gap-2 min-h-[44px]" data-testid="user-menu-trigger">
-                    <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center">
+                  <Button 
+                    variant="ghost" 
+                    className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] gap-2 min-h-[44px] cursor-pointer relative z-10" 
+                    data-testid="user-menu-trigger"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center pointer-events-none">
                       {user?.picture ? (
                         <img src={user.picture} alt="" className="w-8 h-8 rounded-full" />
                       ) : (
                         <User className="w-4 h-4 text-gold" />
                       )}
                     </div>
-                    <span className="hidden lg:inline">{user?.name?.split(' ')[0]}</span>
+                    <span className="hidden lg:inline pointer-events-none">{user?.name?.split(' ')[0]}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] min-w-[200px]">
+                <DropdownMenuContent align="end" className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] min-w-[200px] z-[100]">
                   <div className="px-3 py-2 border-b border-[rgba(212,175,55,0.2)]">
                     <p className="font-medium">{user?.name}</p>
                     <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
                     <div className={`tier-badge tier-${userTier} mt-2`}>
-                      {tierNames[userTier]} • {tierLimits[userTier]} books/mo
+                      {tierDisplayText}
                     </div>
                   </div>
                   {userTier < 4 && (
@@ -196,7 +249,7 @@ const LibraryPage = () => {
                 <p className="font-medium text-[#FDFBF7]">{user?.name}</p>
                 <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
                 <div className={`tier-badge tier-${userTier} mt-2 inline-block`}>
-                  {tierNames[userTier]}
+                  {getTierName(userTier)}
                 </div>
               </div>
               <Link to="/bookshelf" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
