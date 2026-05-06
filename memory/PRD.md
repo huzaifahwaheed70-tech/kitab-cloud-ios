@@ -74,6 +74,10 @@ Create a high-end Digital Library App for Dar-Us-Salam Publications with members
 - ✅ Email confirmations for PDF purchases and subscription activations (May 2026)
 - ✅ Guest mode: Users can browse library without signing up, but cannot read books (May 2026)
 - ✅ iOS external browser: Stripe payment opens in Safari on iOS (Apple compliance) (May 2026)
+- ✅ Fixed profile dropdown unresponsive bug (z-index and pointer-events fix) (May 2026)
+- ✅ Fixed "Failed to load books" error with better error handling and logging (May 2026)
+- ✅ Dynamic tier display: tier names/limits now fetched from /api/tiers instead of hardcoded (May 2026)
+- ✅ Enhanced iPadOS detection for external Stripe links: covers iPadOS 13+ (MacIntel + touch), userAgentData, Macintosh + touch (May 2026)
 
 ## Subscription Tiers
 | Tier | Name | Price | Book Limit | Features |
