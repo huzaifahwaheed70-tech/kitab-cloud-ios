@@ -19,9 +19,16 @@ import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
-// Production URL fallback for iOS builds
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://kitab-cloud.emergent.host';
+// HARDCODED production URL for iOS Capacitor builds
+// Codemagic env vars may not be injected properly during React build
+const PRODUCTION_URL = 'https://kitab-cloud.emergent.host';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || PRODUCTION_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Debug: Log which URL is being used (visible in Safari Web Inspector)
+console.log('[App] BACKEND_URL:', BACKEND_URL);
+console.log('[App] API:', API);
+console.log('[App] process.env.REACT_APP_BACKEND_URL:', process.env.REACT_APP_BACKEND_URL);
 
 // Auth Context
 const AuthContext = createContext(null);
