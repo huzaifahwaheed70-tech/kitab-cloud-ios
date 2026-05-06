@@ -4,10 +4,10 @@
   "webDir": "build",
   "bundledWebRuntime": false,
   "server": {
-    "hostname": "duskitab.com",
+    "hostname": "kitab-cloud.emergent.host",
     "androidScheme": "https",
     "iosScheme": "https",
-    "allowNavigation": ["checkout.stripe.com", "*.stripe.com", "duskitab.com"]
+    "allowNavigation": ["checkout.stripe.com", "*.stripe.com", "kitab-cloud.emergent.host"]
   },
   "ios": {
     "contentInset": "automatic",
