@@ -984,7 +984,10 @@ async def apple_webhook(request: Request):
 
 @api_router.get("/admin/users")
 async def get_all_users(user: dict = Depends(get_admin_user)):
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(100)
+    users = await db.users.find(
+        {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(1000)
     return users
 
 @api_router.put("/admin/users/{user_id}/tier")
@@ -1005,13 +1008,18 @@ async def toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends(get_a
 
 @api_router.get("/admin/stats")
 async def get_admin_stats(user: dict = Depends(get_admin_user)):
-    total_users = await db.users.count_documents({})
+    non_guest_filter = {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]}
+    
+    total_users = await db.users.count_documents(non_guest_filter)
     total_books = await db.books.count_documents({})
     total_purchases = await db.pdf_purchases.count_documents({})
     total_subscriptions = await db.payment_transactions.count_documents({"payment_status": "paid"})
     tier_stats = {}
     for tier in range(0, 5):
-        count = await db.users.count_documents({"subscription_tier": tier})
+        count = await db.users.count_documents({
+            **non_guest_filter,
+            "subscription_tier": tier
+        })
         tier_stats[str(tier)] = count
     return {
         "total_users": total_users,

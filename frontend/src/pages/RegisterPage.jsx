@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { useAuth, API } from '../App';
+import axios from 'axios';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 import Logo from '../components/Logo';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,7 +16,12 @@ const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
-  const { register, guestLogin } = useAuth();
+  const [step, setStep] = useState('form'); // 'form' | 'verify'
+  const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const codeInputRefs = useRef([]);
+  const { guestLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleGuestMode = async () => {
@@ -33,18 +39,182 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    
     setLoading(true);
     
     try {
-      await register(email, password, name);
-      toast.success('Account created successfully!');
-      navigate('/pricing');
+      // Send verification code to email
+      await axios.post(`${API}/auth/send-verification`, {
+        email,
+        name,
+        password
+      });
+      
+      toast.success('Verification code sent to your email!');
+      setStep('verify');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      toast.error(error.response?.data?.detail || 'Failed to send verification code');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleCodeChange = (index, value) => {
+    // Only allow digits
+    if (value && !/^\d$/.test(value)) return;
+    
+    const newCode = [...verificationCode];
+    newCode[index] = value;
+    setVerificationCode(newCode);
+    
+    // Auto-focus next input
+    if (value && index < 5) {
+      codeInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index, e) => {
+    // Handle backspace - move to previous input
+    if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleCodePaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').slice(0, 6);
+    if (/^\d+$/.test(pastedData)) {
+      const newCode = pastedData.split('').concat(Array(6).fill('')).slice(0, 6);
+      setVerificationCode(newCode);
+      // Focus the last filled input or the next empty one
+      const lastIndex = Math.min(pastedData.length, 5);
+      codeInputRefs.current[lastIndex]?.focus();
+    }
+  };
+
+  const handleVerify = async () => {
+    const code = verificationCode.join('');
+    if (code.length !== 6) {
+      toast.error('Please enter the complete 6-digit code');
+      return;
+    }
+    
+    setVerifyLoading(true);
+    
+    try {
+      const response = await axios.post(`${API}/auth/verify-and-register`, {
+        email,
+        code,
+        name,
+        password
+      });
+      
+      // Store token and user data
+      const { token, user } = response.data;
+      localStorage.setItem('auth_token', token);
+      
+      toast.success('Account created successfully!');
+      
+      // Reload to refresh auth state
+      window.location.href = '/pricing';
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid verification code');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setResendLoading(true);
+    
+    try {
+      await axios.post(`${API}/auth/send-verification`, {
+        email,
+        name,
+        password
+      });
+      
+      toast.success('New verification code sent!');
+      setVerificationCode(['', '', '', '', '', '']);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to resend code');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // Verification code entry screen
+  if (step === 'verify') {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <button
+            onClick={() => setStep('form')}
+            className="flex items-center gap-2 text-[#B0C4BF] hover:text-gold mb-8"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-8 h-8 text-gold" />
+            </div>
+            <h1 className="font-serif text-3xl font-bold text-[#FDFBF7] mb-2">Check Your Email</h1>
+            <p className="text-[#B0C4BF]">
+              We sent a 6-digit code to<br />
+              <span className="text-gold font-medium">{email}</span>
+            </p>
+          </div>
+          
+          <div className="mb-6">
+            <Label className="text-[#FDFBF7] mb-3 block text-center">Enter verification code</Label>
+            <div className="flex justify-center gap-2" onPaste={handleCodePaste}>
+              {verificationCode.map((digit, index) => (
+                <Input
+                  key={index}
+                  ref={el => codeInputRefs.current[index] = el}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleCodeChange(index, e.target.value)}
+                  onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                  className="w-12 h-14 text-center text-2xl font-bold bg-surface border-[rgba(212,175,55,0.3)] text-[#FDFBF7] focus:ring-2 focus:ring-gold focus:border-gold"
+                  data-testid={`code-input-${index}`}
+                />
+              ))}
+            </div>
+          </div>
+          
+          <Button
+            onClick={handleVerify}
+            className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-6 mb-4"
+            disabled={verifyLoading || verificationCode.join('').length !== 6}
+            data-testid="verify-btn"
+          >
+            {verifyLoading ? 'Verifying...' : 'Verify & Create Account'}
+          </Button>
+          
+          <p className="text-center text-[#B0C4BF] text-sm">
+            Didn't receive the code?{' '}
+            <button
+              onClick={handleResendCode}
+              disabled={resendLoading}
+              className="text-gold hover:text-[#E9C85C] font-medium"
+            >
+              {resendLoading ? 'Sending...' : 'Resend'}
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dark flex">
@@ -143,7 +313,7 @@ const RegisterPage = () => {
               disabled={loading}
               data-testid="register-submit-btn"
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? 'Sending Code...' : 'Continue'}
             </Button>
 
             <div className="relative my-4">
