@@ -19,7 +19,8 @@ import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Production URL fallback for iOS builds
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://kitab-cloud.emergent.host';
 const API = `${BACKEND_URL}/api`;
 
 // Auth Context
