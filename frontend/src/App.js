@@ -50,7 +50,8 @@ const AuthProvider = ({ children }) => {
         });
         setUser(response.data);
         setToken(storedToken);
-      } else {
+      } else if (Capacitor.getPlatform() !== 'ios') {
+        // Only try cookie auth on web, not iOS
         const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
         setUser(response.data);
       }
@@ -248,17 +249,6 @@ function App() {
   useEffect(() => {
     if (Capacitor.getPlatform() === 'ios') {
       initStore();
-      
-      const handleLinkClick = (e) => {
-        const link = e.target.closest('a');
-        if (link && link.href.includes('kitab-cloud.emergent.host') && !link.target) {
-          e.preventDefault();
-          window.location.href = link.href;
-        }
-      };
-
-      document.addEventListener('click', handleLinkClick);
-      return () => document.removeEventListener('click', handleLinkClick);
     }
   }, []);
 
