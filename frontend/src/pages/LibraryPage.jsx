@@ -27,6 +27,7 @@ const LibraryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [tiers, setTiers] = useState({});
 
   useEffect(() => {
     fetchBooks();
