@@ -55,10 +55,29 @@ SUBSCRIPTION_TIERS = {
 
 # Apple StoreKit Product IDs mapping to tiers
 APPLE_PRODUCT_IDS = {
-    "com.darussalam.kitabcloud.basic.monthly": 1,
-    "com.darussalam.kitabcloud.standard.monthly": 2,
-    "com.darussalam.kitabcloud.advanced.monthly": 3,
-    "com.darussalam.kitabcloud.premium.monthly": 4,
+    # Subscription products
+    "kitabcloud.basic": 1,
+    "kitabcloud.standard": 2,
+    "kitabcloud.advanced": 3,
+    "kitabcloud.premium": 4,
+}
+
+# Apple Book Product IDs (Non-Consumable) - maps to darussalam_code
+APPLE_BOOK_PRODUCT_IDS = {
+    "H22": "200 Golden Hadith",
+    "133": "Al Lulu Wal Marjan 1/2",
+    "H03": "Al Lulu Wal Marjan 1/2nd Volume",
+    "Wastiyyahvolume1": "Al-'Aqidah Al-Wasitiyyah Volume 1/2",
+    "242": "Al-'Aqidah Al-Wasitiyyah Volume 2",
+    "174": "Book of Manners",
+    "H05": "Bulugh Al Maram",
+    "172": "Destination of the Seeker of Truth",
+    "H232nd": "Explanation of Riyadus Saliheen 2/6th Volume",
+    "H235th": "Explanation of Riyadus Saliheen 5/6th Volume",
+    "100": "Medicine of the Prophet (S) * New Color Edition",
+    "1332nd": "Minhaj Al Muslim 2/2 Volume",
+    "H04": "Riyadh As Saliheen 1/2 Volume",
+    "RP10": "Tafseer As Sa'di 2nd Volume",
 }
 
 # Apple StoreKit configuration
@@ -1679,9 +1698,10 @@ async def get_apple_subscription_status_endpoint(user: dict = Depends(get_curren
 
 class ApplePDFValidation(BaseModel):
     transaction_id: str
-    original_transaction_id: str
+    original_transaction_id: Optional[str] = None
     product_id: str
     book_id: str
+    receipt: Optional[str] = None
 
 
 @api_router.post("/payments/apple/validate-pdf")

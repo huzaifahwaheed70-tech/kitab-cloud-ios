@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
-import { openPaymentUrl } from '../utils/browser';
+import { openPaymentUrl, isIOS, isNativeApp } from '../utils/browser';
+import { storeKitService, SUBSCRIPTION_PRODUCTS } from '../services/storekit';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -15,6 +16,8 @@ const PricingPage = () => {
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
+  const [isIOSApp, setIsIOSApp] = useState(false);
+  const [restoringPurchases, setRestoringPurchases] = useState(false);
 
   // Default features for each tier
   const tierFeatures = {
@@ -27,7 +30,23 @@ const PricingPage = () => {
 
   useEffect(() => {
     fetchTiers();
+    initializeStoreKit();
   }, []);
+
+  const initializeStoreKit = async () => {
+    // Check if we're on iOS native app
+    const iosNative = isIOS() && isNativeApp();
+    setIsIOSApp(iosNative);
+    
+    if (iosNative) {
+      try {
+        await storeKitService.initialize();
+        console.log('[PricingPage] StoreKit initialized');
+      } catch (error) {
+        console.error('[PricingPage] StoreKit init failed:', error);
+      }
+    }
+  };
 
   const fetchTiers = async () => {
     try {
@@ -99,24 +118,91 @@ const PricingPage = () => {
     setLoading(tier);
     
     try {
-      // Use Stripe for all platforms
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(`${API}/payments/create-checkout`, {
-        tier,
-        origin_url: window.location.origin
-      }, { headers, withCredentials: true });
-
-      // Open payment URL
-      const result = await openPaymentUrl(response.data.url);
-      
-      // On iOS, show modal with tappable link
-      if (result.showModal) {
-        setPaymentModal({ show: true, url: result.url });
-        setLoading(null);
+      // Use StoreKit for iOS native app, Stripe for web/Android
+      if (isIOSApp) {
+        await handleAppleSubscription(tier);
+      } else {
+        await handleStripeSubscription(tier);
       }
     } catch (error) {
       toast.error(error.message || 'Failed to process payment');
       setLoading(null);
+    }
+  };
+
+  const handleAppleSubscription = async (tier) => {
+    try {
+      // Purchase via StoreKit
+      const result = await storeKitService.purchaseSubscription(tier);
+      
+      if (result.success) {
+        // Validate with backend
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        await axios.post(`${API}/payments/apple/validate`, {
+          product_id: result.productId,
+          transaction_id: result.transactionId,
+          receipt: result.receipt
+        }, { headers, withCredentials: true });
+        
+        toast.success('Subscription activated!');
+        navigate('/library');
+      }
+    } catch (error) {
+      if (error.message === 'Purchase cancelled') {
+        toast.info('Purchase cancelled');
+      } else {
+        throw error;
+      }
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleStripeSubscription = async (tier) => {
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await axios.post(`${API}/payments/create-checkout`, {
+      tier,
+      origin_url: window.location.origin
+    }, { headers, withCredentials: true });
+
+    // Open payment URL
+    const result = await openPaymentUrl(response.data.url);
+    
+    // On iOS web (not native), show modal with tappable link
+    if (result.showModal) {
+      setPaymentModal({ show: true, url: result.url });
+      setLoading(null);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (!isIOSApp) return;
+    
+    setRestoringPurchases(true);
+    try {
+      await storeKitService.restorePurchases();
+      
+      // Check for active subscriptions and sync with backend
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const activeSubscriptions = await storeKitService.getActiveSubscriptions();
+      
+      if (activeSubscriptions.length > 0) {
+        // Restore the first active subscription
+        for (const sub of activeSubscriptions) {
+          await axios.post(`${API}/payments/apple/validate`, {
+            product_id: sub.productId,
+            transaction_id: sub.transactionId,
+          }, { headers, withCredentials: true });
+        }
+        toast.success('Purchases restored!');
+        navigate('/library');
+      } else {
+        toast.info('No purchases to restore');
+      }
+    } catch (error) {
+      toast.error('Failed to restore purchases');
+    } finally {
+      setRestoringPurchases(false);
     }
   };
 
@@ -305,6 +391,27 @@ const PricingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* iOS Restore Purchases */}
+      {isIOSApp && user && (
+        <section className="pb-12">
+          <div className="max-w-3xl mx-auto px-6 text-center">
+            <Button
+              onClick={handleRestorePurchases}
+              disabled={restoringPurchases}
+              variant="outline"
+              className="border-gold/50 text-gold hover:bg-gold/10"
+              data-testid="restore-purchases-btn"
+            >
+              <RotateCcw className={`w-4 h-4 mr-2 ${restoringPurchases ? 'animate-spin' : ''}`} />
+              {restoringPurchases ? 'Restoring...' : 'Restore Purchases'}
+            </Button>
+            <p className="text-[#B0C4BF] text-sm mt-2">
+              Previously purchased? Tap to restore your subscriptions.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-surface border-t border-[rgba(212,175,55,0.2)] py-12">

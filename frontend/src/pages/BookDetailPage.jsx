@@ -10,7 +10,8 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
-import { openPaymentUrl } from '../utils/browser';
+import { openPaymentUrl, isIOS, isNativeApp } from '../utils/browser';
+import { storeKitService, BOOK_PRODUCT_IDS } from '../services/storekit';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -283,24 +284,66 @@ const BookDetailPage = () => {
     setPurchaseLoading(true);
     
     try {
-      // Use Stripe for all platforms
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
-        headers, 
-        withCredentials: true 
-      });
+      const isIOSNative = isIOS() && isNativeApp();
       
-      // Open payment URL
-      const result = await openPaymentUrl(response.data.url);
-      
-      // On iOS, show modal with tappable link
-      if (result.showModal) {
-        setPaymentModal({ show: true, url: result.url });
+      // Check if this book has an Apple product ID for iOS native
+      if (isIOSNative && book?.darussalam_code && BOOK_PRODUCT_IDS[book.darussalam_code]) {
+        await handleAppleBookPurchase();
+      } else {
+        await handleStripeBookPurchase();
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
+      toast.error(error.response?.data?.detail || error.message || 'Failed to initiate purchase');
     } finally {
       setPurchaseLoading(false);
+    }
+  };
+
+  const handleAppleBookPurchase = async () => {
+    try {
+      // Initialize StoreKit if needed
+      await storeKitService.initialize();
+      
+      // Purchase via StoreKit
+      const result = await storeKitService.purchaseBook(book.darussalam_code);
+      
+      if (result.success) {
+        // Validate with backend
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        await axios.post(`${API}/payments/apple/validate-pdf`, {
+          product_id: result.productId,
+          transaction_id: result.transactionId,
+          book_id: bookId,
+          receipt: result.receipt
+        }, { headers, withCredentials: true });
+        
+        toast.success('Book purchased! You now own this PDF.');
+        setHasPurchased(true);
+        // Refresh book data
+        fetchBook();
+      }
+    } catch (error) {
+      if (error.message === 'Purchase cancelled') {
+        toast.info('Purchase cancelled');
+      } else {
+        throw error;
+      }
+    }
+  };
+
+  const handleStripeBookPurchase = async () => {
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
+      headers, 
+      withCredentials: true 
+    });
+    
+    // Open payment URL
+    const result = await openPaymentUrl(response.data.url);
+    
+    // On iOS web (not native), show modal with tappable link
+    if (result.showModal) {
+      setPaymentModal({ show: true, url: result.url });
     }
   };
 
