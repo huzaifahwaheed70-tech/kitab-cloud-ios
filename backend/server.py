@@ -13,38 +13,47 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 import requests
-from io import BytesIO
-import resend
 import secrets
 import httpx
 import base64
 import json
-
-# Stripe Integration
+from io import BytesIO
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Resend email setup
-resend.api_key = os.environ.get('RESEND_API_KEY')
-
-# Constants
 JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'default_secret')
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
+JWT_EXPIRATION_HOURS = 24 * 7
 
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 APP_NAME = "darussalam-kitab"
+
+APPLE_VERIFY_URL = "https://buy.itunes.apple.com/verifyReceipt"
+APPLE_VERIFY_SANDBOX = "https://sandbox.itunes.apple.com/verifyReceipt"
+APPLE_SHARED_SECRET = os.getenv("APPLE_SHARED_SECRET")
+
+APPLE_PRODUCT_IDS = {
+    "kitabcloud.basic": 1,
+    "kitabcloud.standard": 2,
+    "kitabcloud.advanced": 3,
+    "kitabcloud.premium": 4,
+}
+
+APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'host.emergent.kitabcloud')
+APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID', '')
+APPLE_ISSUER_ID = os.environ.get('APPLE_ISSUER_ID', '')
+APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
+APPLE_ENVIRONMENT = os.environ.get('APPLE_ENVIRONMENT', 'sandbox')
+
 storage_key = None
 
-# Subscription Tiers
 SUBSCRIPTION_TIERS = {
     0: {"name": "Pay Per Book", "price": 0, "book_limit": 0},
     1: {"name": "Basic", "price": 20.00, "book_limit": 10},
@@ -53,380 +62,15 @@ SUBSCRIPTION_TIERS = {
     4: {"name": "Premium", "price": 80.00, "book_limit": None},
 }
 
-# Apple StoreKit Product IDs mapping to tiers
-APPLE_PRODUCT_IDS = {
-    # Subscription products
-    "kitabcloud.basic": 1,
-    "kitabcloud.standard": 2,
-    "kitabcloud.advanced": 3,
-    "kitabcloud.premium": 4,
-}
-
-# Apple Book Product IDs (Non-Consumable) - maps to darussalam_code
-APPLE_BOOK_PRODUCT_IDS = {
-    "H22": "200 Golden Hadith",
-    "133": "Al Lulu Wal Marjan 1/2",
-    "H03": "Al Lulu Wal Marjan 1/2nd Volume",
-    "Wastiyyahvolume1": "Al-'Aqidah Al-Wasitiyyah Volume 1/2",
-    "242": "Al-'Aqidah Al-Wasitiyyah Volume 2",
-    "174": "Book of Manners",
-    "H05": "Bulugh Al Maram",
-    "172": "Destination of the Seeker of Truth",
-    "H232nd": "Explanation of Riyadus Saliheen 2/6th Volume",
-    "H235th": "Explanation of Riyadus Saliheen 5/6th Volume",
-    "100": "Medicine of the Prophet (S) * New Color Edition",
-    "1332nd": "Minhaj Al Muslim 2/2 Volume",
-    "H04": "Riyadh As Saliheen 1/2 Volume",
-    "RP10": "Tafseer As Sa'di 2nd Volume",
-}
-
-# Apple StoreKit configuration
-APPLE_BUNDLE_ID = os.environ.get('APPLE_BUNDLE_ID', 'com.darussalam.kitabcloud')
-APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID', '')
-APPLE_ISSUER_ID = os.environ.get('APPLE_ISSUER_ID', '')
-APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
-APPLE_ENVIRONMENT = os.environ.get('APPLE_ENVIRONMENT', 'sandbox')  # 'sandbox' or 'production'
-
-# Email Helper Functions
-RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <kitabcloud@dar-us-salam.com>')
-
-async def send_welcome_email(email: str, name: str = None):
-    """Send welcome email to new users"""
-    try:
-        user_name = name if name else email.split('@')[0]
-        params = {
-            "from": RESEND_FROM_EMAIL,
-            "to": [email],
-            "subject": "Welcome to Kitab Cloud!",
-            "html": f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                    <p style="color: #B0C4BF; margin: 5px 0;">Your Digital Islamic Library</p>
-                </div>
-                <div style="padding: 30px 0;">
-                    <h2 style="color: #FDFBF7;">Assalamu Alaikum {user_name}!</h2>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Welcome to Kitab Cloud! We're excited to have you join our community of readers.
-                    </p>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        With your account, you can:
-                    </p>
-                    <ul style="color: #B0C4BF; line-height: 1.8;">
-                        <li>Browse our collection of Islamic books</li>
-                        <li>Purchase individual PDFs</li>
-                        <li>Subscribe for monthly reading access</li>
-                        <li>Save your reading progress</li>
-                        <li>Create your favorites list</li>
-                    </ul>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="https://kitab-cloud.preview.emergentagent.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
-                            Start Reading
-                        </a>
-                    </div>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        JazakAllah Khair for choosing Kitab Cloud!
-                    </p>
-                </div>
-                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
-                    <p>Powered by Dar-Us-Salam Publications</p>
-                    <p><a href="https://dar-us-salam.com" style="color: #D4AF37;">dar-us-salam.com</a></p>
-                </div>
-            </div>
-            """
-        }
-        resend.Emails.send(params)
-        logger.info(f"Welcome email sent to {email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send welcome email: {e}")
-        return False
-
-
-async def send_verification_email(email: str, code: str):
-    """Send email verification code"""
-    try:
-        params = {
-            "from": RESEND_FROM_EMAIL,
-            "to": [email],
-            "subject": "Verify Your Email - Kitab Cloud",
-            "html": f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                </div>
-                <div style="padding: 30px 0; text-align: center;">
-                    <h2 style="color: #FDFBF7;">Verify Your Email</h2>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Enter this code to verify your email address:
-                    </p>
-                    <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px;">
-                        <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #D4AF37;">{code}</span>
-                    </div>
-                    <p style="color: #B0C4BF; font-size: 14px;">
-                        This code expires in 15 minutes.
-                    </p>
-                </div>
-                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
-                    <p>If you didn't create an account, you can ignore this email.</p>
-                </div>
-            </div>
-            """
-        }
-        resend.Emails.send(params)
-        logger.info(f"Verification email sent to {email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send verification email: {e}")
-        return False
-
-
-async def send_password_reset_email(email: str, reset_token: str):
-    """Send password reset link"""
-    try:
-        reset_link = f"https://kitab-cloud.preview.emergentagent.com/reset-password?token={reset_token}"
-        params = {
-            "from": RESEND_FROM_EMAIL,
-            "to": [email],
-            "subject": "Reset Your Password - Kitab Cloud",
-            "html": f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                </div>
-                <div style="padding: 30px 0; text-align: center;">
-                    <h2 style="color: #FDFBF7;">Reset Your Password</h2>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Click the button below to reset your password:
-                    </p>
-                    <div style="margin: 30px 0;">
-                        <a href="{reset_link}" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
-                            Reset Password
-                        </a>
-                    </div>
-                    <p style="color: #B0C4BF; font-size: 14px;">
-                        This link expires in 1 hour.
-                    </p>
-                    <p style="color: #B0C4BF; font-size: 12px; margin-top: 20px;">
-                        If the button doesn't work, copy this link:<br/>
-                        <a href="{reset_link}" style="color: #D4AF37; word-break: break-all;">{reset_link}</a>
-                    </p>
-                </div>
-                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
-                    <p>If you didn't request this, you can ignore this email.</p>
-                </div>
-            </div>
-            """
-        }
-        resend.Emails.send(params)
-        logger.info(f"Password reset email sent to {email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send password reset email: {e}")
-        return False
-
-
-async def send_pdf_purchase_email(email: str, book_title: str, pdf_url: str, user_name: str = None):
-    """Send PDF purchase confirmation with download link"""
-    try:
-        name = user_name if user_name else email.split('@')[0]
-        # Create a direct link to the book (users can read after login)
-        params = {
-            "from": RESEND_FROM_EMAIL,
-            "to": [email],
-            "subject": f"Your PDF Purchase: {book_title} - Kitab Cloud",
-            "html": f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                </div>
-                <div style="padding: 30px 0;">
-                    <h2 style="color: #FDFBF7; margin-bottom: 10px;">Thank You for Your Purchase!</h2>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Dear {name},
-                    </p>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Your purchase of <strong style="color: #D4AF37;">{book_title}</strong> is complete. 
-                        You now have permanent access to this book in your library.
-                    </p>
-                    <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center;">
-                        <p style="color: #FDFBF7; margin-bottom: 15px;">Access your book anytime:</p>
-                        <a href="https://kitab-cloud.preview.emergentagent.com/library" 
-                           style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-                            Go to My Library
-                        </a>
-                    </div>
-                    <p style="color: #B0C4BF; line-height: 1.6; font-size: 14px;">
-                        Your purchased PDFs are always available in your library under "Purchased Books".
-                    </p>
-                </div>
-                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
-                    <p>Questions? Contact us at sales@dar-us-salam.com</p>
-                    <p>© Dar-Us-Salam Publications</p>
-                </div>
-            </div>
-            """
-        }
-        resend.Emails.send(params)
-        logger.info(f"PDF purchase email sent to {email} for book: {book_title}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send PDF purchase email: {e}")
-        return False
-
-
-async def send_subscription_confirmation_email(email: str, tier: int, user_name: str = None):
-    """Send subscription confirmation email"""
-    try:
-        name = user_name if user_name else email.split('@')[0]
-        tier_names = {1: "Basic", 2: "Standard", 3: "Advanced", 4: "Premium"}
-        tier_limits = {1: "10", 2: "20", 3: "30", 4: "Unlimited"}
-        tier_name = tier_names.get(tier, f"Tier {tier}")
-        book_limit = tier_limits.get(tier, "N/A")
-        
-        params = {
-            "from": RESEND_FROM_EMAIL,
-            "to": [email],
-            "subject": f"Welcome to {tier_name} - Kitab Cloud",
-            "html": f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                </div>
-                <div style="padding: 30px 0;">
-                    <h2 style="color: #FDFBF7; margin-bottom: 10px;">Your {tier_name} Subscription is Active!</h2>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Dear {name},
-                    </p>
-                    <p style="color: #B0C4BF; line-height: 1.6;">
-                        Thank you for subscribing to Kitab Cloud. Your <strong style="color: #D4AF37;">{tier_name}</strong> plan is now active.
-                    </p>
-                    <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px;">
-                        <h3 style="color: #D4AF37; margin-top: 0;">Your Plan Details:</h3>
-                        <ul style="color: #B0C4BF; line-height: 1.8; padding-left: 20px;">
-                            <li><strong>Plan:</strong> {tier_name}</li>
-                            <li><strong>Monthly Book Limit:</strong> {book_limit} books</li>
-                            {"<li><strong>Volume Books:</strong> Included</li>" if tier >= 3 else ""}
-                            {"<li><strong>In-Book Search:</strong> Enabled</li>" if tier >= 3 else ""}
-                            {"<li><strong>Advanced Books:</strong> Full Access</li>" if tier >= 4 else ""}
-                        </ul>
-                    </div>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="https://kitab-cloud.preview.emergentagent.com/library" 
-                           style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-                            Start Reading Now
-                        </a>
-                    </div>
-                </div>
-                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
-                    <p>Questions? Contact us at sales@dar-us-salam.com</p>
-                    <p>© Dar-Us-Salam Publications</p>
-                </div>
-            </div>
-            """
-        }
-        resend.Emails.send(params)
-        logger.info(f"Subscription confirmation email sent to {email} for tier {tier}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send subscription confirmation email: {e}")
-        return False
-
-
-# Apple StoreKit Helper Functions
-def generate_apple_jwt():
-    """Generate JWT token for Apple App Store Server API"""
-    if not APPLE_KEY_ID or not APPLE_ISSUER_ID or not APPLE_PRIVATE_KEY:
-        raise ValueError("Apple StoreKit credentials not configured")
-    
-    now = datetime.now(timezone.utc)
-    expiration = now + timedelta(minutes=5)
-    
-    payload = {
-        "iss": APPLE_ISSUER_ID,
-        "iat": int(now.timestamp()),
-        "exp": int(expiration.timestamp()),
-        "aud": "appstoreconnect-v1",
-        "bid": APPLE_BUNDLE_ID
-    }
-    
-    token = jwt.encode(
-        payload,
-        APPLE_PRIVATE_KEY,
-        algorithm="ES256",
-        headers={"kid": APPLE_KEY_ID}
-    )
-    
-    return token
-
-
-async def validate_apple_transaction(transaction_id: str) -> dict:
-    """Validate a transaction with Apple's App Store Server API"""
-    if APPLE_ENVIRONMENT == "sandbox":
-        base_url = "https://api.storekit-sandbox.itunes.apple.com"
-    else:
-        base_url = "https://api.storekit.itunes.apple.com"
-    
-    token = generate_apple_jwt()
-    
-    url = f"{base_url}/inApps/v1/transactions/{transaction_id}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers, timeout=30)
-    
-    if response.status_code == 200:
-        return response.json()
-    elif response.status_code == 404:
-        raise ValueError("Transaction not found in App Store")
-    elif response.status_code == 401:
-        raise ValueError("Apple JWT authentication failed")
-    else:
-        raise Exception(f"Apple API error: {response.status_code}")
-
-
-async def get_apple_subscription_status(original_transaction_id: str) -> dict:
-    """Get subscription status from Apple"""
-    if APPLE_ENVIRONMENT == "sandbox":
-        base_url = "https://api.storekit-sandbox.itunes.apple.com"
-    else:
-        base_url = "https://api.storekit.itunes.apple.com"
-    
-    token = generate_apple_jwt()
-    
-    url = f"{base_url}/inApps/v1/subscriptions/{original_transaction_id}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers, timeout=30)
-    
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"Failed to get subscription status: {response.status_code}")
-
-
-# Create the main app
 app = FastAPI()
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-
-# Storage Functions
 def init_storage():
     global storage_key
     if storage_key:
@@ -460,8 +104,6 @@ def get_object(path: str) -> tuple:
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
-
-# Pydantic Models
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -485,12 +127,12 @@ class BookCreate(BaseModel):
     title: str
     darussalam_code: str
     tier_level: int = Field(ge=1, le=4)
-    is_volume: bool = False  # Volume books only for Tier 3+
-    is_advanced: bool = False  # Highly advanced books only for Tier 4
+    is_volume: bool = False
+    is_advanced: bool = False
     description: Optional[str] = None
-    original_price: Optional[float] = None  # Original book price
-    pdf_price: Optional[float] = None  # Price to buy PDF
-    purchase_link: Optional[str] = None  # Link to buy physical book from Dar-Us-Salam
+    original_price: Optional[float] = None
+    pdf_price: Optional[float] = None
+    purchase_link: Optional[str] = None
 
 class BookResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -512,8 +154,9 @@ class PaymentCreate(BaseModel):
     tier: int = Field(ge=1, le=4)
     origin_url: str
 
+class ApplePaymentVerify(BaseModel):
+    receipt: dict
 
-# Apple StoreKit Models
 class AppleTransactionValidation(BaseModel):
     transaction_id: str
     original_transaction_id: str
@@ -526,8 +169,27 @@ class AppleSubscriptionResponse(BaseModel):
     expiration_date: Optional[str] = None
     message: str
 
+class ApplePDFValidation(BaseModel):
+    transaction_id: str
+    original_transaction_id: str
+    product_id: str
+    book_id: str
 
-# Auth Helpers
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -549,9 +211,22 @@ def decode_jwt_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-
 async def get_current_user(request: Request, authorization: str = Header(None)):
-    # Check Authorization header (JWT)
+    session_token = request.cookies.get("session_token")
+
+    if session_token:
+        session = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
+        if session:
+            expires_at = session.get("expires_at")
+            if isinstance(expires_at, str):
+                expires_at = datetime.fromisoformat(expires_at)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at > datetime.now(timezone.utc):
+                user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+                if user:
+                    return user
+
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         try:
@@ -561,127 +236,24 @@ async def get_current_user(request: Request, authorization: str = Header(None)):
                 return user
         except Exception:
             pass
-    
-    raise HTTPException(status_code=401, detail="Not authenticated")
 
+    raise HTTPException(status_code=401, detail="Not authenticated")
 
 async def get_admin_user(user: dict = Depends(get_current_user)):
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
-
-# Root endpoint
 @api_router.get("/")
 async def root():
     return {"message": "Darussalam Kitab Cloud API"}
 
-
-# Auth Routes
-
-# Models for email verification
-class SendVerificationRequest(BaseModel):
-    email: EmailStr
-    name: str
-    password: str
-
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    code: str
-    name: str
-    password: str
-
-
-@api_router.post("/auth/send-verification")
-async def send_verification_code(request: SendVerificationRequest):
-    """Send verification code to email before creating account"""
-    # Check if email already registered
-    existing = await db.users.find_one({"email": request.email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Generate 6-digit verification code
-    code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
-    
-    # Store verification code
-    await db.email_verifications.delete_many({"email": request.email})  # Remove old codes
-    await db.email_verifications.insert_one({
-        "email": request.email,
-        "code": code,
-        "expires_at": expires_at.isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    # Send verification email
-    email_sent = await send_verification_email(request.email, code)
-    if not email_sent:
-        raise HTTPException(status_code=500, detail="Failed to send verification email")
-    
-    return {"message": "Verification code sent to your email"}
-
-
-@api_router.post("/auth/verify-and-register")
-async def verify_and_register(request: VerifyEmailRequest):
-    """Verify email code and create account"""
-    # Check if email already registered
-    existing = await db.users.find_one({"email": request.email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Find verification record
-    verification = await db.email_verifications.find_one({"email": request.email})
-    if not verification:
-        raise HTTPException(status_code=400, detail="No verification code found. Please request a new one.")
-    
-    # Check if code matches
-    if verification["code"] != request.code:
-        raise HTTPException(status_code=400, detail="Invalid verification code")
-    
-    # Check if code expired
-    expires_at = datetime.fromisoformat(verification["expires_at"])
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    
-    if expires_at < datetime.now(timezone.utc):
-        await db.email_verifications.delete_one({"email": request.email})
-        raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
-    
-    # Create user account
-    user_id = f"user_{uuid.uuid4().hex[:12]}"
-    user_doc = {
-        "user_id": user_id,
-        "email": request.email,
-        "name": request.name,
-        "password_hash": hash_password(request.password),
-        "picture": None,
-        "subscription_tier": 0,
-        "is_admin": False,
-        "email_verified": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.users.insert_one(user_doc)
-    
-    # Delete verification code
-    await db.email_verifications.delete_one({"email": request.email})
-    
-    # Send welcome email
-    try:
-        await send_welcome_email(request.email, request.name)
-    except Exception as e:
-        logger.warning(f"Failed to send welcome email to {request.email}: {e}")
-    
-    token = create_jwt_token(user_id)
-    return {"token": token, "user": UserResponse(**user_doc).model_dump()}
-
-
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
-    """Direct registration (backwards compatible, but now requires verification)"""
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     user_doc = {
         "user_id": user_id,
@@ -694,92 +266,32 @@ async def register(user_data: UserCreate):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(user_doc)
-    
-    # Send welcome email (non-blocking)
-    try:
-        await send_welcome_email(user_data.email, user_data.name)
-    except Exception as e:
-        logger.warning(f"Failed to send welcome email to {user_data.email}: {e}")
-    
+
     token = create_jwt_token(user_id)
     return {"token": token, "user": UserResponse(**user_doc).model_dump()}
-
 
 @api_router.post("/auth/login")
 async def login(user_data: UserLogin):
     user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
     if not user or not user.get("password_hash"):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     if not verify_password(user_data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     token = create_jwt_token(user["user_id"])
     return {"token": token, "user": UserResponse(**user).model_dump()}
 
-
-@api_router.post("/auth/guest")
-async def guest_login():
-    """Create a guest account for browsing without signing up"""
-    guest_id = f"guest_{uuid.uuid4().hex[:12]}"
-    guest_doc = {
-        "user_id": guest_id,
-        "email": f"{guest_id}@guest.kitabcloud.com",
-        "name": "Guest User",
-        "password_hash": None,
-        "picture": None,
-        "subscription_tier": 0,
-        "is_admin": False,
-        "is_guest": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.users.insert_one(guest_doc)
-    
-    token = create_jwt_token(guest_id)
-    
-    # Add is_guest to response
-    response_data = {
-        "user_id": guest_id,
-        "email": guest_doc["email"],
-        "name": "Guest User",
-        "picture": None,
-        "subscription_tier": 0,
-        "is_admin": False,
-        "is_guest": True,
-        "created_at": guest_doc["created_at"]
-    }
-    
-    return {"token": token, "user": response_data}
-
-
-# Password Reset Models
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
-
-
 @api_router.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
-    """Request password reset link"""
     user = await db.users.find_one({"email": request.email}, {"_id": 0})
-    
-    # Always return success to prevent email enumeration
-    if not user:
+    if not user or not user.get("password_hash"):
         return {"message": "If an account with that email exists, a reset link has been sent."}
-    
-    # Check if user has a password (not just OAuth user)
-    if not user.get("password_hash"):
-        return {"message": "If an account with that email exists, a reset link has been sent."}
-    
-    # Generate reset token
+
     reset_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    
-    # Store reset token
-    await db.password_resets.delete_many({"user_id": user["user_id"]})  # Remove old tokens
+
+    await db.password_resets.delete_many({"user_id": user["user_id"]})
     await db.password_resets.insert_one({
         "user_id": user["user_id"],
         "email": request.email,
@@ -787,61 +299,97 @@ async def forgot_password(request: ForgotPasswordRequest):
         "expires_at": expires_at.isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
-    # Send email
-    try:
-        await send_password_reset_email(request.email, reset_token)
-    except Exception as e:
-        logger.error(f"Failed to send password reset email: {e}")
-    
-    return {"message": "If an account with that email exists, a reset link has been sent."}
 
+    return {"message": "If an account with that email exists, a reset link has been sent."}
 
 @api_router.post("/auth/reset-password")
 async def reset_password(request: ResetPasswordRequest):
-    """Reset password with token"""
-    # Find reset token
     reset_record = await db.password_resets.find_one({"token": request.token})
-    
     if not reset_record:
         raise HTTPException(status_code=400, detail="Invalid or expired reset link")
-    
-    # Check expiration
+
     expires_at = datetime.fromisoformat(reset_record["expires_at"])
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    
     if expires_at < datetime.now(timezone.utc):
         await db.password_resets.delete_one({"token": request.token})
         raise HTTPException(status_code=400, detail="Reset link has expired")
-    
-    # Update password
+
     new_hash = hash_password(request.new_password)
     await db.users.update_one(
         {"user_id": reset_record["user_id"]},
         {"$set": {"password_hash": new_hash}}
     )
-    
-    # Delete used token
     await db.password_resets.delete_one({"token": request.token})
-    
     return {"message": "Password has been reset successfully"}
 
+@api_router.get("/auth/session")
+async def get_session(request: Request, session_id: str = Query(...)):
+    try:
+        resp = requests.get(
+            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+            headers={"X-Session-ID": session_id},
+            timeout=30
+        )
+        resp.raise_for_status()
+        auth_data = resp.json()
+    except Exception as e:
+        logger.error(f"Failed to fetch session data: {e}")
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    email = auth_data.get("email")
+    name = auth_data.get("name")
+    picture = auth_data.get("picture")
+    session_token = auth_data.get("session_token")
+
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        user = {
+            "user_id": user_id,
+            "email": email,
+            "name": name,
+            "picture": picture,
+            "subscription_tier": 0,
+            "is_admin": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(user)
+    else:
+        user_id = user["user_id"]
+        if picture and user.get("picture") != picture:
+            await db.users.update_one({"user_id": user_id}, {"$set": {"picture": picture}})
+            user["picture"] = picture
+
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await db.user_sessions.insert_one({
+        "user_id": user_id,
+        "session_token": session_token,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    jwt_token = create_jwt_token(user_id)
+
+    return {
+        "user": UserResponse(**user).model_dump(),
+        "token": jwt_token,
+        "set_cookie": True
+    }
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    # Include is_guest flag in response
     response = UserResponse(**user).model_dump()
     response["is_guest"] = user.get("is_guest", False)
     return response
 
-
 @api_router.post("/auth/logout")
-async def logout():
+async def logout(request: Request, response: Response):
+    session_token = request.cookies.get("session_token")
+    if session_token:
+        await db.user_sessions.delete_one({"session_token": session_token})
+    response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out"}
 
-
-# Books Routes
 @api_router.get("/books", response_model=List[BookResponse])
 async def get_books(
     user: dict = Depends(get_current_user),
@@ -849,9 +397,8 @@ async def get_books(
     tier: Optional[int] = None
 ):
     user_tier = user.get("subscription_tier", 0)
-    
     query = {"tier_level": {"$lte": user_tier}} if user_tier > 0 else {"tier_level": {"$lte": 0}}
-    
+
     if search:
         query["$or"] = [
             {"darussalam_code": {"$regex": search, "$options": "i"}},
@@ -859,39 +406,32 @@ async def get_books(
         ]
     if tier:
         query["tier_level"] = {"$lte": min(tier, user_tier)} if user_tier > 0 else {"$lte": 0}
-    
+
     books = await db.books.find(query, {"_id": 0}).to_list(100)
     return books
 
-
 @api_router.get("/books/all")
-async def get_all_books_preview(
-    search: Optional[str] = None
-):
-    """Get all books for preview (without auth) - shows locked state"""
+async def get_all_books_preview(search: Optional[str] = None):
     query = {}
     if search:
         query["$or"] = [
             {"darussalam_code": {"$regex": search, "$options": "i"}},
             {"title": {"$regex": search, "$options": "i"}}
         ]
-    
     books = await db.books.find(query, {"_id": 0, "pdf_url": 0}).to_list(100)
     return books
-
 
 @api_router.get("/books/{book_id}")
 async def get_book(book_id: str, user: dict = Depends(get_current_user)):
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    # Allow all authenticated users (including guests) to view book details
-    # Reading restrictions are enforced at the PDF access level (/api/files/)
-    # This allows guests to browse and see what books are available
-    
-    return book
 
+    user_tier = user.get("subscription_tier", 0)
+    if book["tier_level"] > user_tier:
+        raise HTTPException(status_code=403, detail="Upgrade required to access this book")
+
+    return book
 
 @api_router.post("/books", response_model=BookResponse)
 async def create_book(book: BookCreate, user: dict = Depends(get_admin_user)):
@@ -906,7 +446,6 @@ async def create_book(book: BookCreate, user: dict = Depends(get_admin_user)):
     await db.books.insert_one(book_doc)
     return BookResponse(**book_doc)
 
-
 @api_router.put("/books/{book_id}")
 async def update_book(book_id: str, book: BookCreate, user: dict = Depends(get_admin_user)):
     result = await db.books.update_one(
@@ -915,10 +454,9 @@ async def update_book(book_id: str, book: BookCreate, user: dict = Depends(get_a
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Book not found")
-    
+
     updated = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     return updated
-
 
 @api_router.delete("/books/{book_id}")
 async def delete_book(book_id: str, user: dict = Depends(get_admin_user)):
@@ -927,33 +465,25 @@ async def delete_book(book_id: str, user: dict = Depends(get_admin_user)):
         raise HTTPException(status_code=404, detail="Book not found")
     return {"message": "Book deleted"}
 
-
 @api_router.post("/books/{book_id}/upload-pdf")
 async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = Depends(get_admin_user)):
     book = await db.books.find_one({"book_id": book_id})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
+
     path = f"{APP_NAME}/pdfs/{book_id}.pdf"
     data = await file.read()
-    
     result = put_object(path, data, "application/pdf")
-    
-    # Generate thumbnail from first page of PDF
+
     cover_path = None
     try:
-        import fitz  # PyMuPDF
-        from io import BytesIO
-        
+        import fitz
         pdf_doc = fitz.open(stream=data, filetype="pdf")
         if pdf_doc.page_count > 0:
             page = pdf_doc[0]
-            # Render at 2x resolution for better quality
             mat = fitz.Matrix(2, 2)
             pix = page.get_pixmap(matrix=mat)
             img_data = pix.tobytes("png")
-            
-            # Upload thumbnail
             thumb_path = f"{APP_NAME}/covers/{book_id}.png"
             thumb_result = put_object(thumb_path, img_data, "image/png")
             cover_path = thumb_result["path"]
@@ -961,24 +491,16 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
         pdf_doc.close()
     except Exception as e:
         logger.warning(f"Failed to generate thumbnail: {e}")
-    
-    # Update book with PDF URL and cover (if generated)
+
     update_data = {"pdf_url": result["path"]}
     if cover_path:
         update_data["cover_url"] = cover_path
-    
-    await db.books.update_one(
-        {"book_id": book_id},
-        {"$set": update_data}
-    )
-    
+
+    await db.books.update_one({"book_id": book_id}, {"$set": update_data})
     return {"pdf_url": result["path"], "cover_url": cover_path}
 
-
-# Public access for cover images (no auth required)
 @api_router.get("/covers/{path:path}")
 async def get_cover_image(path: str):
-    """Get cover images without authentication"""
     try:
         full_path = f"darussalam-kitab/covers/{path}"
         data, content_type = get_object(full_path)
@@ -987,71 +509,8 @@ async def get_cover_image(path: str):
         logger.error(f"Cover fetch error: {e}")
         raise HTTPException(status_code=404, detail="Cover not found")
 
-
-# Protected access for PDFs and other files (requires auth)
 @api_router.get("/files/{path:path}")
 async def get_file(path: str, user: dict = Depends(get_current_user)):
-    user_id = user["user_id"]
-    user_tier = user.get("subscription_tier", 0)
-    
-    # Check if this is a PDF file access (reading a book)
-    if path.endswith('.pdf'):
-        # Extract book_id from path if possible
-        # Track monthly unique book reads for tier limits
-        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
-        
-        # Get or create monthly reading record
-        monthly_reads = await db.monthly_reads.find_one(
-            {"user_id": user_id, "month": current_month},
-            {"_id": 0}
-        )
-        
-        # Get tier limits from database or use defaults
-        custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
-        tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
-        
-        # Get read limit for user's tier
-        tier_key = str(user_tier) if str(user_tier) in tiers else user_tier
-        tier_info = tiers.get(tier_key) or tiers.get(str(tier_key)) or SUBSCRIPTION_TIERS.get(user_tier, {})
-        read_limit = tier_info.get("book_limit")
-        
-        # Check if user has purchased this specific PDF (Tier 0 users can read purchased PDFs)
-        book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
-        has_purchased = await db.pdf_purchases.find_one({
-            "user_id": user_id,
-            "book_id": book_id_from_path
-        })
-        
-        if has_purchased:
-            # User purchased this PDF, allow access regardless of tier
-            pass
-        elif user_tier == 0:
-            # Tier 0 without purchase
-            raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
-        elif read_limit is not None and read_limit > 0:
-            # Check monthly read limit for Tier 1-3
-            read_book_ids = monthly_reads.get("book_ids", []) if monthly_reads else []
-            
-            # If this book is already in their reads, allow (re-reading)
-            if book_id_from_path not in read_book_ids:
-                # New book this month
-                if len(read_book_ids) >= read_limit:
-                    raise HTTPException(
-                        status_code=403, 
-                        detail=f"Monthly reading limit reached ({read_limit} books). Wait until next billing cycle or upgrade your subscription."
-                    )
-                
-                # Add this book to monthly reads
-                await db.monthly_reads.update_one(
-                    {"user_id": user_id, "month": current_month},
-                    {
-                        "$addToSet": {"book_ids": book_id_from_path},
-                        "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
-                        "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
-                    },
-                    upsert=True
-                )
-    
     try:
         data, content_type = get_object(path)
         return Response(content=data, media_type=content_type)
@@ -1059,62 +518,44 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
         logger.error(f"File fetch error: {e}")
         raise HTTPException(status_code=404, detail="File not found")
 
-
-# Bookshelf Routes - Monthly selection system
 @api_router.get("/bookshelf")
 async def get_bookshelf(user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
     user_tier = user.get("subscription_tier", 0)
-    
-    # Get current month's bookshelf
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
-    bookshelf = await db.bookshelves.find_one(
-        {"user_id": user_id, "month": current_month}, 
-        {"_id": 0}
-    )
-    
-    # Tier limits: 1=10, 2=20, 3=30, 4=unlimited
+    bookshelf = await db.bookshelves.find_one({"user_id": user_id, "month": current_month}, {"_id": 0})
     tier_limits = {0: 0, 1: 10, 2: 20, 3: 30, 4: None}
     limit = tier_limits.get(user_tier, 0)
-    
+
     if not bookshelf:
         return {"books": [], "count": 0, "limit": limit, "month": current_month}
-    
-    # Get full book details
+
     book_ids = bookshelf.get("book_ids", [])
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
-    
     return {"books": books, "count": len(books), "limit": limit, "month": current_month}
-
 
 @api_router.post("/bookshelf/{book_id}")
 async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
     user_tier = user.get("subscription_tier", 0)
-    
+
     if user_tier == 0:
         raise HTTPException(status_code=403, detail="Subscribe to add books to your monthly reading list")
-    
-    # Check book exists
+
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    # Check volume/advanced restrictions
+
     if book.get("is_volume") and user_tier < 3:
         raise HTTPException(status_code=403, detail="Volume books require Tier 3 or higher")
     if book.get("is_advanced") and user_tier < 4:
         raise HTTPException(status_code=403, detail="Advanced books require Tier 4 (Premium)")
-    
-    # Get current month
+
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
-    
     bookshelf = await db.bookshelves.find_one({"user_id": user_id, "month": current_month})
-    
-    # Tier limits
     tier_limits = {1: 10, 2: 20, 3: 30, 4: None}
     limit = tier_limits.get(user_tier)
-    
+
     if not bookshelf:
         await db.bookshelves.insert_one({
             "user_id": user_id,
@@ -1124,241 +565,143 @@ async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user))
         })
     else:
         book_ids = bookshelf.get("book_ids", [])
-        
         if book_id in book_ids:
             raise HTTPException(status_code=400, detail="Book already in this month's reading list")
-        
         if limit and len(book_ids) >= limit:
             raise HTTPException(status_code=400, detail=f"Monthly limit reached ({limit} books). Upgrade for more or wait until next month.")
-        
         await db.bookshelves.update_one(
             {"user_id": user_id, "month": current_month},
             {"$push": {"book_ids": book_id}}
         )
-    
-    return {"message": "Book added to this month's reading list"}
 
+    return {"message": "Book added to this month's reading list"}
 
 @api_router.delete("/bookshelf/{book_id}")
 async def remove_from_bookshelf(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
-    
     result = await db.bookshelves.update_one(
         {"user_id": user_id, "month": current_month},
         {"$pull": {"book_ids": book_id}}
     )
-    
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Book not in this month's reading list")
-    
     return {"message": "Book removed from reading list"}
 
-
-# Reading Progress & Favorites
 @api_router.post("/reading-progress/{book_id}")
 async def save_reading_progress(book_id: str, page: int, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
     await db.reading_progress.update_one(
         {"user_id": user_id, "book_id": book_id},
         {
-            "$set": {
-                "page": page,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            },
-            "$setOnInsert": {
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
+            "$set": {"page": page, "updated_at": datetime.now(timezone.utc).isoformat()},
+            "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
         },
         upsert=True
     )
-    
     return {"message": "Progress saved", "page": page}
-
 
 @api_router.get("/reading-progress/{book_id}")
 async def get_reading_progress(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
-    progress = await db.reading_progress.find_one(
-        {"user_id": user_id, "book_id": book_id},
-        {"_id": 0}
-    )
-    
+    progress = await db.reading_progress.find_one({"user_id": user_id, "book_id": book_id}, {"_id": 0})
     return {"page": progress.get("page", 1) if progress else 1}
-
 
 @api_router.get("/continue-reading")
 async def get_continue_reading(user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
-    # Get recent reading progress
-    progress_list = await db.reading_progress.find(
-        {"user_id": user_id}
-    ).sort("updated_at", -1).limit(5).to_list(5)
-    
+    progress_list = await db.reading_progress.find({"user_id": user_id}).sort("updated_at", -1).limit(5).to_list(5)
     if not progress_list:
         return {"books": []}
-    
     book_ids = [p["book_id"] for p in progress_list]
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(10)
-    
-    # Add page info to books
     books_with_progress = []
     for book in books:
         progress = next((p for p in progress_list if p["book_id"] == book["book_id"]), None)
         if progress:
             book["current_page"] = progress.get("page", 1)
             books_with_progress.append(book)
-    
     return {"books": books_with_progress}
-
 
 @api_router.post("/favorites/{book_id}")
 async def add_to_favorites(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
-    # Check book exists
     book = await db.books.find_one({"book_id": book_id})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    await db.favorites.update_one(
-        {"user_id": user_id},
-        {"$addToSet": {"book_ids": book_id}},
-        upsert=True
-    )
-    
+    await db.favorites.update_one({"user_id": user_id}, {"$addToSet": {"book_ids": book_id}}, upsert=True)
     return {"message": "Added to favorites"}
-
 
 @api_router.delete("/favorites/{book_id}")
 async def remove_from_favorites(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
-    await db.favorites.update_one(
-        {"user_id": user_id},
-        {"$pull": {"book_ids": book_id}}
-    )
-    
+    await db.favorites.update_one({"user_id": user_id}, {"$pull": {"book_ids": book_id}})
     return {"message": "Removed from favorites"}
-
 
 @api_router.get("/favorites")
 async def get_favorites(user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
     favorites = await db.favorites.find_one({"user_id": user_id}, {"_id": 0})
-    
     if not favorites:
         return {"books": []}
-    
     book_ids = favorites.get("book_ids", [])
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
-    
     return {"books": books}
 
-
-# PDF Purchase for Tier 0 users
 @api_router.post("/purchase-pdf/{book_id}")
 async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_current_user)):
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
     if not book.get("pdf_price"):
         raise HTTPException(status_code=400, detail="This book is not available for individual purchase")
-    
-    # Create Stripe checkout for single PDF
+
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
     webhook_url = f"{str(request.base_url)}api/webhook/stripe"
-    
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
-    # Get origin from header or use base_url
-    origin_url = request.headers.get("origin", "")
-    if not origin_url:
-        # Fallback to base_url without trailing slash
-        origin_url = str(request.base_url).rstrip('/')
-    
-    # Redirect to payment success page for consistent handling
-    success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{origin_url}/book/{book_id}"
-    
+    success_url = f"https://kitab-cloud.emergent.host/#/book/{book_id}?purchased=true"
+    cancel_url = f"https://kitab-cloud.emergent.host/#/book/{book_id}"
     checkout_request = CheckoutSessionRequest(
         amount=float(book["pdf_price"]),
         currency="usd",
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={
-            "user_id": user["user_id"],
-            "book_id": book_id,
-            "type": "pdf_purchase"
-        }
+        metadata={"user_id": user["user_id"], "book_id": book_id, "type": "pdf_purchase"}
     )
-    
     session = await stripe_checkout.create_checkout_session(checkout_request)
-    
     return {"url": session.url, "session_id": session.session_id}
-
 
 @api_router.get("/purchased-books")
 async def get_purchased_books(user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
-    
     purchases = await db.pdf_purchases.find({"user_id": user_id}, {"_id": 0}).to_list(100)
-    
     if not purchases:
         return {"books": []}
-    
     book_ids = [p["book_id"] for p in purchases]
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
-    
     return {"books": books}
 
-
-# Payment Routes
 @api_router.post("/payments/create-checkout")
 async def create_checkout(payment: PaymentCreate, request: Request, user: dict = Depends(get_current_user)):
     tier = payment.tier
-    
-    # Get tier info from database or use defaults
-    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
-    tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
-    
-    # Convert tier to string key if needed (MongoDB stores dict keys as strings)
-    tier_key = str(tier) if str(tier) in tiers else tier
-    
-    if tier_key not in tiers and str(tier_key) not in tiers:
+    if tier not in SUBSCRIPTION_TIERS:
         raise HTTPException(status_code=400, detail="Invalid tier")
-    
-    tier_info = tiers.get(tier_key) or tiers.get(str(tier_key))
+
+    tier_info = SUBSCRIPTION_TIERS[tier]
     amount = tier_info["price"]
-    
     success_url = f"{payment.origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{payment.origin_url}/pricing"
-    
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
     webhook_url = f"{str(request.base_url)}api/webhook/stripe"
-    
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
     checkout_request = CheckoutSessionRequest(
         amount=float(amount),
         currency="usd",
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={
-            "user_id": user["user_id"],
-            "tier": str(tier),
-            "tier_name": tier_info["name"]
-        }
+        metadata={"user_id": user["user_id"], "tier": str(tier), "tier_name": tier_info["name"]}
     )
-    
     session = await stripe_checkout.create_checkout_session(checkout_request)
-    
-    # Create payment transaction record
     await db.payment_transactions.insert_one({
         "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
         "session_id": session.session_id,
@@ -1369,80 +712,20 @@ async def create_checkout(payment: PaymentCreate, request: Request, user: dict =
         "payment_status": "initiated",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
     return {"url": session.url, "session_id": session.session_id}
-
 
 @api_router.get("/payments/status/{session_id}")
 async def get_payment_status(session_id: str, user: dict = Depends(get_current_user)):
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
-    
     status = await stripe_checkout.get_checkout_status(session_id)
-    
-    # Update transaction status
     transaction = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
-    
     if transaction and transaction.get("payment_status") != "paid":
         new_status = status.payment_status
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
-            {"$set": {"payment_status": new_status}}
-        )
-        
-        # If paid, handle based on payment type
+        await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_status": new_status}})
         if new_status == "paid":
-            payment_type = status.metadata.get("type", "subscription")
-            
-            if payment_type == "pdf_purchase":
-                # Handle PDF purchase
-                book_id = status.metadata.get("book_id")
-                if book_id:
-                    # Check if already recorded
-                    existing = await db.pdf_purchases.find_one({
-                        "user_id": user["user_id"],
-                        "book_id": book_id
-                    })
-                    if not existing:
-                        purchase_record = {
-                            "purchase_id": f"purchase_{uuid.uuid4().hex[:12]}",
-                            "user_id": user["user_id"],
-                            "book_id": book_id,
-                            "session_id": session_id,
-                            "purchased_at": datetime.now(timezone.utc).isoformat(),
-                            "platform": "stripe"
-                        }
-                        await db.pdf_purchases.insert_one(purchase_record)
-                        logger.info(f"PDF purchase recorded via status poll: user {user['user_id']}, book {book_id}")
-                        
-                        # Send email
-                        book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
-                        if book:
-                            await send_pdf_purchase_email(
-                                user.get("email"),
-                                book.get("title", "Your Book"),
-                                book.get("pdf_url", ""),
-                                user.get("name")
-                            )
-            else:
-                # Handle subscription
-                tier = int(status.metadata.get("tier", 0))
-                if tier:
-                    current_tier = user.get("subscription_tier", 0)
-                    if current_tier != tier:
-                        await db.users.update_one(
-                            {"user_id": user["user_id"]},
-                            {"$set": {"subscription_tier": tier}}
-                        )
-                        logger.info(f"Subscription upgraded via status poll: user {user['user_id']} to tier {tier}")
-                        
-                        # Send email
-                        await send_subscription_confirmation_email(
-                            user.get("email"),
-                            tier,
-                            user.get("name")
-                        )
-    
+            tier = int(status.metadata.get("tier", 0))
+            await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"subscription_tier": tier}})
     return {
         "status": status.status,
         "payment_status": status.payment_status,
@@ -1450,110 +733,54 @@ async def get_payment_status(session_id: str, user: dict = Depends(get_current_u
         "metadata": status.metadata
     }
 
+@api_router.post("/payments/apple")
+async def verify_apple_payment(data: ApplePaymentVerify, user: dict = Depends(get_current_user)):
+    receipt = data.receipt
+    if not receipt:
+        raise HTTPException(status_code=400, detail="Missing receipt")
 
-@api_router.post("/webhook/stripe")
-async def stripe_webhook(request: Request):
-    body = await request.body()
-    stripe_signature = request.headers.get("Stripe-Signature")
-    
-    stripe_api_key = os.environ.get("STRIPE_API_KEY")
-    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
-    
-    try:
-        webhook_response = await stripe_checkout.handle_webhook(body, stripe_signature)
-        
-        if webhook_response.payment_status == "paid":
-            session_id = webhook_response.session_id
-            user_id = webhook_response.metadata.get("user_id")
-            payment_type = webhook_response.metadata.get("type", "subscription")
-            
-            # Update transaction
-            await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {"$set": {"payment_status": "paid"}}
-            )
-            
-            # Get user for email
-            user = await db.users.find_one({"user_id": user_id}, {"_id": 0}) if user_id else None
-            
-            if payment_type == "pdf_purchase":
-                # Handle PDF purchase
-                book_id = webhook_response.metadata.get("book_id")
-                if user_id and book_id:
-                    # Record the purchase
-                    purchase_record = {
-                        "purchase_id": f"purchase_{uuid.uuid4().hex[:12]}",
-                        "user_id": user_id,
-                        "book_id": book_id,
-                        "session_id": session_id,
-                        "purchased_at": datetime.now(timezone.utc).isoformat(),
-                        "platform": "stripe"
-                    }
-                    await db.pdf_purchases.insert_one(purchase_record)
-                    logger.info(f"PDF purchase recorded: user {user_id}, book {book_id}")
-                    
-                    # Get book info and send email
-                    if user:
-                        book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
-                        if book:
-                            await send_pdf_purchase_email(
-                                user.get("email"),
-                                book.get("title", "Your Book"),
-                                book.get("pdf_url", ""),
-                                user.get("name")
-                            )
-            else:
-                # Handle subscription purchase
-                tier = int(webhook_response.metadata.get("tier", 0))
-                if user_id and tier:
-                    await db.users.update_one(
-                        {"user_id": user_id},
-                        {"$set": {"subscription_tier": tier}}
-                    )
-                    logger.info(f"Subscription upgraded: user {user_id} to tier {tier}")
-                    
-                    # Send confirmation email
-                    if user:
-                        await send_subscription_confirmation_email(
-                            user.get("email"),
-                            tier,
-                            user.get("name")
-                        )
-        
-        return {"status": "ok"}
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return {"status": "error"}
+    payload = {"receipt-data": receipt.get("receipt"), "password": APPLE_SHARED_SECRET}
+    response = requests.post(APPLE_VERIFY_URL, json=payload)
+    result = response.json()
 
+    if result.get("status") == 21007:
+        response = requests.post(APPLE_VERIFY_SANDBOX, json=payload)
+        result = response.json()
 
-# Apple StoreKit Endpoints
+    if result.get("status") != 0:
+        raise HTTPException(status_code=400, detail=f"Invalid receipt: {result}")
+
+    latest = result.get("latest_receipt_info", [])
+    if not latest:
+        raise HTTPException(status_code=400, detail="No purchases found")
+
+    product_id = latest[-1]["product_id"]
+    tier = APPLE_PRODUCT_IDS.get(product_id, 0)
+    if tier == 0:
+        raise HTTPException(status_code=400, detail="Unknown product ID")
+
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"subscription_tier": tier}})
+    await db.payment_transactions.insert_one({
+        "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+        "user_id": user["user_id"],
+        "product_id": product_id,
+        "tier": tier,
+        "payment_status": "paid",
+        "platform": "apple",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "tier": tier}
+
 @api_router.post("/payments/apple/validate", response_model=AppleSubscriptionResponse)
-async def validate_apple_purchase(
-    transaction: AppleTransactionValidation,
-    user: dict = Depends(get_current_user)
-):
-    """Validate an Apple in-app purchase and upgrade user subscription"""
+async def validate_apple_purchase(transaction: AppleTransactionValidation, user: dict = Depends(get_current_user)):
     try:
-        # Map product ID to tier
         product_id = transaction.product_id
         if product_id not in APPLE_PRODUCT_IDS:
             raise HTTPException(status_code=400, detail=f"Unknown product ID: {product_id}")
-        
+
         tier = APPLE_PRODUCT_IDS[product_id]
-        
-        # Check if Apple credentials are configured
-        if APPLE_KEY_ID and APPLE_ISSUER_ID and APPLE_PRIVATE_KEY:
-            # Validate with Apple's servers
-            try:
-                apple_data = await validate_apple_transaction(transaction.transaction_id)
-                logger.info(f"Apple transaction validated: {apple_data}")
-            except Exception as e:
-                logger.warning(f"Apple validation failed (continuing with local validation): {e}")
-        
-        # Calculate expiration (1 month from now for monthly subscriptions)
         expiration_date = datetime.now(timezone.utc) + timedelta(days=30)
-        
-        # Store Apple subscription record
+
         subscription_record = {
             "subscription_id": f"apple_sub_{uuid.uuid4().hex[:12]}",
             "user_id": user["user_id"],
@@ -1567,61 +794,43 @@ async def validate_apple_purchase(
             "expiration_date": expiration_date.isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
-        # Upsert subscription (update if exists, insert if new)
+
         await db.apple_subscriptions.update_one(
             {"original_transaction_id": transaction.original_transaction_id},
             {"$set": subscription_record},
             upsert=True
         )
-        
-        # Update user's subscription tier
         await db.users.update_one(
             {"user_id": user["user_id"]},
-            {"$set": {
-                "subscription_tier": tier,
-                "subscription_platform": "apple",
-                "subscription_expiry": expiration_date.isoformat()
-            }}
+            {"$set": {"subscription_tier": tier, "subscription_platform": "apple", "subscription_expiry": expiration_date.isoformat()}}
         )
-        
-        logger.info(f"Apple subscription activated for user {user['user_id']}, tier {tier}")
-        
+
         return AppleSubscriptionResponse(
             success=True,
             subscription_tier=tier,
             expiration_date=expiration_date.isoformat(),
             message="Subscription activated successfully"
         )
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Apple validation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @api_router.post("/payments/apple/restore")
-async def restore_apple_purchases(
-    transactions: List[AppleTransactionValidation],
-    user: dict = Depends(get_current_user)
-):
-    """Restore Apple purchases for a user"""
+async def restore_apple_purchases(transactions: List[AppleTransactionValidation], user: dict = Depends(get_current_user)):
     restored = []
     highest_tier = 0
     latest_expiry = None
-    
+
     for transaction in transactions:
         try:
             product_id = transaction.product_id
             if product_id in APPLE_PRODUCT_IDS:
                 tier = APPLE_PRODUCT_IDS[product_id]
-                
-                # Check if this subscription exists
-                existing = await db.apple_subscriptions.find_one({
-                    "original_transaction_id": transaction.original_transaction_id
-                }, {"_id": 0})
-                
+                existing = await db.apple_subscriptions.find_one(
+                    {"original_transaction_id": transaction.original_transaction_id}, {"_id": 0}
+                )
                 if existing and existing.get("status") == "active":
                     expiry = existing.get("expiration_date")
                     if expiry:
@@ -1630,63 +839,34 @@ async def restore_apple_purchases(
                             if tier > highest_tier:
                                 highest_tier = tier
                                 latest_expiry = expiry
-                            restored.append({
-                                "product_id": product_id,
-                                "tier": tier,
-                                "expiration_date": expiry
-                            })
+                            restored.append({"product_id": product_id, "tier": tier, "expiration_date": expiry})
         except Exception as e:
             logger.warning(f"Error restoring transaction: {e}")
-    
-    # Update user tier if restored subscriptions found
+
     if highest_tier > 0:
         await db.users.update_one(
             {"user_id": user["user_id"]},
-            {"$set": {
-                "subscription_tier": highest_tier,
-                "subscription_platform": "apple",
-                "subscription_expiry": latest_expiry
-            }}
+            {"$set": {"subscription_tier": highest_tier, "subscription_platform": "apple", "subscription_expiry": latest_expiry}}
         )
-    
-    return {
-        "restored_count": len(restored),
-        "subscriptions": restored,
-        "current_tier": highest_tier
-    }
 
+    return {"restored_count": len(restored), "subscriptions": restored, "current_tier": highest_tier}
 
 @api_router.get("/payments/apple/status")
 async def get_apple_subscription_status_endpoint(user: dict = Depends(get_current_user)):
-    """Get current Apple subscription status for user"""
-    subscription = await db.apple_subscriptions.find_one(
-        {"user_id": user["user_id"], "status": "active"},
-        {"_id": 0}
-    )
-    
+    subscription = await db.apple_subscriptions.find_one({"user_id": user["user_id"], "status": "active"}, {"_id": 0})
     if not subscription:
-        return {
-            "has_subscription": False,
-            "tier": 0,
-            "message": "No active Apple subscription"
-        }
-    
-    # Check if subscription has expired
+        return {"has_subscription": False, "tier": 0, "message": "No active Apple subscription"}
+
     expiry = subscription.get("expiration_date")
     if expiry:
         expiry_dt = datetime.fromisoformat(expiry.replace('Z', '+00:00'))
         if expiry_dt < datetime.now(timezone.utc):
-            # Mark as expired
             await db.apple_subscriptions.update_one(
                 {"subscription_id": subscription["subscription_id"]},
                 {"$set": {"status": "expired"}}
             )
-            return {
-                "has_subscription": False,
-                "tier": 0,
-                "message": "Subscription has expired"
-            }
-    
+            return {"has_subscription": False, "tier": 0, "message": "Subscription has expired"}
+
     return {
         "has_subscription": True,
         "tier": subscription.get("tier", 0),
@@ -1695,36 +875,13 @@ async def get_apple_subscription_status_endpoint(user: dict = Depends(get_curren
         "platform": "apple"
     }
 
-
-class ApplePDFValidation(BaseModel):
-    transaction_id: str
-    original_transaction_id: Optional[str] = None
-    product_id: str
-    book_id: str
-    receipt: Optional[str] = None
-
-
 @api_router.post("/payments/apple/validate-pdf")
-async def validate_apple_pdf_purchase(
-    transaction: ApplePDFValidation,
-    user: dict = Depends(get_current_user)
-):
-    """Validate an Apple in-app purchase for a single PDF"""
+async def validate_apple_pdf_purchase(transaction: ApplePDFValidation, user: dict = Depends(get_current_user)):
     try:
-        # Check if book exists
         book = await db.books.find_one({"book_id": transaction.book_id}, {"_id": 0})
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
-        
-        # Validate with Apple if credentials configured
-        if APPLE_KEY_ID and APPLE_ISSUER_ID and APPLE_PRIVATE_KEY:
-            try:
-                apple_data = await validate_apple_transaction(transaction.transaction_id)
-                logger.info(f"Apple PDF transaction validated: {apple_data}")
-            except Exception as e:
-                logger.warning(f"Apple validation failed (continuing): {e}")
-        
-        # Record the PDF purchase
+
         purchase_record = {
             "purchase_id": f"apple_pdf_{uuid.uuid4().hex[:12]}",
             "user_id": user["user_id"],
@@ -1736,145 +893,127 @@ async def validate_apple_pdf_purchase(
             "purchase_date": datetime.now(timezone.utc).isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
-        # Upsert to avoid duplicates
+
         await db.pdf_purchases.update_one(
             {"user_id": user["user_id"], "book_id": transaction.book_id},
             {"$set": purchase_record},
             upsert=True
         )
-        
-        logger.info(f"Apple PDF purchase recorded for user {user['user_id']}, book {transaction.book_id}")
-        
-        return {
-            "success": True,
-            "book_id": transaction.book_id,
-            "message": "PDF purchase validated successfully"
-        }
-        
+
+        return {"success": True, "book_id": transaction.book_id, "message": "PDF purchase validated successfully"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Apple PDF validation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    body = await request.body()
+    stripe_signature = request.headers.get("Stripe-Signature")
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+    try:
+        webhook_response = await stripe_checkout.handle_webhook(body, stripe_signature)
+        if webhook_response.payment_status == "paid":
+            session_id = webhook_response.session_id
+            tier = int(webhook_response.metadata.get("tier", 0))
+            user_id = webhook_response.metadata.get("user_id")
+            payment_type = webhook_response.metadata.get("type", "subscription")
+            await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_status": "paid"}})
+            if payment_type == "pdf_purchase":
+                book_id = webhook_response.metadata.get("book_id")
+                if user_id and book_id:
+                    await db.pdf_purchases.update_one(
+                        {"user_id": user_id, "book_id": book_id},
+                        {"$set": {
+                            "purchase_id": f"purchase_{uuid.uuid4().hex[:12]}",
+                            "user_id": user_id,
+                            "book_id": book_id,
+                            "session_id": session_id,
+                            "purchased_at": datetime.now(timezone.utc).isoformat(),
+                            "platform": "stripe"
+                        }},
+                        upsert=True
+                    )
+            elif user_id and tier:
+                await db.users.update_one({"user_id": user_id}, {"$set": {"subscription_tier": tier}})
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"status": "error"}
 
 @api_router.post("/webhook/apple")
 async def apple_webhook(request: Request):
-    """Handle Apple App Store Server Notifications"""
     try:
         body = await request.json()
         signed_payload = body.get("signedPayload")
-        
         if not signed_payload:
-            logger.warning("Apple webhook missing signedPayload")
             return {"status": "ok"}
-        
-        # Decode the JWS payload (simplified - in production use proper JWS validation)
         try:
             parts = signed_payload.split('.')
             if len(parts) == 3:
-                # Decode payload (middle part)
                 payload_b64 = parts[1]
-                # Add padding if needed
                 padding = 4 - (len(payload_b64) % 4)
                 if padding != 4:
                     payload_b64 += '=' * padding
                 payload_json = base64.urlsafe_b64decode(payload_b64)
                 notification_data = json.loads(payload_json)
-                
                 notification_type = notification_data.get("notificationType")
                 logger.info(f"Apple notification received: {notification_type}")
-                
-                # Handle different notification types
-                if notification_type in ["DID_RENEW", "SUBSCRIBED"]:
-                    # Renewal or new subscription
-                    transaction_info = notification_data.get("data", {}).get("signedTransactionInfo")
-                    if transaction_info:
-                        # Process renewal
-                        logger.info("Processing Apple subscription renewal")
-                        
-                elif notification_type == "EXPIRED":
-                    # Subscription expired
+                if notification_type == "EXPIRED":
                     original_transaction_id = notification_data.get("data", {}).get("originalTransactionId")
                     if original_transaction_id:
                         await db.apple_subscriptions.update_one(
                             {"original_transaction_id": original_transaction_id},
                             {"$set": {"status": "expired"}}
                         )
-                        logger.info(f"Apple subscription expired: {original_transaction_id}")
-                        
-                elif notification_type == "DID_CHANGE_RENEWAL_STATUS":
-                    # Auto-renew status changed
-                    subtype = notification_data.get("subtype")
-                    logger.info(f"Apple renewal status changed: {subtype}")
-                    
                 elif notification_type == "REFUND":
-                    # Refund processed
                     original_transaction_id = notification_data.get("data", {}).get("originalTransactionId")
                     if original_transaction_id:
                         await db.apple_subscriptions.update_one(
                             {"original_transaction_id": original_transaction_id},
                             {"$set": {"status": "refunded"}}
                         )
-                        logger.info(f"Apple subscription refunded: {original_transaction_id}")
         except Exception as decode_error:
             logger.warning(f"Error decoding Apple webhook payload: {decode_error}")
-        
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Apple webhook error: {e}")
         return {"status": "error"}
 
-
-# Admin Routes
 @api_router.get("/admin/users")
 async def get_all_users(user: dict = Depends(get_admin_user)):
-    # Exclude guest users from the list
     users = await db.users.find(
         {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
         {"_id": 0, "password_hash": 0}
     ).to_list(1000)
     return users
 
-
 @api_router.put("/admin/users/{user_id}/tier")
 async def update_user_tier(user_id: str, tier: int, admin: dict = Depends(get_admin_user)):
     if tier < 0 or tier > 5:
         raise HTTPException(status_code=400, detail="Invalid tier")
-    
-    result = await db.users.update_one(
-        {"user_id": user_id},
-        {"$set": {"subscription_tier": tier}}
-    )
+    result = await db.users.update_one({"user_id": user_id}, {"$set": {"subscription_tier": tier}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-    
     return {"message": "Tier updated"}
-
 
 @api_router.put("/admin/users/{user_id}/admin")
 async def toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends(get_admin_user)):
-    result = await db.users.update_one(
-        {"user_id": user_id},
-        {"$set": {"is_admin": is_admin}}
-    )
+    result = await db.users.update_one({"user_id": user_id}, {"$set": {"is_admin": is_admin}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-    
     return {"message": "Admin status updated"}
-
 
 @api_router.get("/admin/stats")
 async def get_admin_stats(user: dict = Depends(get_admin_user)):
-    # Exclude guest users from counts
     non_guest_filter = {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]}
     
     total_users = await db.users.count_documents(non_guest_filter)
     total_books = await db.books.count_documents({})
     total_purchases = await db.pdf_purchases.count_documents({})
     total_subscriptions = await db.payment_transactions.count_documents({"payment_status": "paid"})
-    
     tier_stats = {}
     for tier in range(0, 5):
         count = await db.users.count_documents({
@@ -1882,7 +1021,6 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
             "subscription_tier": tier
         })
         tier_stats[str(tier)] = count
-    
     return {
         "total_users": total_users,
         "total_books": total_books,
@@ -1891,16 +1029,12 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
         "tier_distribution": tier_stats
     }
 
-
 @api_router.get("/admin/purchases")
 async def get_admin_purchases(user: dict = Depends(get_admin_user)):
-    """Get all PDF purchases with user details"""
     purchases = []
     cursor = db.pdf_purchases.find({}, {"_id": 0}).sort("purchased_at", -1)
     async for purchase in cursor:
-        # Get user email
         user_data = await db.users.find_one({"user_id": purchase.get("user_id")}, {"_id": 0, "email": 1, "name": 1})
-        # Get book title
         book_data = await db.books.find_one({"book_id": purchase.get("book_id")}, {"_id": 0, "title": 1})
         purchases.append({
             **purchase,
@@ -1910,14 +1044,11 @@ async def get_admin_purchases(user: dict = Depends(get_admin_user)):
         })
     return purchases
 
-
 @api_router.get("/admin/subscriptions")
 async def get_admin_subscriptions(user: dict = Depends(get_admin_user)):
-    """Get all subscription payments with user details"""
     subscriptions = []
     cursor = db.payment_transactions.find({"payment_status": "paid"}, {"_id": 0}).sort("created_at", -1)
     async for payment in cursor:
-        # Get user email
         user_data = await db.users.find_one({"user_id": payment.get("user_id")}, {"_id": 0, "email": 1, "name": 1})
         subscriptions.append({
             **payment,
@@ -1926,46 +1057,37 @@ async def get_admin_subscriptions(user: dict = Depends(get_admin_user)):
         })
     return subscriptions
 
-
 @api_router.get("/admin/users/{user_id}/details")
 async def get_user_details(user_id: str, admin: dict = Depends(get_admin_user)):
-    """Get detailed user info including favorites, bookshelf, and purchases"""
     user_data = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Get favorite books
+
     favorite_ids = user_data.get("favorite_books", [])
     favorites = []
     for book_id in favorite_ids:
         book = await db.books.find_one({"book_id": book_id}, {"_id": 0, "book_id": 1, "title": 1})
         if book:
             favorites.append(book)
-    
-    # Get bookshelf
+
     bookshelf_ids = user_data.get("bookshelf", [])
     bookshelf = []
     for book_id in bookshelf_ids:
         book = await db.books.find_one({"book_id": book_id}, {"_id": 0, "book_id": 1, "title": 1})
         if book:
             bookshelf.append(book)
-    
-    # Get purchases
+
     purchases = []
     cursor = db.pdf_purchases.find({"user_id": user_id}, {"_id": 0})
     async for purchase in cursor:
         book = await db.books.find_one({"book_id": purchase.get("book_id")}, {"_id": 0, "title": 1})
-        purchases.append({
-            **purchase,
-            "book_title": book.get("title") if book else "Unknown"
-        })
-    
-    # Get subscription payments
+        purchases.append({**purchase, "book_title": book.get("title") if book else "Unknown"})
+
     payments = []
     cursor = db.payment_transactions.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1)
     async for payment in cursor:
         payments.append(payment)
-    
+
     return {
         **user_data,
         "favorites": favorites,
@@ -1974,132 +1096,38 @@ async def get_user_details(user_id: str, admin: dict = Depends(get_admin_user)):
         "payment_history": payments
     }
 
-
-# Tiers info endpoint (public)
 @api_router.get("/tiers")
 async def get_tiers():
-    # Try to get custom tiers from database first
-    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
-    if custom_tiers and custom_tiers.get("tiers"):
-        return custom_tiers["tiers"]
     return SUBSCRIPTION_TIERS
-
-
-# Admin endpoint to get tier settings
-@api_router.get("/admin/tiers")
-async def get_admin_tiers(user: dict = Depends(get_current_user)):
-    if not user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    # Get custom tiers from database or return defaults
-    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
-    if custom_tiers and custom_tiers.get("tiers"):
-        return {"tiers": custom_tiers["tiers"], "is_custom": True}
-    return {"tiers": SUBSCRIPTION_TIERS, "is_custom": False}
-
-
-# Admin endpoint to update tier settings
-class TierUpdate(BaseModel):
-    tier_id: int
-    name: str
-    price: float
-    book_limit: Optional[int] = None
-
-class TiersUpdateRequest(BaseModel):
-    tiers: dict
-
-@api_router.put("/admin/tiers")
-async def update_tiers(request: TiersUpdateRequest, user: dict = Depends(get_current_user)):
-    if not user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    # Validate tiers
-    for tier_id, tier_info in request.tiers.items():
-        if not isinstance(tier_info, dict):
-            raise HTTPException(status_code=400, detail=f"Invalid tier format for tier {tier_id}")
-        if "name" not in tier_info or "price" not in tier_info:
-            raise HTTPException(status_code=400, detail=f"Tier {tier_id} missing name or price")
-    
-    # Save to database
-    await db.settings.update_one(
-        {"setting_id": "subscription_tiers"},
-        {"$set": {
-            "setting_id": "subscription_tiers",
-            "tiers": request.tiers,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "updated_by": user["user_id"]
-        }},
-        upsert=True
-    )
-    
-    logger.info(f"Tier settings updated by {user['user_id']}")
-    return {"message": "Tier settings updated successfully"}
-
-
-# Admin endpoint to reset tiers to defaults
-@api_router.post("/admin/tiers/reset")
-async def reset_tiers(user: dict = Depends(get_current_user)):
-    if not user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    await db.settings.delete_one({"setting_id": "subscription_tiers"})
-    logger.info(f"Tier settings reset to defaults by {user['user_id']}")
-    return {"message": "Tier settings reset to defaults", "tiers": SUBSCRIPTION_TIERS}
-
-
-# ============== User Settings Endpoints ==============
-
-class UpdateProfileRequest(BaseModel):
-    name: Optional[str] = None
-    email: Optional[EmailStr] = None
-
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
 
 @api_router.get("/user/profile")
 async def get_user_profile(user: dict = Depends(get_current_user)):
-    """Get full user profile with subscription details"""
-    # Get user data including password_hash to check if user has password
     full_user_data = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-    
     if not full_user_data:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Check if user has a password (for email/password login)
+
     has_password = bool(full_user_data.get("password_hash"))
-    
-    # Remove password_hash from response
     user_data = {k: v for k, v in full_user_data.items() if k != "password_hash"}
-    
-    # Get subscription info
     tier = user_data.get("subscription_tier", 0)
-    # Handle tiers > 4 as Premium (admin users may have tier 5+)
     tier_key = min(tier, 4) if tier > 0 else 0
     tier_info = SUBSCRIPTION_TIERS.get(tier_key, SUBSCRIPTION_TIERS[0])
-    
-    # Get latest payment for subscription date
+
     latest_payment = await db.payment_transactions.find_one(
         {"user_id": user["user_id"], "payment_status": "paid"},
         sort=[("created_at", -1)]
     )
-    
+
     subscription_start = None
     subscription_end = None
     if latest_payment and tier > 0:
         subscription_start = latest_payment.get("created_at")
-        # Calculate end date (30 days from start)
         if subscription_start:
-            from datetime import datetime
             start_dt = datetime.fromisoformat(subscription_start.replace('Z', '+00:00'))
             end_dt = start_dt + timedelta(days=30)
             subscription_end = end_dt.isoformat()
-    
-    # Check cancellation status
-    cancellation = await db.subscription_cancellations.find_one(
-        {"user_id": user["user_id"], "status": "pending"}
-    )
-    
+
+    cancellation = await db.subscription_cancellations.find_one({"user_id": user["user_id"], "status": "pending"})
+
     return {
         **user_data,
         "has_password": has_password,
@@ -2110,94 +1138,55 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
         "cancellation_effective_date": cancellation.get("effective_date") if cancellation else None
     }
 
-
 @api_router.put("/user/profile")
 async def update_user_profile(profile: UpdateProfileRequest, user: dict = Depends(get_current_user)):
-    """Update user profile (name, email)"""
     update_data = {}
-    
     if profile.name:
         update_data["name"] = profile.name
-    
     if profile.email and profile.email != user.get("email"):
-        # Check if email is already taken
         existing = await db.users.find_one({"email": profile.email})
         if existing:
             raise HTTPException(status_code=400, detail="Email already in use")
         update_data["email"] = profile.email
-    
     if not update_data:
         raise HTTPException(status_code=400, detail="No updates provided")
-    
-    await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": update_data}
-    )
-    
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": update_data})
     return {"message": "Profile updated successfully"}
-
 
 @api_router.put("/user/password")
 async def change_password(passwords: ChangePasswordRequest, user: dict = Depends(get_current_user)):
-    """Change user password"""
-    # Get full user data with password hash
     user_data = await db.users.find_one({"user_id": user["user_id"]})
-    
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Check if user has a password (Google OAuth users may not)
     if not user_data.get("password_hash"):
         raise HTTPException(status_code=400, detail="Cannot change password for social login accounts")
-    
-    # Verify current password
     if not bcrypt.checkpw(passwords.current_password.encode('utf-8'), user_data["password_hash"].encode('utf-8')):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-    
-    # Hash new password
     new_hash = bcrypt.hashpw(passwords.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    
-    await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": {"password_hash": new_hash}}
-    )
-    
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"password_hash": new_hash}})
     return {"message": "Password changed successfully"}
-
 
 @api_router.post("/user/cancel-subscription")
 async def cancel_subscription(user: dict = Depends(get_current_user)):
-    """Cancel subscription at end of billing period"""
     user_data = await db.users.find_one({"user_id": user["user_id"]})
-    
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
-    
     tier = user_data.get("subscription_tier", 0)
     if tier == 0:
         raise HTTPException(status_code=400, detail="No active subscription to cancel")
-    
-    # Check if already pending cancellation
-    existing = await db.subscription_cancellations.find_one(
-        {"user_id": user["user_id"], "status": "pending"}
-    )
+    existing = await db.subscription_cancellations.find_one({"user_id": user["user_id"], "status": "pending"})
     if existing:
         raise HTTPException(status_code=400, detail="Subscription cancellation already pending")
-    
-    # Get latest payment to determine end date
     latest_payment = await db.payment_transactions.find_one(
         {"user_id": user["user_id"], "payment_status": "paid"},
         sort=[("created_at", -1)]
     )
-    
-    # Calculate effective date (30 days from last payment or now if no payment found)
     if latest_payment and latest_payment.get("created_at"):
         start_dt = datetime.fromisoformat(latest_payment["created_at"].replace('Z', '+00:00'))
         effective_date = (start_dt + timedelta(days=30)).isoformat()
     else:
         effective_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
-    
-    # Create cancellation record
+
     cancellation_id = f"cancel_{uuid.uuid4().hex[:12]}"
     await db.subscription_cancellations.insert_one({
         "cancellation_id": cancellation_id,
@@ -2207,71 +1196,30 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
         "requested_at": datetime.now(timezone.utc).isoformat(),
         "effective_date": effective_date
     })
-    
-    return {
-        "message": "Subscription will be cancelled at end of billing period",
-        "effective_date": effective_date
-    }
-
+    return {"message": "Subscription will be cancelled at end of billing period", "effective_date": effective_date}
 
 @api_router.post("/user/reactivate-subscription")
 async def reactivate_subscription(user: dict = Depends(get_current_user)):
-    """Reactivate a pending cancellation"""
-    result = await db.subscription_cancellations.delete_one(
-        {"user_id": user["user_id"], "status": "pending"}
-    )
-    
+    result = await db.subscription_cancellations.delete_one({"user_id": user["user_id"], "status": "pending"})
     if result.deleted_count == 0:
         raise HTTPException(status_code=400, detail="No pending cancellation found")
-    
     return {"message": "Subscription reactivated"}
 
-
-@api_router.delete("/user/account")
-async def delete_account(user: dict = Depends(get_current_user)):
-    """Permanently delete user account and all associated data (Apple App Store requirement)"""
-    user_id = user["user_id"]
-    
-    # Check if user exists
-    user_data = await db.users.find_one({"user_id": user_id})
-    if not user_data:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Cancel any active Stripe subscription
-    if user_data.get("stripe_customer_id"):
-        try:
-            import stripe
-            stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
-            # List all subscriptions for this customer
-            subscriptions = stripe.Subscription.list(customer=user_data["stripe_customer_id"], status="active")
-            for sub in subscriptions.data:
-                stripe.Subscription.delete(sub.id)
-        except Exception as e:
-            print(f"Error cancelling Stripe subscription: {e}")
-    
-    # Delete all user-related data
-    await db.users.delete_one({"user_id": user_id})
-    await db.user_bookshelf.delete_many({"user_id": user_id})
-    await db.reading_progress.delete_many({"user_id": user_id})
-    await db.favorites.delete_many({"user_id": user_id})
-    await db.payment_transactions.delete_many({"user_id": user_id})
-    await db.subscription_cancellations.delete_many({"user_id": user_id})
-    await db.email_verification_codes.delete_many({"email": user_data.get("email")})
-    
-    return {"message": "Account deleted successfully"}
-
-
-# Include the router in the main app
 app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=[
+        "https://kitab-cloud.emergent.host",
+        "http://localhost:3000",
+        "capacitor://localhost",
+        "https://localhost",
+        "http://localhost",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.on_event("startup")
 async def startup():
@@ -2279,17 +1227,14 @@ async def startup():
         init_storage()
     except Exception as e:
         logger.warning(f"Storage init failed on startup: {e}")
-    
-    # Create indexes
+
     await db.users.create_index("email", unique=True)
     await db.users.create_index("user_id", unique=True)
     await db.books.create_index("book_id", unique=True)
     await db.books.create_index("darussalam_code")
     await db.user_sessions.create_index("session_token")
-    
     logger.info("Darussalam Kitab Cloud API started")
-
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    client.close() 
