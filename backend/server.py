@@ -2207,6 +2207,40 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
     return {"message": "Subscription reactivated"}
 
 
+@api_router.delete("/user/account")
+async def delete_account(user: dict = Depends(get_current_user)):
+    """Permanently delete user account and all associated data (Apple App Store requirement)"""
+    user_id = user["user_id"]
+    
+    # Check if user exists
+    user_data = await db.users.find_one({"user_id": user_id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Cancel any active Stripe subscription
+    if user_data.get("stripe_customer_id"):
+        try:
+            import stripe
+            stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+            # List all subscriptions for this customer
+            subscriptions = stripe.Subscription.list(customer=user_data["stripe_customer_id"], status="active")
+            for sub in subscriptions.data:
+                stripe.Subscription.delete(sub.id)
+        except Exception as e:
+            print(f"Error cancelling Stripe subscription: {e}")
+    
+    # Delete all user-related data
+    await db.users.delete_one({"user_id": user_id})
+    await db.user_bookshelf.delete_many({"user_id": user_id})
+    await db.reading_progress.delete_many({"user_id": user_id})
+    await db.favorites.delete_many({"user_id": user_id})
+    await db.payment_transactions.delete_many({"user_id": user_id})
+    await db.subscription_cancellations.delete_many({"user_id": user_id})
+    await db.email_verification_codes.delete_many({"email": user_data.get("email")})
+    
+    return {"message": "Account deleted successfully"}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 

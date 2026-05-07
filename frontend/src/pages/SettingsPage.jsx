@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   User, ArrowLeft, Mail, Lock, CreditCard, AlertTriangle,
-  CheckCircle, XCircle, Calendar, Library, Crown
+  CheckCircle, XCircle, Calendar, Library, Crown, Trash2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -20,7 +20,7 @@ import {
 } from '../components/ui/dialog';
 
 const SettingsPage = () => {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -40,6 +40,11 @@ const SettingsPage = () => {
   // Cancel subscription dialog
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  
+  // Delete account dialog
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const fetchProfile = async () => {
     if (!token) {
@@ -162,6 +167,30 @@ const SettingsPage = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error('Please type DELETE to confirm');
+      return;
+    }
+    
+    setDeleting(true);
+    
+    try {
+      await axios.delete(`${API}/user/account`, { 
+        headers, 
+        withCredentials: true 
+      });
+      toast.success('Account deleted successfully');
+      setShowDeleteDialog(false);
+      await logout();
+      navigate('/');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete account');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -206,16 +235,17 @@ const SettingsPage = () => {
 
       <main className="max-w-4xl mx-auto px-4 md:px-6 py-8">
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 border-b border-[rgba(212,175,55,0.2)]">
+        <div className="flex gap-2 mb-8 border-b border-[rgba(212,175,55,0.2)] overflow-x-auto">
           {[
             { id: 'profile', label: 'Profile', icon: User },
             { id: 'security', label: 'Security', icon: Lock },
-            { id: 'subscription', label: 'Subscription', icon: CreditCard }
+            { id: 'subscription', label: 'Subscription', icon: CreditCard },
+            { id: 'account', label: 'Account', icon: AlertTriangle }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id 
                   ? 'border-gold text-gold' 
                   : 'border-transparent text-[#B0C4BF] hover:text-[#FDFBF7]'
@@ -484,6 +514,40 @@ const SettingsPage = () => {
             )}
           </div>
         )}
+
+        {/* Account Tab */}
+        {activeTab === 'account' && (
+          <div className="space-y-6">
+            {/* Danger Zone */}
+            <div className="glass-card rounded-sm p-6 border border-red-500/30">
+              <h2 className="font-serif text-xl text-red-400 mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Danger Zone
+              </h2>
+              
+              <div className="bg-red-500/10 rounded-sm p-4 mb-4">
+                <h3 className="text-[#FDFBF7] font-medium mb-2">Delete Account</h3>
+                <p className="text-[#B0C4BF] text-sm mb-4">
+                  Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+                <ul className="text-sm text-[#B0C4BF] space-y-1 mb-4">
+                  <li>• All your reading progress will be deleted</li>
+                  <li>• Your bookshelf and favorites will be removed</li>
+                  <li>• Any active subscription will be cancelled</li>
+                  <li>• Purchased PDFs access will be revoked</li>
+                </ul>
+                <Button 
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="bg-red-600 text-white hover:bg-red-500"
+                  data-testid="delete-account-btn"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete My Account
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Cancel Subscription Dialog */}
@@ -526,6 +590,55 @@ const SettingsPage = () => {
               data-testid="confirm-cancel-btn"
             >
               {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="bg-surface border-red-500/30">
+          <DialogHeader>
+            <DialogTitle className="text-red-400 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              Delete Account Permanently
+            </DialogTitle>
+            <DialogDescription className="text-[#B0C4BF]">
+              This action is permanent and cannot be undone. All your data will be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="my-4">
+            <Label className="text-[#FDFBF7] mb-2 block">
+              Type <strong className="text-red-400">DELETE</strong> to confirm:
+            </Label>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE here"
+              className="bg-[#082E26] border-red-500/30 text-[#FDFBF7]"
+              data-testid="delete-confirm-input"
+            />
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeleteConfirmText('');
+              }}
+              className="border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteAccount}
+              disabled={deleting || deleteConfirmText !== 'DELETE'}
+              className="bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+              data-testid="confirm-delete-btn"
+            >
+              {deleting ? 'Deleting...' : 'Delete My Account'}
             </Button>
           </DialogFooter>
         </DialogContent>
