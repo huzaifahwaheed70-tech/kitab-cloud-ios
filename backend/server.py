@@ -54,12 +54,17 @@ SUBSCRIPTION_TIERS = {
 }
 
 # Apple StoreKit Product IDs mapping to tiers
+# NOTE: Product IDs are reversed from names in App Store Connect
+# kitabcloud.basic = Premium Plan (Level 1) = Tier 4
+# kitabcloud.standard = Advanced Plan (Level 2) = Tier 3
+# kitabcloud.advanced = Standard Plan (Level 3) = Tier 2
+# kitabcloud.premium = Basic Plan (Level 4) = Tier 1
 APPLE_PRODUCT_IDS = {
-    # Subscription products
-    "kitabcloud.basic": 1,
-    "kitabcloud.standard": 2,
-    "kitabcloud.advanced": 3,
-    "kitabcloud.premium": 4,
+    # Subscription products (mapped to match App Store Connect setup)
+    "kitabcloud.basic": 4,      # Premium Plan (highest tier)
+    "kitabcloud.standard": 3,   # Advanced Plan
+    "kitabcloud.advanced": 2,   # Standard Plan
+    "kitabcloud.premium": 1,    # Basic Plan (lowest tier)
 }
 
 # Apple Book Product IDs (Non-Consumable) - maps to darussalam_code
