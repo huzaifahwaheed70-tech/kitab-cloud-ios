@@ -6,16 +6,11 @@
 import { Capacitor } from '@capacitor/core';
 
 // Product IDs matching App Store Connect
-// NOTE: Product IDs are reversed from tier numbers due to App Store Connect setup
-// kitabcloud.basic = Premium Plan (Level 1) = Tier 4
-// kitabcloud.standard = Advanced Plan (Level 2) = Tier 3
-// kitabcloud.advanced = Standard Plan (Level 3) = Tier 2
-// kitabcloud.premium = Basic Plan (Level 4) = Tier 1
 export const SUBSCRIPTION_PRODUCTS = {
-  1: 'kitabcloud.premium',    // Tier 1 - Basic Plan
-  2: 'kitabcloud.advanced',   // Tier 2 - Standard Plan
-  3: 'kitabcloud.standard',   // Tier 3 - Advanced Plan
-  4: 'kitabcloud.basic',      // Tier 4 - Premium Plan
+  1: 'kitabcloud.basic',      // Tier 1 - Basic
+  2: 'kitabcloud.standard',   // Tier 2 - Standard
+  3: 'kitabcloud.advanced',   // Tier 3 - Advanced
+  4: 'kitabcloud.premium',    // Tier 4 - Premium
 };
 
 // Map book darussalam_code to Apple Product ID
