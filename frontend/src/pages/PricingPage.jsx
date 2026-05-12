@@ -2,18 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, RotateCcw } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
-import { openPaymentUrl, isIOS, isNativeApp } from '../utils/browser';
+import { isIOS, isNativeApp } from '../utils/browser';
 import { storeKitService, SUBSCRIPTION_PRODUCTS } from '../services/storekit';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
-  const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [isIOSApp, setIsIOSApp] = useState(false);
@@ -135,9 +134,8 @@ const PricingPage = () => {
       // Ensure StoreKit is initialized
       const initResult = await storeKitService.initialize();
       if (!initResult) {
-        // Fall back to Stripe if StoreKit fails
-        console.log('[PricingPage] StoreKit init failed, falling back to Stripe');
-        await handleStripeSubscription(tier);
+        toast.error('In-App Purchases not available. Please try again later.');
+        setLoading(null);
         return;
       }
       
@@ -159,13 +157,9 @@ const PricingPage = () => {
     } catch (error) {
       if (error.message === 'Purchase cancelled') {
         toast.info('Purchase cancelled');
-      } else if (error.message?.includes('not available') || error.message?.includes('not initialized')) {
-        // Fall back to Stripe
-        console.log('[PricingPage] StoreKit error, falling back to Stripe:', error.message);
-        toast.info('Using web checkout...');
-        await handleStripeSubscription(tier);
       } else {
-        throw error;
+        console.error('[PricingPage] StoreKit error:', error);
+        toast.error(error.message || 'Purchase failed. Please try again.');
       }
     } finally {
       setLoading(null);
@@ -179,14 +173,8 @@ const PricingPage = () => {
       origin_url: window.location.origin
     }, { headers, withCredentials: true });
 
-    // Open payment URL
-    const result = await openPaymentUrl(response.data.url);
-    
-    // On iOS web (not native), show modal with tappable link
-    if (result.showModal) {
-      setPaymentModal({ show: true, url: result.url });
-      setLoading(null);
-    }
+    // For web, just redirect to Stripe
+    window.location.href = response.data.url;
   };
 
   const handleRestorePurchases = async () => {
@@ -441,47 +429,6 @@ const PricingPage = () => {
           </div>
         </div>
       </footer>
-
-      {/* iOS Payment Modal - Shows tappable link to open in external browser */}
-      {paymentModal.show && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
-            <button 
-              onClick={() => setPaymentModal({ show: false, url: null })}
-              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
-                <ExternalLink className="w-8 h-8 text-gold" />
-              </div>
-              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Payment</h3>
-              <p className="text-[#B0C4BF] mb-6">
-                Tap the button below to open secure checkout in your browser.
-              </p>
-              
-              {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
-              <a 
-                href={paymentModal.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
-                onClick={() => setPaymentModal({ show: false, url: null })}
-                data-testid="external-payment-link"
-              >
-                <ExternalLink className="w-5 h-5" />
-                Open Secure Checkout
-              </a>
-              
-              <p className="text-xs text-[#B0C4BF] mt-4">
-                You'll be redirected to Stripe's secure payment page
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
