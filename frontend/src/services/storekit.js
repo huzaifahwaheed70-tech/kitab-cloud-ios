@@ -1,6 +1,6 @@
 /**
  * StoreKit Service for Apple In-App Purchases
- * Handles subscriptions and one-time book purchases on iOS
+ * Uses @capgo/native-purchases for iOS StoreKit 2
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -33,7 +33,8 @@ export const BOOK_PRODUCT_IDS = {
 
 class StoreKitService {
   constructor() {
-    this.purchases = null;
+    this.NativePurchases = null;
+    this.PURCHASE_TYPE = null;
     this.initialized = false;
     this.products = {};
   }
@@ -42,7 +43,11 @@ class StoreKitService {
    * Check if we're running on iOS native app
    */
   isIOSNativeApp() {
-    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+    try {
+      return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+    } catch (e) {
+      return false;
+    }
   }
 
   /**
@@ -60,17 +65,16 @@ class StoreKitService {
 
     try {
       // Dynamically import the plugin only on iOS
-      const { Purchases } = await import('@capgo/capacitor-purchases');
-      this.purchases = Purchases;
+      const module = await import('@capgo/native-purchases');
+      this.NativePurchases = module.NativePurchases;
+      this.PURCHASE_TYPE = module.PURCHASE_TYPE;
       
-      // Setup purchase listener
-      await this.purchases.addListener('purchaseCompleted', (info) => {
-        console.log('[StoreKit] Purchase completed:', info);
-      });
-
-      await this.purchases.addListener('purchaseFailed', (info) => {
-        console.error('[StoreKit] Purchase failed:', info);
-      });
+      // Check if billing is supported
+      const { isBillingSupported } = await this.NativePurchases.isBillingSupported();
+      if (!isBillingSupported) {
+        console.error('[StoreKit] Billing not supported on this device');
+        return false;
+      }
 
       this.initialized = true;
       console.log('[StoreKit] Initialized successfully');
@@ -84,19 +88,32 @@ class StoreKitService {
   /**
    * Fetch available products from App Store
    */
-  async fetchProducts(productIds) {
-    if (!this.isIOSNativeApp() || !this.purchases) {
+  async fetchProducts(productIds, type = 'SUBS') {
+    if (!this.isIOSNativeApp()) {
+      return [];
+    }
+
+    // Ensure initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.NativePurchases) {
+      console.error('[StoreKit] Plugin not available');
       return [];
     }
 
     try {
-      const { products } = await this.purchases.getProducts({ 
-        productIds: productIds 
+      const purchaseType = type === 'SUBS' ? this.PURCHASE_TYPE.SUBS : this.PURCHASE_TYPE.INAPP;
+      
+      const { products } = await this.NativePurchases.getProducts({
+        productIdentifiers: productIds,
+        productType: purchaseType
       });
       
       // Cache products
       products.forEach(product => {
-        this.products[product.identifier] = product;
+        this.products[product.productIdentifier] = product;
       });
 
       console.log('[StoreKit] Fetched products:', products);
@@ -112,7 +129,7 @@ class StoreKitService {
    */
   async fetchSubscriptionProducts() {
     const subscriptionIds = Object.values(SUBSCRIPTION_PRODUCTS);
-    return this.fetchProducts(subscriptionIds);
+    return this.fetchProducts(subscriptionIds, 'SUBS');
   }
 
   /**
@@ -125,7 +142,7 @@ class StoreKitService {
       return null;
     }
     
-    const products = await this.fetchProducts([productId]);
+    const products = await this.fetchProducts([productId], 'INAPP');
     return products.length > 0 ? products[0] : null;
   }
 
@@ -133,8 +150,16 @@ class StoreKitService {
    * Purchase a subscription
    */
   async purchaseSubscription(tier) {
-    if (!this.isIOSNativeApp() || !this.purchases) {
+    if (!this.isIOSNativeApp()) {
       throw new Error('StoreKit not available');
+    }
+
+    // Ensure initialized
+    if (!this.initialized) {
+      const initResult = await this.initialize();
+      if (!initResult) {
+        throw new Error('StoreKit initialization failed');
+      }
     }
 
     const productId = SUBSCRIPTION_PRODUCTS[tier];
@@ -145,8 +170,9 @@ class StoreKitService {
     try {
       console.log('[StoreKit] Purchasing subscription:', productId);
       
-      const result = await this.purchases.purchaseProduct({
+      const result = await this.NativePurchases.purchaseProduct({
         productIdentifier: productId,
+        productType: this.PURCHASE_TYPE.SUBS
       });
 
       console.log('[StoreKit] Purchase result:', result);
@@ -155,14 +181,16 @@ class StoreKitService {
       return {
         success: true,
         productId: productId,
-        transactionId: result.transactionIdentifier,
-        receipt: result.receipt,
+        transactionId: result.transactionId || result.transaction?.transactionIdentifier,
+        receipt: result.receipt || '',
       };
     } catch (error) {
       console.error('[StoreKit] Purchase failed:', error);
       
       // Check if user cancelled
-      if (error.code === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+      if (error.code === 'USER_CANCELLED' || 
+          error.message?.includes('cancelled') || 
+          error.message?.includes('canceled')) {
         throw new Error('Purchase cancelled');
       }
       
@@ -174,8 +202,16 @@ class StoreKitService {
    * Purchase a book (non-consumable)
    */
   async purchaseBook(darussalamCode) {
-    if (!this.isIOSNativeApp() || !this.purchases) {
+    if (!this.isIOSNativeApp()) {
       throw new Error('StoreKit not available');
+    }
+
+    // Ensure initialized
+    if (!this.initialized) {
+      const initResult = await this.initialize();
+      if (!initResult) {
+        throw new Error('StoreKit initialization failed');
+      }
     }
 
     const productId = BOOK_PRODUCT_IDS[darussalamCode];
@@ -186,8 +222,9 @@ class StoreKitService {
     try {
       console.log('[StoreKit] Purchasing book:', productId);
       
-      const result = await this.purchases.purchaseProduct({
+      const result = await this.NativePurchases.purchaseProduct({
         productIdentifier: productId,
+        productType: this.PURCHASE_TYPE.INAPP
       });
 
       console.log('[StoreKit] Book purchase result:', result);
@@ -195,13 +232,15 @@ class StoreKitService {
       return {
         success: true,
         productId: productId,
-        transactionId: result.transactionIdentifier,
-        receipt: result.receipt,
+        transactionId: result.transactionId || result.transaction?.transactionIdentifier,
+        receipt: result.receipt || '',
       };
     } catch (error) {
       console.error('[StoreKit] Book purchase failed:', error);
       
-      if (error.code === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+      if (error.code === 'USER_CANCELLED' || 
+          error.message?.includes('cancelled') ||
+          error.message?.includes('canceled')) {
         throw new Error('Purchase cancelled');
       }
       
@@ -213,12 +252,21 @@ class StoreKitService {
    * Restore previous purchases
    */
   async restorePurchases() {
-    if (!this.isIOSNativeApp() || !this.purchases) {
+    if (!this.isIOSNativeApp()) {
       throw new Error('StoreKit not available');
     }
 
+    // Ensure initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.NativePurchases) {
+      throw new Error('StoreKit not initialized');
+    }
+
     try {
-      const result = await this.purchases.restorePurchases();
+      const result = await this.NativePurchases.restorePurchases();
       console.log('[StoreKit] Restore result:', result);
       return result;
     } catch (error) {
@@ -231,32 +279,26 @@ class StoreKitService {
    * Get active subscriptions
    */
   async getActiveSubscriptions() {
-    if (!this.isIOSNativeApp() || !this.purchases) {
+    if (!this.isIOSNativeApp()) {
+      return [];
+    }
+
+    // Ensure initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.NativePurchases) {
       return [];
     }
 
     try {
-      const { activeSubscriptions } = await this.purchases.getActiveSubscriptions();
-      return activeSubscriptions || [];
+      const { transactions } = await this.NativePurchases.getLatestTransaction({
+        productIdentifier: Object.values(SUBSCRIPTION_PRODUCTS)[0]
+      });
+      return transactions || [];
     } catch (error) {
       console.error('[StoreKit] Failed to get active subscriptions:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get purchased products (books)
-   */
-  async getPurchasedProducts() {
-    if (!this.isIOSNativeApp() || !this.purchases) {
-      return [];
-    }
-
-    try {
-      const { purchasedProducts } = await this.purchases.getPurchasedProducts();
-      return purchasedProducts || [];
-    } catch (error) {
-      console.error('[StoreKit] Failed to get purchased products:', error);
       return [];
     }
   }
@@ -266,7 +308,7 @@ class StoreKitService {
    */
   formatPrice(product) {
     if (!product) return '';
-    return product.priceString || `$${product.price}`;
+    return product.priceString || product.localizedPrice || `$${product.price}`;
   }
 }
 
