@@ -2,21 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown, RotateCcw } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
-import { isIOS, isNativeApp } from '../utils/browser';
-import { storeKitService, SUBSCRIPTION_PRODUCTS } from '../services/storekit';
+import { openPaymentUrl } from '../utils/browser';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
+  const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
-  const [isIOSApp, setIsIOSApp] = useState(false);
-  const [restoringPurchases, setRestoringPurchases] = useState(false);
 
   // Default features for each tier
   const tierFeatures = {
@@ -29,23 +27,7 @@ const PricingPage = () => {
 
   useEffect(() => {
     fetchTiers();
-    initializeStoreKit();
   }, []);
-
-  const initializeStoreKit = async () => {
-    // Check if we're on iOS native app
-    const iosNative = isIOS() && isNativeApp();
-    setIsIOSApp(iosNative);
-    
-    if (iosNative) {
-      try {
-        await storeKitService.initialize();
-        console.log('[PricingPage] StoreKit initialized');
-      } catch (error) {
-        console.error('[PricingPage] StoreKit init failed:', error);
-      }
-    }
-  };
 
   const fetchTiers = async () => {
     try {
@@ -117,94 +99,24 @@ const PricingPage = () => {
     setLoading(tier);
     
     try {
-      // Use StoreKit for iOS native app, Stripe for web/Android
-      if (isIOSApp) {
-        await handleAppleSubscription(tier);
-      } else {
-        await handleStripeSubscription(tier);
+      // Use Stripe for all platforms
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.post(`${API}/payments/create-checkout`, {
+        tier,
+        origin_url: window.location.origin
+      }, { headers, withCredentials: true });
+
+      // Open payment URL
+      const result = await openPaymentUrl(response.data.url);
+      
+      // On iOS, show modal with tappable link
+      if (result.showModal) {
+        setPaymentModal({ show: true, url: result.url });
+        setLoading(null);
       }
     } catch (error) {
       toast.error(error.message || 'Failed to process payment');
       setLoading(null);
-    }
-  };
-
-  const handleAppleSubscription = async (tier) => {
-    try {
-      // Ensure StoreKit is initialized
-      const initResult = await storeKitService.initialize();
-      if (!initResult) {
-        toast.error('In-App Purchases not available. Please try again later.');
-        setLoading(null);
-        return;
-      }
-      
-      // Purchase via StoreKit
-      const result = await storeKitService.purchaseSubscription(tier);
-      
-      if (result.success) {
-        // Validate with backend
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        await axios.post(`${API}/payments/apple/validate`, {
-          product_id: result.productId,
-          transaction_id: result.transactionId,
-          receipt: result.receipt
-        }, { headers, withCredentials: true });
-        
-        toast.success('Subscription activated!');
-        navigate('/library');
-      }
-    } catch (error) {
-      if (error.message === 'Purchase cancelled') {
-        toast.info('Purchase cancelled');
-      } else {
-        console.error('[PricingPage] StoreKit error:', error);
-        toast.error(error.message || 'Purchase failed. Please try again.');
-      }
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleStripeSubscription = async (tier) => {
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const response = await axios.post(`${API}/payments/create-checkout`, {
-      tier,
-      origin_url: window.location.origin
-    }, { headers, withCredentials: true });
-
-    // For web, just redirect to Stripe
-    window.location.href = response.data.url;
-  };
-
-  const handleRestorePurchases = async () => {
-    if (!isIOSApp) return;
-    
-    setRestoringPurchases(true);
-    try {
-      await storeKitService.restorePurchases();
-      
-      // Check for active subscriptions and sync with backend
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const activeSubscriptions = await storeKitService.getActiveSubscriptions();
-      
-      if (activeSubscriptions.length > 0) {
-        // Restore the first active subscription
-        for (const sub of activeSubscriptions) {
-          await axios.post(`${API}/payments/apple/validate`, {
-            product_id: sub.productId,
-            transaction_id: sub.transactionId,
-          }, { headers, withCredentials: true });
-        }
-        toast.success('Purchases restored!');
-        navigate('/library');
-      } else {
-        toast.info('No purchases to restore');
-      }
-    } catch (error) {
-      toast.error('Failed to restore purchases');
-    } finally {
-      setRestoringPurchases(false);
     }
   };
 
@@ -394,27 +306,6 @@ const PricingPage = () => {
         </div>
       </section>
 
-      {/* iOS Restore Purchases */}
-      {isIOSApp && user && (
-        <section className="pb-12">
-          <div className="max-w-3xl mx-auto px-6 text-center">
-            <Button
-              onClick={handleRestorePurchases}
-              disabled={restoringPurchases}
-              variant="outline"
-              className="border-gold/50 text-gold hover:bg-gold/10"
-              data-testid="restore-purchases-btn"
-            >
-              <RotateCcw className={`w-4 h-4 mr-2 ${restoringPurchases ? 'animate-spin' : ''}`} />
-              {restoringPurchases ? 'Restoring...' : 'Restore Purchases'}
-            </Button>
-            <p className="text-[#B0C4BF] text-sm mt-2">
-              Previously purchased? Tap to restore your subscriptions.
-            </p>
-          </div>
-        </section>
-      )}
-
       {/* Footer */}
       <footer className="bg-surface border-t border-[rgba(212,175,55,0.2)] py-12">
         <div className="max-w-7xl mx-auto px-6">
@@ -429,6 +320,47 @@ const PricingPage = () => {
           </div>
         </div>
       </footer>
+
+      {/* iOS Payment Modal - Shows tappable link to open in external browser */}
+      {paymentModal.show && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
+            <button 
+              onClick={() => setPaymentModal({ show: false, url: null })}
+              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
+                <ExternalLink className="w-8 h-8 text-gold" />
+              </div>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Payment</h3>
+              <p className="text-[#B0C4BF] mb-6">
+                Tap the button below to open secure checkout in your browser.
+              </p>
+              
+              {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
+              <a 
+                href={paymentModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
+                onClick={() => setPaymentModal({ show: false, url: null })}
+                data-testid="external-payment-link"
+              >
+                <ExternalLink className="w-5 h-5" />
+                Open Secure Checkout
+              </a>
+              
+              <p className="text-xs text-[#B0C4BF] mt-4">
+                You'll be redirected to Stripe's secure payment page
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
