@@ -302,7 +302,13 @@ const BookDetailPage = () => {
   const handleAppleBookPurchase = async () => {
     try {
       // Initialize StoreKit if needed
-      await storeKitService.initialize();
+      const initResult = await storeKitService.initialize();
+      if (!initResult) {
+        // Fall back to Stripe if StoreKit fails
+        console.log('[BookDetail] StoreKit init failed, falling back to Stripe');
+        await handleStripeBookPurchase();
+        return;
+      }
       
       // Purchase via StoreKit
       const result = await storeKitService.purchaseBook(book.darussalam_code);
@@ -325,6 +331,11 @@ const BookDetailPage = () => {
     } catch (error) {
       if (error.message === 'Purchase cancelled') {
         toast.info('Purchase cancelled');
+      } else if (error.message?.includes('not available') || error.message?.includes('not initialized')) {
+        // Fall back to Stripe
+        console.log('[BookDetail] StoreKit error, falling back to Stripe:', error.message);
+        toast.info('Using web checkout...');
+        await handleStripeBookPurchase();
       } else {
         throw error;
       }
