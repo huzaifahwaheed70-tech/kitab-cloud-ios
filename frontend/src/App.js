@@ -18,6 +18,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 
 // HARDCODED production URL for iOS Capacitor builds
 // Codemagic env vars may not be injected properly during React build
@@ -200,6 +201,8 @@ const AppRouter = () => {
           <AdminDashboard />
         </ProtectedRoute>
       } />
+      
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
       
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

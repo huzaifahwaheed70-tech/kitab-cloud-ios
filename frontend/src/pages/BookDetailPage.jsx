@@ -856,6 +856,9 @@ const BookDetailPage = () => {
               <p className="text-xs text-[#B0C4BF] mt-4">
                 You'll be redirected to Stripe's secure payment page
               </p>
+              <Link to="/privacy" className="text-xs text-gold hover:underline mt-2 inline-block">
+                Privacy Policy
+              </Link>
             </div>
           </div>
         </div>

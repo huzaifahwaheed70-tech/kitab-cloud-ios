@@ -314,9 +314,14 @@ const PricingPage = () => {
               <img src="/logo.png" alt="Kitab Cloud" className="w-8 h-8 rounded-sm object-cover" />
               <span className="font-serif text-lg text-[#FDFBF7]">Dar-Us-Salam Kitab Cloud</span>
             </div>
-            <p className="text-[#B0C4BF] text-sm">
-              © {new Date().getFullYear()} Dar-Us-Salam Publications. All rights reserved.
-            </p>
+            <div className="flex items-center gap-6">
+              <Link to="/privacy" className="text-[#B0C4BF] hover:text-gold text-sm transition-colors">
+                Privacy Policy
+              </Link>
+              <p className="text-[#B0C4BF] text-sm">
+                © {new Date().getFullYear()} Dar-Us-Salam Publications
+              </p>
+            </div>
           </div>
         </div>
       </footer>
@@ -357,6 +362,9 @@ const PricingPage = () => {
               <p className="text-xs text-[#B0C4BF] mt-4">
                 You'll be redirected to Stripe's secure payment page
               </p>
+              <Link to="/privacy" className="text-xs text-gold hover:underline mt-2 inline-block">
+                Privacy Policy
+              </Link>
             </div>
           </div>
         </div>
