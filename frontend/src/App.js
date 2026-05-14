@@ -19,6 +19,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://kitab-cloud.emergent.host";
 const API = `${BACKEND_URL}/api`;
@@ -51,7 +52,6 @@ const AuthProvider = ({ children }) => {
         setUser(response.data);
         setToken(storedToken);
       } else if (Capacitor.getPlatform() !== 'ios') {
-        // Only try cookie auth on web, not iOS
         const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
         setUser(response.data);
       }

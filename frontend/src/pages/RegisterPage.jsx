@@ -350,6 +350,13 @@ const RegisterPage = () => {
               Forgot your password?
             </Link>
           </p>
+          
+          <p className="mt-4 text-center text-xs text-[#B0C4BF]">
+            By creating an account, you agree to our{' '}
+            <Link to="/privacy" className="text-gold hover:underline">
+              Privacy Policy
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -297,9 +297,14 @@ const LandingPage = () => {
             <img src="/logo.png" alt="Kitab Cloud" className="w-8 h-8 rounded-sm object-cover" />
             <span className="font-serif text-[#FDFBF7]">Kitab Cloud</span>
           </div>
-          <p className="text-sm text-[#B0C4BF]">
-            Powered by <a href="https://dar-us-salam.com" target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">Dar-Us-Salam Publications</a>
-          </p>
+          <div className="flex items-center gap-4">
+            <Link to="/privacy" className="text-sm text-[#B0C4BF] hover:text-gold transition-colors">
+              Privacy Policy
+            </Link>
+            <p className="text-sm text-[#B0C4BF]">
+              Powered by <a href="https://dar-us-salam.com" target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">Dar-Us-Salam</a>
+            </p>
+          </div>
           <a href="https://dar-us-salam.com" target="_blank" rel="noopener noreferrer" className="text-sm text-gold hover:underline flex items-center gap-1">
             Visit Dar-Us-Salam.com <ExternalLink className="w-3 h-3" />
           </a>
