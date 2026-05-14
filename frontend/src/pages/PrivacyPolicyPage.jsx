@@ -152,7 +152,7 @@ const PrivacyPolicyPage = () => {
       {/* Footer */}
       <footer className="bg-surface border-t border-[rgba(212,175,55,0.2)] py-8 mt-12">
         <div className="max-w-4xl mx-auto px-6 text-center text-[#B0C4BF] text-sm">
-          <p>&copy; {new Date().getFullYear()} Darussalam Publishers. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Dar-Us-Salam Publications. All rights reserved.</p>
         </div>
       </footer>
     </div>
