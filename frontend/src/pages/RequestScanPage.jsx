@@ -43,7 +43,7 @@ const RequestScanPage = () => {
     e.preventDefault();
     
     if (!formData.book_title && !formData.darussalam_code) {
-      toast.error('Please provide a book title or Darussalam code');
+      toast.error('Please provide a book title or Dar-Us-Salam code');
       return;
     }
 
@@ -138,7 +138,7 @@ const RequestScanPage = () => {
 
               <div>
                 <Label htmlFor="darussalam_code" className="text-[#FDFBF7] mb-2 block">
-                  Darussalam Code <span className="text-[#B0C4BF] text-sm">(if known)</span>
+                  Dar-Us-Salam Code <span className="text-[#B0C4BF] text-sm">(if known)</span>
                 </Label>
                 <Input
                   id="darussalam_code"

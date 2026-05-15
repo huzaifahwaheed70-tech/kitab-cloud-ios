@@ -142,8 +142,8 @@ const PrivacyPolicyPage = () => {
               If you have questions or concerns about this Privacy Policy or our data practices, please contact us at:
             </p>
             <div className="bg-surface p-4 rounded-sm border border-[rgba(212,175,55,0.2)] mt-4">
-              <p><strong className="text-[#FDFBF7]">Darussalam Publishers</strong></p>
-              <p>Email: support@darussalam.com</p>
+              <p><strong className="text-[#FDFBF7]">Dar-Us-Salam Publications</strong></p>
+              <p>Email: sales@dar-us-salam.com</p>
             </div>
           </section>
         </div>
@@ -152,7 +152,7 @@ const PrivacyPolicyPage = () => {
       {/* Footer */}
       <footer className="bg-surface border-t border-[rgba(212,175,55,0.2)] py-8 mt-12">
         <div className="max-w-4xl mx-auto px-6 text-center text-[#B0C4BF] text-sm">
-          <p>&copy; {new Date().getFullYear()} Darussalam Publishers. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Dar-Us-Salam Publications. All rights reserved.</p>
         </div>
       </footer>
     </div>
