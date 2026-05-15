@@ -274,14 +274,15 @@ const BookDetailPage = () => {
       return;
     }
 
-    // For guest users, open the external Dar-Us-Salam website to purchase
+    // For guest users, redirect to the same book on the Kitab Cloud website
+    // They'll create an account there, purchase, then log in to the app
     if (user?.is_guest) {
-      const purchaseUrl = book?.purchase_link || 'https://dar-us-salam.com';
-      const result = await openPaymentUrl(purchaseUrl);
+      const websiteUrl = `https://kitab-cloud.emergent.host/book/${bookId}`;
+      const result = await openPaymentUrl(websiteUrl);
       if (result.showModal) {
         setPaymentModal({ show: true, url: result.url });
       } else {
-        window.open(purchaseUrl, '_blank');
+        window.open(websiteUrl, '_blank');
       }
       return;
     }
@@ -895,11 +896,11 @@ const BookDetailPage = () => {
                 <ExternalLink className="w-8 h-8 text-gold" />
               </div>
               <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
-                {user?.is_guest ? 'Purchase on Website' : 'Complete Payment'}
+                {user?.is_guest ? 'Continue on Website' : 'Complete Payment'}
               </h3>
               <p className="text-[#B0C4BF] mb-6">
                 {user?.is_guest 
-                  ? 'Tap the button below to purchase this book on our website.'
+                  ? 'Create an account on our website to purchase this book, then log in here.'
                   : 'Tap the button below to open secure checkout in your browser.'
                 }
               </p>
@@ -913,28 +914,24 @@ const BookDetailPage = () => {
                 data-testid="external-payment-link"
               >
                 <ExternalLink className="w-5 h-5" />
-                {user?.is_guest ? 'Open Dar-Us-Salam Store' : 'Open Secure Checkout'}
+                {user?.is_guest ? 'Open Kitab Cloud Website' : 'Open Secure Checkout'}
               </a>
               
-              {/* For guests, show message to create account after purchase */}
+              {/* For guests, show instructions */}
               {user?.is_guest && (
-                <div className="mt-4 p-3 bg-[#082E26] rounded-md">
-                  <p className="text-sm text-[#B0C4BF] mb-2">
-                    After purchasing, create an account to access your downloads in the app.
-                  </p>
-                  <Link
-                    to="/register"
-                    className="inline-flex items-center justify-center gap-2 text-gold hover:underline text-sm"
-                    onClick={() => setPaymentModal({ show: false, url: null })}
-                  >
-                    Create Account
-                  </Link>
+                <div className="mt-4 p-3 bg-[#082E26] rounded-md text-left">
+                  <p className="text-sm text-[#FDFBF7] font-medium mb-2">How to purchase:</p>
+                  <ol className="text-sm text-[#B0C4BF] space-y-1 list-decimal list-inside">
+                    <li>Create an account on the website</li>
+                    <li>Purchase the book</li>
+                    <li>Return here and log in with your account</li>
+                  </ol>
                 </div>
               )}
               
               <p className="text-xs text-[#B0C4BF] mt-4">
                 {user?.is_guest 
-                  ? 'Your purchase will be available after you create an account'
+                  ? 'After purchasing, log in to the app to access your book'
                   : 'You\'ll be redirected to Stripe\'s secure payment page'
                 }
               </p>
