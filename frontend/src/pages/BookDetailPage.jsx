@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { 
   ArrowLeft, BookMarked, ChevronLeft, ChevronRight, 
-  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library, ExternalLink
+  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library, ExternalLink, Download
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -45,6 +45,32 @@ const BookDetailPage = () => {
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
 
+  // Check local storage for guest purchases
+  const getLocalPurchases = () => {
+    try {
+      const purchases = localStorage.getItem('kitabcloud_purchases');
+      return purchases ? JSON.parse(purchases) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const addLocalPurchase = (bookId) => {
+    try {
+      const purchases = getLocalPurchases();
+      if (!purchases.includes(bookId)) {
+        purchases.push(bookId);
+        localStorage.setItem('kitabcloud_purchases', JSON.stringify(purchases));
+      }
+    } catch (e) {
+      console.error('Failed to save local purchase:', e);
+    }
+  };
+
+  const hasLocalPurchase = (bookId) => {
+    return getLocalPurchases().includes(bookId);
+  };
+
   useEffect(() => {
     // Only fetch once auth is fully resolved
     if (!authLoading) {
@@ -57,12 +83,20 @@ const BookDetailPage = () => {
         checkPurchased();
         loadReadingProgress();
       }
+      // Check local storage for guest purchases
+      if (user?.is_guest && hasLocalPurchase(bookId)) {
+        setHasPurchased(true);
+      }
     }
     
-    // Check if just purchased
+    // Check if just purchased (from URL param)
     if (searchParams.get('purchased') === 'true') {
       toast.success('PDF purchased successfully! You can now read it.');
       setHasPurchased(true);
+      // Save to local storage for guests
+      if (user?.is_guest) {
+        addLocalPurchase(bookId);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, authLoading, user, token]);
@@ -274,9 +308,15 @@ const BookDetailPage = () => {
       return;
     }
 
+    // For guest users, open the external Dar-Us-Salam website to purchase
     if (user?.is_guest) {
-      toast.error('Please create an account to purchase');
-      navigate('/register');
+      const purchaseUrl = book?.purchase_link || 'https://dar-us-salam.com';
+      const result = await openPaymentUrl(purchaseUrl);
+      if (result.showModal) {
+        setPaymentModal({ show: true, url: result.url });
+      } else {
+        window.open(purchaseUrl, '_blank');
+      }
       return;
     }
     
@@ -301,6 +341,37 @@ const BookDetailPage = () => {
       toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
     } finally {
       setPurchaseLoading(false);
+    }
+  };
+
+  // Download PDF to device files
+  const handleDownloadPdf = async () => {
+    if (!book?.pdf_url) {
+      toast.error('PDF not available');
+      return;
+    }
+    
+    try {
+      toast.info('Preparing download...');
+      
+      // Fetch the PDF
+      const response = await fetch(book.pdf_url);
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Download started!');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download PDF');
     }
   };
 
@@ -749,21 +820,35 @@ const BookDetailPage = () => {
                   </Button>
                 )}
 
-                {/* Buy PDF button */}
+                {/* Buy PDF button - for guests, opens external store */}
                 {book.pdf_price && !hasPurchased && (
                   <Button
                     size="lg"
                     variant="outline"
                     onClick={handleBuyPdf}
+                    disabled={purchaseLoading}
                     className="border-gold text-gold hover:bg-gold/10"
                     data-testid="buy-pdf-btn"
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
-                    Buy PDF (${book.pdf_price})
+                    {purchaseLoading ? 'Processing...' : (user?.is_guest ? `Buy on Website ($${book.pdf_price})` : `Buy PDF ($${book.pdf_price})`)}
                   </Button>
                 )}
 
-                {hasPurchased && (
+                {/* Download PDF button - shown after purchase */}
+                {hasPurchased && book.pdf_url && (
+                  <Button
+                    size="lg"
+                    onClick={handleDownloadPdf}
+                    className="bg-green-600 hover:bg-green-500 text-white"
+                    data-testid="download-pdf-btn"
+                  >
+                    <Download className="w-5 h-5 mr-2" />
+                    Download PDF
+                  </Button>
+                )}
+
+                {hasPurchased && !book.pdf_url && (
                   <span className="text-green-500 text-sm self-center">✓ PDF Purchased</span>
                 )}
 
@@ -835,9 +920,14 @@ const BookDetailPage = () => {
               <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
                 <ExternalLink className="w-8 h-8 text-gold" />
               </div>
-              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Payment</h3>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
+                {user?.is_guest ? 'Purchase on Website' : 'Complete Payment'}
+              </h3>
               <p className="text-[#B0C4BF] mb-6">
-                Tap the button below to open secure checkout in your browser.
+                {user?.is_guest 
+                  ? 'Tap the button below to purchase this book on our website.'
+                  : 'Tap the button below to open secure checkout in your browser.'
+                }
               </p>
               
               {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
@@ -846,15 +936,33 @@ const BookDetailPage = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
-                onClick={() => setPaymentModal({ show: false, url: null })}
                 data-testid="external-payment-link"
               >
                 <ExternalLink className="w-5 h-5" />
-                Open Secure Checkout
+                {user?.is_guest ? 'Open Dar-Us-Salam Store' : 'Open Secure Checkout'}
               </a>
               
+              {/* Button for guests to confirm purchase completion */}
+              {user?.is_guest && (
+                <button
+                  onClick={() => {
+                    addLocalPurchase(bookId);
+                    setHasPurchased(true);
+                    setPaymentModal({ show: false, url: null });
+                    toast.success('Purchase confirmed! You can now download the PDF.');
+                  }}
+                  className="mt-4 w-full py-3 text-gold border border-gold/30 rounded-md hover:bg-gold/10 transition-colors"
+                  data-testid="confirm-purchase-btn"
+                >
+                  I've Completed My Purchase
+                </button>
+              )}
+              
               <p className="text-xs text-[#B0C4BF] mt-4">
-                You'll be redirected to Stripe's secure payment page
+                {user?.is_guest 
+                  ? 'After purchasing, tap "I\'ve Completed My Purchase" to access your download'
+                  : 'You\'ll be redirected to Stripe\'s secure payment page'
+                }
               </p>
               <Link to="/privacy" className="text-xs text-gold hover:underline mt-2 inline-block">
                 Privacy Policy

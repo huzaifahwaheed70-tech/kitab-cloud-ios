@@ -181,39 +181,67 @@ const LibraryPage = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] min-w-[200px] z-[100]">
                   <div className="px-3 py-2 border-b border-[rgba(212,175,55,0.2)]">
-                    <p className="font-medium">{user?.name}</p>
-                    <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
-                    <div className={`tier-badge tier-${userTier} mt-2`}>
-                      {tierDisplayText}
-                    </div>
+                    {user?.is_guest ? (
+                      <>
+                        <p className="font-medium">Guest User</p>
+                        <p className="text-sm text-[#B0C4BF]">Browsing without account</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium">{user?.name}</p>
+                        <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
+                        <div className={`tier-badge tier-${userTier} mt-2`}>
+                          {tierDisplayText}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  {userTier < 4 && (
-                    <DropdownMenuItem asChild className="cursor-pointer hover:bg-gold/10 text-gold">
-                      <Link to="/pricing" data-testid="upgrade-link">
-                        <ChevronRight className="w-4 h-4 mr-2" />
-                        Upgrade Plan
-                      </Link>
-                    </DropdownMenuItem>
+                  {user?.is_guest ? (
+                    <>
+                      <DropdownMenuItem asChild className="cursor-pointer hover:bg-gold/10 text-gold">
+                        <Link to="/register" data-testid="create-account-link">
+                          <User className="w-4 h-4 mr-2" />
+                          Create Account
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
+                        <Link to="/login" data-testid="login-link">
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Sign In
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <>
+                      {userTier < 4 && (
+                        <DropdownMenuItem asChild className="cursor-pointer hover:bg-gold/10 text-gold">
+                          <Link to="/pricing" data-testid="upgrade-link">
+                            <ChevronRight className="w-4 h-4 mr-2" />
+                            Upgrade Plan
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
+                        <Link to="/settings" data-testid="settings-link">
+                          <Settings className="w-4 h-4 mr-2" />
+                          Settings
+                        </Link>
+                      </DropdownMenuItem>
+                      {user?.is_admin && (
+                        <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
+                          <Link to="/admin" data-testid="admin-link">
+                            <User className="w-4 h-4 mr-2" />
+                            Admin Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator className="bg-[rgba(212,175,55,0.2)]" />
+                      <DropdownMenuItem onClick={handleLogout} className="cursor-pointer hover:bg-[#082E26] text-red-400" data-testid="logout-btn">
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </>
                   )}
-                  <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
-                    <Link to="/settings" data-testid="settings-link">
-                      <Settings className="w-4 h-4 mr-2" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  {user?.is_admin && (
-                    <DropdownMenuItem asChild className="cursor-pointer hover:bg-[#082E26]">
-                      <Link to="/admin" data-testid="admin-link">
-                        <User className="w-4 h-4 mr-2" />
-                        Admin Dashboard
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator className="bg-[rgba(212,175,55,0.2)]" />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer hover:bg-[#082E26] text-red-400" data-testid="logout-btn">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -250,40 +278,64 @@ const LibraryPage = () => {
           <div className="md:hidden border-t border-[rgba(212,175,55,0.2)] bg-surface">
             <div className="px-4 py-4 space-y-1">
               <div className="pb-3 border-b border-[rgba(212,175,55,0.2)]">
-                <p className="font-medium text-[#FDFBF7]">{user?.name}</p>
-                <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
-                <div className={`tier-badge tier-${userTier} mt-2 inline-block`}>
-                  {getTierName(userTier)}
-                </div>
+                {user?.is_guest ? (
+                  <>
+                    <p className="font-medium text-[#FDFBF7]">Guest User</p>
+                    <p className="text-sm text-[#B0C4BF]">Browsing without account</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-[#FDFBF7]">{user?.name}</p>
+                    <p className="text-sm text-[#B0C4BF]">{user?.email}</p>
+                    <div className={`tier-badge tier-${userTier} mt-2 inline-block`}>
+                      {getTierName(userTier)}
+                    </div>
+                  </>
+                )}
               </div>
-              <Link to="/bookshelf" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
-                <BookMarked className="w-5 h-5" />
-                My Books
-              </Link>
-              <Link to="/favorites" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
-                <Heart className="w-5 h-5" />
-                Favorites
-              </Link>
-              {userTier < 4 && (
-                <Link to="/pricing" className="flex items-center gap-3 py-3 text-gold min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
-                  <ChevronRight className="w-5 h-5" />
-                  Upgrade Plan
-                </Link>
+              {user?.is_guest ? (
+                <>
+                  <Link to="/register" className="flex items-center gap-3 py-3 text-gold min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                    <User className="w-5 h-5" />
+                    Create Account
+                  </Link>
+                  <Link to="/login" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                    <LogOut className="w-5 h-5" />
+                    Sign In
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/bookshelf" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                    <BookMarked className="w-5 h-5" />
+                    My Books
+                  </Link>
+                  <Link to="/favorites" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                    <Heart className="w-5 h-5" />
+                    Favorites
+                  </Link>
+                  {userTier < 4 && (
+                    <Link to="/pricing" className="flex items-center gap-3 py-3 text-gold min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                      <ChevronRight className="w-5 h-5" />
+                      Upgrade Plan
+                    </Link>
+                  )}
+                  <Link to="/settings" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                    <Settings className="w-5 h-5" />
+                    Settings
+                  </Link>
+                  {user?.is_admin && (
+                    <Link to="/admin" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
+                      <User className="w-5 h-5" />
+                      Admin Dashboard
+                    </Link>
+                  )}
+                  <button onClick={handleLogout} className="flex items-center gap-3 py-3 text-red-400 w-full min-h-[48px]">
+                    <LogOut className="w-5 h-5" />
+                    Sign Out
+                  </button>
+                </>
               )}
-              <Link to="/settings" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
-                <Settings className="w-5 h-5" />
-                Settings
-              </Link>
-              {user?.is_admin && (
-                <Link to="/admin" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
-                  <User className="w-5 h-5" />
-                  Admin Dashboard
-                </Link>
-              )}
-              <button onClick={handleLogout} className="flex items-center gap-3 py-3 text-red-400 w-full min-h-[48px]">
-                <LogOut className="w-5 h-5" />
-                Sign Out
-              </button>
             </div>
           </div>
         )}
