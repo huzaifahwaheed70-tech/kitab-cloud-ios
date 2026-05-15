@@ -45,58 +45,24 @@ const BookDetailPage = () => {
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
 
-  // Check local storage for guest purchases
-  const getLocalPurchases = () => {
-    try {
-      const purchases = localStorage.getItem('kitabcloud_purchases');
-      return purchases ? JSON.parse(purchases) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const addLocalPurchase = (bookId) => {
-    try {
-      const purchases = getLocalPurchases();
-      if (!purchases.includes(bookId)) {
-        purchases.push(bookId);
-        localStorage.setItem('kitabcloud_purchases', JSON.stringify(purchases));
-      }
-    } catch (e) {
-      console.error('Failed to save local purchase:', e);
-    }
-  };
-
-  const hasLocalPurchase = (bookId) => {
-    return getLocalPurchases().includes(bookId);
-  };
-
   useEffect(() => {
     // Only fetch once auth is fully resolved
     if (!authLoading) {
       // Always try to fetch the book (it's public info)
       fetchBook();
-      // Only fetch user-specific data if authenticated
-      if (user && token) {
+      // Only fetch user-specific data if authenticated (not guest)
+      if (user && token && !user.is_guest) {
         checkBookshelf();
         checkFavorites();
         checkPurchased();
         loadReadingProgress();
       }
-      // Check local storage for guest purchases
-      if (user?.is_guest && hasLocalPurchase(bookId)) {
-        setHasPurchased(true);
-      }
     }
     
-    // Check if just purchased (from URL param)
+    // Check if just purchased (from URL param after Stripe redirect)
     if (searchParams.get('purchased') === 'true') {
-      toast.success('PDF purchased successfully! You can now read it.');
+      toast.success('PDF purchased successfully! You can now download it.');
       setHasPurchased(true);
-      // Save to local storage for guests
-      if (user?.is_guest) {
-        addLocalPurchase(bookId);
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, authLoading, user, token]);
@@ -352,26 +318,34 @@ const BookDetailPage = () => {
     }
     
     try {
-      toast.info('Preparing download...');
+      toast.info('Starting download...');
       
-      // Fetch the PDF
-      const response = await fetch(book.pdf_url);
-      const blob = await response.blob();
+      // For iOS/mobile, open in new tab which triggers native download
+      // For desktop, use direct download approach
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('Download started!');
+      if (isIOS) {
+        // On iOS, opening the PDF URL in a new tab allows native sharing/saving
+        window.open(book.pdf_url, '_blank');
+        toast.success('PDF opened! Use the share button to save to Files.');
+      } else {
+        // For desktop and Android, use anchor download
+        const a = document.createElement('a');
+        a.href = book.pdf_url;
+        a.download = `${book.title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.pdf`;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success('Download started!');
+      }
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('Failed to download PDF');
+      // Fallback: just open in new tab
+      window.open(book.pdf_url, '_blank');
+      toast.info('PDF opened in new tab. Right-click to save.');
     }
   };
 
@@ -942,25 +916,25 @@ const BookDetailPage = () => {
                 {user?.is_guest ? 'Open Dar-Us-Salam Store' : 'Open Secure Checkout'}
               </a>
               
-              {/* Button for guests to confirm purchase completion */}
+              {/* For guests, show message to create account after purchase */}
               {user?.is_guest && (
-                <button
-                  onClick={() => {
-                    addLocalPurchase(bookId);
-                    setHasPurchased(true);
-                    setPaymentModal({ show: false, url: null });
-                    toast.success('Purchase confirmed! You can now download the PDF.');
-                  }}
-                  className="mt-4 w-full py-3 text-gold border border-gold/30 rounded-md hover:bg-gold/10 transition-colors"
-                  data-testid="confirm-purchase-btn"
-                >
-                  I've Completed My Purchase
-                </button>
+                <div className="mt-4 p-3 bg-[#082E26] rounded-md">
+                  <p className="text-sm text-[#B0C4BF] mb-2">
+                    After purchasing, create an account to access your downloads in the app.
+                  </p>
+                  <Link
+                    to="/register"
+                    className="inline-flex items-center justify-center gap-2 text-gold hover:underline text-sm"
+                    onClick={() => setPaymentModal({ show: false, url: null })}
+                  >
+                    Create Account
+                  </Link>
+                </div>
               )}
               
               <p className="text-xs text-[#B0C4BF] mt-4">
                 {user?.is_guest 
-                  ? 'After purchasing, tap "I\'ve Completed My Purchase" to access your download'
+                  ? 'Your purchase will be available after you create an account'
                   : 'You\'ll be redirected to Stripe\'s secure payment page'
                 }
               </p>
