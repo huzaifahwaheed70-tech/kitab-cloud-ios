@@ -62,7 +62,7 @@ const BookDetailPage = () => {
       }
     }
     if (searchParams.get('purchased') === 'true') {
-      toast.success('PDF purchased successfully! You can now read it.');
+      toast.success('PDF purchased successfully! You can now download it.');
       setHasPurchased(true);
     }
   }, [bookId, authLoading, user, token]);
