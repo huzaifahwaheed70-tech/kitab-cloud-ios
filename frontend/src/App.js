@@ -4,6 +4,17 @@ import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
+// Global error handler for uncaught errors
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error('[App] Global error:', { message, source, lineno, colno, error });
+  return false;
+};
+
+// Handle unhandled promise rejections
+window.onunhandledrejection = function(event) {
+  console.error('[App] Unhandled promise rejection:', event.reason);
+};
+
 // Pages
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -27,9 +38,11 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || PRODUCTION_URL;
 const API = `${BACKEND_URL}/api`;
 
 // Debug: Log which URL is being used (visible in Safari Web Inspector)
+console.log('[App] Initializing Kitab Cloud');
 console.log('[App] BACKEND_URL:', BACKEND_URL);
 console.log('[App] API:', API);
-console.log('[App] process.env.REACT_APP_BACKEND_URL:', process.env.REACT_APP_BACKEND_URL);
+console.log('[App] Platform:', navigator.platform);
+console.log('[App] UserAgent:', navigator.userAgent);
 
 // Auth Context
 const AuthContext = createContext(null);
@@ -211,13 +224,74 @@ const AppRouter = () => {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRouter />
-        <Toaster position="bottom-right" richColors />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRouter />
+          <Toaster position="bottom-right" richColors />
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
+}
+
+// Error Boundary to catch React errors and prevent blank screen
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          backgroundColor: '#02120F',
+          color: '#FDFBF7',
+          padding: '20px',
+          textAlign: 'center'
+        }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>Something went wrong</h1>
+          <p style={{ color: '#B0C4BF', marginBottom: '24px' }}>
+            Please try refreshing the app or restarting it.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            style={{
+              backgroundColor: '#D4AF37',
+              color: '#02120F',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Refresh App
+          </button>
+          <p style={{ color: '#B0C4BF', fontSize: '12px', marginTop: '24px' }}>
+            Error: {this.state.error?.message || 'Unknown error'}
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default App;

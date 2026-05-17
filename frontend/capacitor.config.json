@@ -2,7 +2,6 @@
   "appId": "com.darussalam.kitabcloud",
   "appName": "Kitab Cloud",
   "webDir": "build",
-  "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https",
     "iosScheme": "https",
@@ -13,8 +12,8 @@
     "allowsLinkPreview": false,
     "scrollEnabled": true,
     "backgroundColor": "#02120F",
-    "appendUserAgent": "KitabCloudApp",
-    "limitsNavigationsToAppBoundDomains": false
+    "limitsNavigationsToAppBoundDomains": false,
+    "preferredContentMode": "mobile"
   },
   "plugins": {
     "SplashScreen": {
