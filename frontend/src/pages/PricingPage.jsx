@@ -199,7 +199,7 @@ const PricingPage = () => {
                 <div className="p-6">
                   {tier.featured && (
                     <div className="text-xs font-mono text-gold uppercase tracking-wider mb-2 text-center">
-                      Best Value
+                      Popular Choice
                     </div>
                   )}
                   
@@ -290,8 +290,8 @@ const PricingPage = () => {
             <div className="glass-card rounded-sm p-6">
               <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">What are Volume and Advanced books?</h3>
               <p className="text-[#B0C4BF]">
-                Volume books are multi-volume collections only available for Tier 3+. Advanced books are highly 
-                specialized scholarly works exclusively for Tier 4 (Premium) members.
+                Volume books are multi-volume collections available for Tier 3 and above. Advanced books are 
+                specialized scholarly works available to Tier 4 (Premium) members.
               </p>
             </div>
             
