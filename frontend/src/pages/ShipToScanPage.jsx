@@ -59,7 +59,7 @@ const ShipToScanPage = () => {
               <Package className="w-8 h-8 text-[#02120F]" />
             </div>
             <div>
-              <div className="tier-badge tier-4 mb-2">Premium & Unlimited Exclusive</div>
+              <div className="tier-badge tier-4 mb-2">Premium & Unlimited Members</div>
               <h1 className="font-serif text-4xl md:text-5xl text-[#FDFBF7] font-bold tracking-tight">
                 Ship-to-Scan Portal
               </h1>

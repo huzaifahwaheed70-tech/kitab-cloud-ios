@@ -36,8 +36,8 @@ const LandingPage = () => {
   const features = [
     {
       icon: <Library className="w-8 h-8" />,
-      title: "Premium Digital Library",
-      description: "Access hundreds of carefully digitized Islamic texts from the Dar-Us-Salam collection."
+      title: "Digital Book Collection",
+      description: "Access Islamic texts from the Dar-Us-Salam collection in digital format."
     },
     {
       icon: <Shield className="w-8 h-8" />,
@@ -241,7 +241,7 @@ const LandingPage = () => {
                 className={`glass-card rounded-sm p-6 ${tier.featured ? 'border-gold ring-2 ring-gold/20' : ''}`}
               >
                 {tier.featured && (
-                  <span className="text-xs font-semibold text-gold mb-2 block">MOST POPULAR</span>
+                  <span className="text-xs font-semibold text-gold mb-2 block">RECOMMENDED</span>
                 )}
                 <h3 className="font-serif text-lg text-[#FDFBF7] mb-1">{tier.name}</h3>
                 <div className="mb-4">
@@ -280,7 +280,7 @@ const LandingPage = () => {
       <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] mb-4">Ready to Start Reading?</h2>
-          <p className="text-[#B0C4BF] mb-8">Join thousands of readers accessing the Dar-Us-Salam digital library.</p>
+          <p className="text-[#B0C4BF] mb-8">Join readers accessing the Dar-Us-Salam digital library.</p>
           <Link to="/register">
             <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8">
               Create Free Account
