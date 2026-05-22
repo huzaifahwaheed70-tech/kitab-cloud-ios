@@ -17,6 +17,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
+import { shouldHidePrices } from '../utils/platform';
 
 const BACKEND_URL = "https://kitab-cloud.emergent.host";
 const API = `${BACKEND_URL}/api`;
@@ -31,6 +32,11 @@ const LibraryPage = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [tierSettings, setTierSettings] = useState(null);
+  const [hidePrices, setHidePrices] = useState(false);
+
+  useEffect(() => {
+    setHidePrices(shouldHidePrices());
+  }, []);
 
   useEffect(() => {
     fetchBooks();
@@ -423,13 +429,13 @@ const LibraryPage = () => {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
             {books.map((book) => (
-              <BookCard key={book.book_id} book={book} userTier={userTier} />
+              <BookCard key={book.book_id} book={book} userTier={userTier} hidePrices={hidePrices} />
             ))}
           </div>
         ) : (
           <div className="space-y-4">
             {books.map((book) => (
-              <BookListItem key={book.book_id} book={book} userTier={userTier} />
+              <BookListItem key={book.book_id} book={book} userTier={userTier} hidePrices={hidePrices} />
             ))}
           </div>
         )}
@@ -495,7 +501,7 @@ const BookCard = ({ book, userTier }) => {
         {book.pdf_price && (
           <div className="absolute bottom-2 right-2 bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
             <ShoppingCart className="w-3 h-3 inline mr-1" />
-            PDF
+            {hidePrices ? 'PDF' : `$${book.pdf_price}`}
           </div>
         )}
 
@@ -508,12 +514,15 @@ const BookCard = ({ book, userTier }) => {
         <h3 className="font-serif text-[#FDFBF7] text-sm md:text-base line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
         </h3>
+        {book.original_price && !hidePrices && (
+          <p className="text-xs text-[#B0C4BF] mt-1">Book: ${book.original_price}</p>
+        )}
       </div>
     </Link>
   );
 };
 
-const BookListItem = ({ book, userTier }) => {
+const BookListItem = ({ book, userTier, hidePrices }) => {
   const isVolumeLocked = book.is_volume && userTier < 3;
   const isAdvancedLocked = book.is_advanced && userTier < 4;
   const isLocked = isVolumeLocked || isAdvancedLocked;
@@ -559,7 +568,7 @@ const BookListItem = ({ book, userTier }) => {
           <div className="flex items-center gap-2">
             {book.pdf_price && (
               <span className="bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
-                PDF Available
+                {hidePrices ? 'PDF Available' : `$${book.pdf_price}`}
               </span>
             )}
           </div>
