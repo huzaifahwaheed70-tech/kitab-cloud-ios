@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, API } from '../App';
+import { useAuth } from '../App';
 import axios from 'axios';
-import { 
+import {
   Search, Grid, List, Lock, BookMarked, Heart,
   LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart
 } from 'lucide-react';
@@ -18,6 +18,9 @@ import {
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 
+const BACKEND_URL = "https://kitab-cloud.emergent.host";
+const API = `${BACKEND_URL}/api`;
+
 const LibraryPage = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
@@ -31,9 +34,14 @@ const LibraryPage = () => {
 
   useEffect(() => {
     fetchBooks();
-    fetchContinueReading();
     fetchTierSettings();
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (token) {
+      fetchContinueReading();
+    }
+  }, [token]);
 
   const fetchTierSettings = async () => {
     try {
@@ -41,7 +49,6 @@ const LibraryPage = () => {
       setTierSettings(response.data);
     } catch (error) {
       console.error('Error fetching tier settings:', error);
-      // Fallback to defaults if API fails
       setTierSettings({
         0: { name: 'Pay Per Book', book_limit: 0 },
         1: { name: 'Basic', book_limit: 10 },
@@ -57,21 +64,12 @@ const LibraryPage = () => {
       setLoading(true);
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-
-      const apiUrl = `${API}/books/all?${params}`;
-      console.log('[LibraryPage] Fetching books from:', apiUrl);
-      console.log('[LibraryPage] API base:', API);
-      
+      const queryString = params.toString();
+      const apiUrl = `${API}/books/all${queryString ? `?${queryString}` : ''}`;
       const response = await axios.get(apiUrl);
-      console.log('[LibraryPage] Books fetched successfully:', response.data?.length || 0);
       setBooks(response.data || []);
     } catch (error) {
-      console.error('[LibraryPage] Error fetching books:', error);
-      console.error('[LibraryPage] Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status
-      });
+      console.error('Error fetching books:', error);
       toast.error('Failed to load books. Please refresh the page.');
       setBooks([]);
     } finally {
@@ -82,10 +80,9 @@ const LibraryPage = () => {
   const fetchContinueReading = async () => {
     if (!token) return;
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.get(`${API}/continue-reading`, { 
-        headers,
-        withCredentials: true 
+      const storedToken = localStorage.getItem('auth_token') || token;
+      const response = await axios.get(`${API}/continue-reading`, {
+        headers: { Authorization: `Bearer ${storedToken}` }
       });
       setContinueReading(response.data.books || []);
     } catch (error) {
@@ -99,13 +96,9 @@ const LibraryPage = () => {
   };
 
   const userTier = user?.subscription_tier || 0;
-  
-  // Get dynamic tier name and limit from API settings
+
   const getTierName = (tier) => {
-    if (tierSettings && tierSettings[tier]) {
-      return tierSettings[tier].name;
-    }
-    // Fallback
+    if (tierSettings && tierSettings[tier]) return tierSettings[tier].name;
     const defaultNames = ['Pay Per Book', 'Basic', 'Standard', 'Advanced', 'Premium'];
     return defaultNames[tier] || 'Unknown';
   };
@@ -115,24 +108,21 @@ const LibraryPage = () => {
       const limit = tierSettings[tier].book_limit;
       return limit === 0 || limit === 'Unlimited' ? 'Unlimited' : limit;
     }
-    // Fallback
     const defaultLimits = { 0: 0, 1: 10, 2: 20, 3: 30, 4: 'Unlimited' };
     return defaultLimits[tier] || 0;
   };
 
-  const tierDisplayText = userTier === 4 
-    ? `${getTierName(userTier)} • Unlimited` 
+  const tierDisplayText = userTier === 4
+    ? `${getTierName(userTier)} • Unlimited`
     : `${getTierName(userTier)} • ${getTierLimit(userTier)} books/mo`;
 
   return (
     <div className="min-h-screen bg-dark">
-      {/* Navigation */}
       <nav className="glass sticky top-0 z-50 border-b border-[rgba(212,175,55,0.2)]">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
           <div className="flex items-center justify-between">
             <Logo linkTo="/library" testId="library-logo" />
 
-            {/* Search Bar - Search by Title */}
             <div className="flex-1 max-w-md mx-4 hidden md:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
@@ -147,7 +137,6 @@ const LibraryPage = () => {
               </div>
             </div>
 
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-2">
               <Link to="/bookshelf">
                 <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" data-testid="nav-bookshelf">
@@ -164,9 +153,9 @@ const LibraryPage = () => {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] gap-2 min-h-[44px] cursor-pointer relative z-10" 
+                  <Button
+                    variant="ghost"
+                    className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] gap-2 min-h-[44px] cursor-pointer relative z-10"
                     data-testid="user-menu-trigger"
                   >
                     <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center pointer-events-none">
@@ -246,9 +235,8 @@ const LibraryPage = () => {
               </DropdownMenu>
             </div>
 
-            {/* Mobile Menu Button */}
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="md:hidden text-[#FDFBF7] min-h-[44px] min-w-[44px]"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="mobile-menu-btn"
@@ -257,7 +245,6 @@ const LibraryPage = () => {
             </Button>
           </div>
 
-          {/* Mobile Search */}
           <div className="mt-4 md:hidden">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
@@ -273,7 +260,6 @@ const LibraryPage = () => {
           </div>
         </div>
 
-        {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-[rgba(212,175,55,0.2)] bg-surface">
             <div className="px-4 py-4 space-y-1">
@@ -341,29 +327,7 @@ const LibraryPage = () => {
         )}
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-5 md:px-6 py-8">
-        {/* Guest Banner */}
-        {user?.is_guest && (
-          <div className="mb-8 glass-card rounded-lg p-4 border border-gold/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
-                <User className="w-5 h-5 text-gold" />
-              </div>
-              <div>
-                <p className="text-[#FDFBF7] font-medium">You're browsing as a guest</p>
-                <p className="text-sm text-[#B0C4BF]">Create an account to read books and save your progress</p>
-              </div>
-            </div>
-            <Link to="/register">
-              <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] min-h-[44px]" data-testid="guest-signup-btn">
-                Create Account
-              </Button>
-            </Link>
-          </div>
-        )}
-        
-        {/* Continue Reading Section */}
         {continueReading.length > 0 && (
           <section className="mb-12">
             <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6 flex items-center gap-2">
@@ -372,7 +336,7 @@ const LibraryPage = () => {
             </h2>
             <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 hide-scrollbar px-1">
               {continueReading.map((book) => (
-                <Link 
+                <Link
                   key={book.book_id}
                   to={`/book/${book.book_id}`}
                   className="flex-shrink-0 w-36 md:w-40 min-h-[44px]"
@@ -380,8 +344,8 @@ const LibraryPage = () => {
                 >
                   <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-gold/50 book-card-hover">
                     {book.cover_url ? (
-                      <img 
-                        src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
+                      <img
+                        src={`${BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
                         alt={book.title}
                         className="w-full h-full object-cover"
                       />
@@ -401,7 +365,6 @@ const LibraryPage = () => {
           </section>
         )}
 
-        {/* Subscription Banner for Tier 0 Users */}
         {userTier === 0 && (
           <div className="mb-8 p-6 rounded-sm bg-gradient-to-r from-gold/20 to-gold/5 border border-gold/30">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -418,13 +381,11 @@ const LibraryPage = () => {
           </div>
         )}
 
-        {/* View Toggle */}
         <div className="flex items-center justify-between mb-8">
           <h2 className="font-serif text-2xl text-[#FDFBF7]">
             All Books
             {searchQuery && <span className="text-gold ml-2">"{searchQuery}"</span>}
           </h2>
-          
           <div className="hidden sm:flex items-center gap-2">
             <Button
               variant="ghost"
@@ -447,7 +408,6 @@ const LibraryPage = () => {
           </div>
         </div>
 
-        {/* Loading State */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
@@ -479,22 +439,21 @@ const LibraryPage = () => {
 };
 
 const BookCard = ({ book, userTier }) => {
-  // Check access restrictions
   const isTierLocked = book.tier_level > userTier;
   const isVolumeLocked = book.is_volume && userTier < 3;
   const isAdvancedLocked = book.is_advanced && userTier < 4;
   const isLocked = isVolumeLocked || isAdvancedLocked;
-  
+
   return (
-    <Link 
+    <Link
       to={`/book/${book.book_id}`}
       className="group flex-shrink-0 w-full min-h-[44px]"
       data-testid={`book-card-${book.book_id}`}
     >
       <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover">
         {book.cover_url ? (
-          <img 
-            src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
+          <img
+            src={`${BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
             alt={book.title}
             className="w-full h-full object-cover"
           />
@@ -503,8 +462,7 @@ const BookCard = ({ book, userTier }) => {
             <img src="/logo.png" alt="Book" className="w-12 h-12 opacity-30" />
           </div>
         )}
-        
-        {/* Tier Lock Badge - shows when user's tier is lower than book's tier */}
+
         {isTierLocked && !isLocked && (
           <div className="absolute top-2 right-2">
             <span className="text-[10px] px-2 py-1 bg-[#02120F]/90 text-gold rounded flex items-center gap-1 font-medium">
@@ -513,8 +471,7 @@ const BookCard = ({ book, userTier }) => {
             </span>
           </div>
         )}
-        
-        {/* Badges */}
+
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {book.is_volume && (
             <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/80 text-white rounded">VOLUME</span>
@@ -523,8 +480,7 @@ const BookCard = ({ book, userTier }) => {
             <span className="text-[10px] px-1.5 py-0.5 bg-red-500/80 text-white rounded">ADVANCED</span>
           )}
         </div>
-        
-        {/* Lock Overlay for Volume/Advanced books */}
+
         {isLocked && (
           <div className="absolute inset-0 bg-[#02120F]/80 flex items-center justify-center">
             <div className="text-center">
@@ -536,7 +492,6 @@ const BookCard = ({ book, userTier }) => {
           </div>
         )}
 
-        {/* Price badge - show as available, not price */}
         {book.pdf_price && (
           <div className="absolute bottom-2 right-2 bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
             <ShoppingCart className="w-3 h-3 inline mr-1" />
@@ -544,12 +499,11 @@ const BookCard = ({ book, userTier }) => {
           </div>
         )}
 
-        {/* Hover Overlay */}
         {!isLocked && (
           <div className="absolute inset-0 bg-gradient-to-t from-[#02120F] via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         )}
       </div>
-      
+
       <div className="mt-3 px-1">
         <h3 className="font-serif text-[#FDFBF7] text-sm md:text-base line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
@@ -563,17 +517,17 @@ const BookListItem = ({ book, userTier }) => {
   const isVolumeLocked = book.is_volume && userTier < 3;
   const isAdvancedLocked = book.is_advanced && userTier < 4;
   const isLocked = isVolumeLocked || isAdvancedLocked;
-  
+
   return (
-    <Link 
+    <Link
       to={`/book/${book.book_id}`}
       className="flex gap-4 p-4 rounded-sm bg-surface border border-[rgba(212,175,55,0.2)] book-card-hover"
       data-testid={`book-list-${book.book_id}`}
     >
       <div className="relative w-20 h-28 flex-shrink-0 rounded-sm overflow-hidden">
         {book.cover_url ? (
-          <img 
-            src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
+          <img
+            src={`${BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
             alt={book.title}
             className="w-full h-full object-cover"
           />
@@ -588,7 +542,7 @@ const BookListItem = ({ book, userTier }) => {
           </div>
         )}
       </div>
-      
+
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div>
