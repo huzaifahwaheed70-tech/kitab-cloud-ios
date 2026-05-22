@@ -438,7 +438,7 @@ const AdminDashboard = () => {
                         <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
                           {[1, 2, 3, 4].map(t => (
                             <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">
-                              Tier {t} - {t === 1 ? 'Basic ($20)' : t === 2 ? 'Standard ($40)' : t === 3 ? 'Advanced ($60)' : 'Premium ($80)'}
+                              Tier {t} - {t === 1 ? 'Basic' : t === 2 ? 'Standard' : t === 3 ? 'Advanced' : 'Premium'}
                             </SelectItem>
                           ))}
                         </SelectContent>

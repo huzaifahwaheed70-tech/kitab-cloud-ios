@@ -60,13 +60,13 @@ const PricingPage = () => {
       setTiers(tiersArray);
     } catch (error) {
       console.error('Error fetching tiers:', error);
-      // Fallback to defaults
+      // Fallback to defaults (no prices shown per Apple Reader App guidelines)
       setTiers([
-        { tier: 0, name: "Pay Per Book", price: 0, features: tierFeatures[0], color: "tier-0", perBook: true },
-        { tier: 1, name: "Basic", price: 20, features: ["10 books per month", ...tierFeatures[1].slice(1)], color: "tier-1" },
-        { tier: 2, name: "Standard", price: 40, features: ["20 books per month", ...tierFeatures[2].slice(1)], color: "tier-2" },
-        { tier: 3, name: "Advanced", price: 60, features: ["30 books per month", ...tierFeatures[3].slice(1)], color: "tier-3" },
-        { tier: 4, name: "Premium", price: 80, features: tierFeatures[4], color: "tier-4", featured: true }
+        { tier: 0, name: "Pay Per Book", features: tierFeatures[0], color: "tier-0", perBook: true },
+        { tier: 1, name: "Basic", features: ["Monthly book allowance", ...tierFeatures[1].slice(1)], color: "tier-1" },
+        { tier: 2, name: "Standard", features: ["Expanded book allowance", ...tierFeatures[2].slice(1)], color: "tier-2" },
+        { tier: 3, name: "Advanced", features: ["Enhanced book allowance", ...tierFeatures[3].slice(1)], color: "tier-3" },
+        { tier: 4, name: "Premium", features: tierFeatures[4], color: "tier-4", featured: true }
       ]);
     } finally {
       setTiersLoading(false);
@@ -215,10 +215,7 @@ const PricingPage = () => {
                     {tier.perBook ? (
                       <span className="text-lg text-gold">Pay per book</span>
                     ) : (
-                      <>
-                        <span className="text-4xl font-bold text-gold">${tier.price}</span>
-                        <span className="text-[#B0C4BF]">/mo</span>
-                      </>
+                      <span className="text-lg text-gold">Monthly Plan</span>
                     )}
                   </div>
                   
@@ -251,7 +248,7 @@ const PricingPage = () => {
                       'Included'
                     ) : (
                       <>
-                        Subscribe <ArrowRight className="w-4 h-4 ml-1" />
+                        View Plan Options <ArrowRight className="w-4 h-4 ml-1" />
                       </>
                     )}
                   </Button>

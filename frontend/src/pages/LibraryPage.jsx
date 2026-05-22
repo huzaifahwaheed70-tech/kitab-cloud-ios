@@ -536,11 +536,11 @@ const BookCard = ({ book, userTier }) => {
           </div>
         )}
 
-        {/* Price badge */}
+        {/* Price badge - show as available, not price */}
         {book.pdf_price && (
           <div className="absolute bottom-2 right-2 bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
             <ShoppingCart className="w-3 h-3 inline mr-1" />
-            ${book.pdf_price}
+            PDF
           </div>
         )}
 
@@ -554,9 +554,6 @@ const BookCard = ({ book, userTier }) => {
         <h3 className="font-serif text-[#FDFBF7] text-sm md:text-base line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
         </h3>
-        {book.original_price && (
-          <p className="text-xs text-[#B0C4BF] mt-1">Book: ${book.original_price}</p>
-        )}
       </div>
     </Link>
   );
@@ -608,16 +605,13 @@ const BookListItem = ({ book, userTier }) => {
           <div className="flex items-center gap-2">
             {book.pdf_price && (
               <span className="bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
-                ${book.pdf_price}
+                PDF Available
               </span>
             )}
           </div>
         </div>
         {book.description && (
           <p className="text-sm text-[#B0C4BF] mt-2 line-clamp-2">{book.description}</p>
-        )}
-        {book.original_price && (
-          <p className="text-xs text-[#B0C4BF] mt-2">Original book price: ${book.original_price}</p>
         )}
       </div>
     </Link>

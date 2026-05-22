@@ -737,18 +737,18 @@ const BookDetailPage = () => {
                 </p>
               )}
 
-              {/* Pricing Info */}
+              {/* Info */}
               <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
                 {book.original_price && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">Physical Book</p>
-                    <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
+                    <p className="text-[#FDFBF7] text-xl font-bold">Available</p>
                   </div>
                 )}
                 {book.pdf_price && (
                   <div>
-                    <p className="text-[#B0C4BF] text-sm">PDF Price</p>
-                    <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
+                    <p className="text-[#B0C4BF] text-sm">PDF</p>
+                    <p className="text-gold text-xl font-bold">Available</p>
                   </div>
                 )}
               </div>
@@ -806,7 +806,7 @@ const BookDetailPage = () => {
                     data-testid="buy-pdf-btn"
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
-                    {purchaseLoading ? 'Processing...' : (user?.is_guest ? `Buy on Website ($${book.pdf_price})` : `Buy PDF ($${book.pdf_price})`)}
+                    {purchaseLoading ? 'Processing...' : (user?.is_guest ? 'Buy on Website' : 'Purchase PDF')}
                   </Button>
                 )}
 
