@@ -57,11 +57,11 @@ const LandingPage = () => {
   ];
 
   const tiers = [
-    { tier: 0, name: "Pay Per Book", price: 0, features: ["Buy individual PDFs", "Own forever", "No monthly fee"], perBook: true },
-    { tier: 1, name: "Basic", price: 20, features: ["10 books/month", "Standard library", "Email support"] },
-    { tier: 2, name: "Standard", price: 40, features: ["20 books/month", "Standard library", "Email support"] },
-    { tier: 3, name: "Advanced", price: 60, features: ["30 books/month", "Volume books access", "In-book search"] },
-    { tier: 4, name: "Premium", price: 80, features: ["Unlimited books", "All books including advanced", "In-book search"], featured: true },
+    { tier: 0, name: "Pay Per Book", features: ["Buy individual PDFs", "Own forever", "No monthly fee"], perBook: true },
+    { tier: 1, name: "Basic", features: ["Monthly book allowance", "Standard library", "Email support"] },
+    { tier: 2, name: "Standard", features: ["Expanded book allowance", "Standard library", "Email support"] },
+    { tier: 3, name: "Advanced", features: ["Enhanced book allowance", "Volume books access", "In-book search"] },
+    { tier: 4, name: "Premium", features: ["Unlimited books", "All books including advanced", "In-book search"], featured: true },
   ];
 
   const getTierBadgeClass = (tier) => {
@@ -191,7 +191,7 @@ const LandingPage = () => {
                     <h3 className="font-serif text-sm text-[#FDFBF7] line-clamp-2 mb-1">{book.title}</h3>
                     <p className="text-xs text-gold font-mono">{book.darussalam_code}</p>
                     {book.pdf_price && (
-                      <p className="text-xs text-[#B0C4BF] mt-1">PDF: ${book.pdf_price}</p>
+                      <p className="text-xs text-gold mt-1">PDF Available</p>
                     )}
                   </div>
                 </div>
@@ -248,10 +248,7 @@ const LandingPage = () => {
                   {tier.perBook ? (
                     <span className="text-[#B0C4BF] text-sm">Pay per book</span>
                   ) : (
-                    <>
-                      <span className="text-3xl font-bold text-gold">${tier.price}</span>
-                      <span className="text-[#B0C4BF]">/mo</span>
-                    </>
+                    <span className="text-gold text-sm">Monthly Plan</span>
                   )}
                 </div>
                 <ul className="space-y-2 mb-6">

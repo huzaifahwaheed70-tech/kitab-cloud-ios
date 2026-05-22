@@ -292,8 +292,8 @@ const SettingsPage = () => {
                 </div>
                 {profile?.subscription_tier > 0 && (
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-gold">${profile?.tier_info?.price || 0}</p>
-                    <p className="text-sm text-[#B0C4BF]">per month</p>
+                    <p className="text-lg font-bold text-gold">Active Plan</p>
+                    <p className="text-sm text-[#B0C4BF]">Manage via web portal</p>
                   </div>
                 )}
               </div>

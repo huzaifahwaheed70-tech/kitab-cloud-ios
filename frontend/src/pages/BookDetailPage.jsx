@@ -497,13 +497,13 @@ const BookDetailPage = () => {
                 {book.original_price && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">Physical Book</p>
-                    <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
+                    <p className="text-[#FDFBF7] text-xl font-bold">Available</p>
                   </div>
                 )}
                 {book.pdf_price && (
                   <div>
-                    <p className="text-[#B0C4BF] text-sm">PDF Price</p>
-                    <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
+                    <p className="text-[#B0C4BF] text-sm">PDF</p>
+                    <p className="text-gold text-xl font-bold">Available</p>
                   </div>
                 )}
               </div>
