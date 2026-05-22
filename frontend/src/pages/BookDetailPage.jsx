@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
+import { shouldHidePrices } from '../utils/platform';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -33,6 +34,7 @@ const BookDetailPage = () => {
   const [searchText, setSearchText] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
+  const [hidePrices, setHidePrices] = useState(false);
   const [pdfDocument, setPdfDocument] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
@@ -46,6 +48,9 @@ const BookDetailPage = () => {
   const canSearch = userTier >= 3;
 
   useEffect(() => {
+    // Check if we're on iOS native app
+    setHidePrices(shouldHidePrices());
+    
     // Only fetch once auth is fully resolved
     if (!authLoading) {
       // Always try to fetch the book (it's public info)
@@ -742,13 +747,21 @@ const BookDetailPage = () => {
                 {book.original_price && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">Physical Book</p>
-                    <p className="text-[#FDFBF7] text-xl font-bold">Available</p>
+                    {hidePrices ? (
+                      <p className="text-[#FDFBF7] text-xl font-bold">Available</p>
+                    ) : (
+                      <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
+                    )}
                   </div>
                 )}
                 {book.pdf_price && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">PDF</p>
-                    <p className="text-gold text-xl font-bold">Available</p>
+                    {hidePrices ? (
+                      <p className="text-gold text-xl font-bold">Available</p>
+                    ) : (
+                      <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -806,7 +819,7 @@ const BookDetailPage = () => {
                     data-testid="buy-pdf-btn"
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
-                    {purchaseLoading ? 'Processing...' : (user?.is_guest ? 'Buy on Website' : 'Purchase PDF')}
+                    {purchaseLoading ? 'Processing...' : hidePrices ? (user?.is_guest ? 'Buy on Website' : 'Purchase PDF') : (user?.is_guest ? `Buy on Website ($${book.pdf_price})` : `Buy PDF ($${book.pdf_price})`)}
                   </Button>
                 )}
 
