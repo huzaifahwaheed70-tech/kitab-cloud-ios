@@ -7,7 +7,6 @@ import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldHidePrices } from '../utils/platform';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -16,12 +15,6 @@ const PricingPage = () => {
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
-  const [hidePrices, setHidePrices] = useState(false);
-
-  // Check if we're on iOS native app (hide prices for Apple compliance)
-  useEffect(() => {
-    setHidePrices(shouldHidePrices());
-  }, []);
 
   // Default features for each tier
   const tierFeatures = {
@@ -221,8 +214,6 @@ const PricingPage = () => {
                   <div className="flex items-baseline gap-1 mb-6">
                     {tier.perBook ? (
                       <span className="text-lg text-gold">Pay per book</span>
-                    ) : hidePrices ? (
-                      <span className="text-lg text-gold">Monthly Plan</span>
                     ) : (
                       <>
                         <span className="text-4xl font-bold text-gold">${tier.price}</span>
@@ -258,10 +249,6 @@ const PricingPage = () => {
                       'Current Plan'
                     ) : userTier > tier.tier ? (
                       'Included'
-                    ) : hidePrices ? (
-                      <>
-                        View Plan Options <ArrowRight className="w-4 h-4 ml-1" />
-                      </>
                     ) : (
                       <>
                         Subscribe <ArrowRight className="w-4 h-4 ml-1" />
@@ -354,12 +341,9 @@ const PricingPage = () => {
               <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
                 <ExternalLink className="w-8 h-8 text-gold" />
               </div>
-              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Registration</h3>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">Complete Payment</h3>
               <p className="text-[#B0C4BF] mb-6">
-                {hidePrices 
-                  ? "To select a reading plan or manage your access options, please complete registration via our secure web portal."
-                  : "Tap the button below to open secure checkout in your browser."
-                }
+                Tap the button below to open secure checkout in your browser.
               </p>
               
               {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}

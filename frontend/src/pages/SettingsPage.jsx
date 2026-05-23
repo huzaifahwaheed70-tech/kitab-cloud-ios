@@ -18,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { shouldHidePrices } from '../utils/platform';
 
 const SettingsPage = () => {
   const { user, token, loading: authLoading, logout } = useAuth();
@@ -26,12 +25,6 @@ const SettingsPage = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
-  const [hidePrices, setHidePrices] = useState(false);
-  
-  // Check if we're on iOS native app (hide prices for Apple compliance)
-  useEffect(() => {
-    setHidePrices(shouldHidePrices());
-  }, []);
   
   // Profile form
   const [name, setName] = useState('');
@@ -395,17 +388,8 @@ const SettingsPage = () => {
                 
                 {profile?.subscription_tier > 0 && (
                   <div className="text-right">
-                    {hidePrices ? (
-                      <>
-                        <p className="text-lg font-bold text-gold">Active Plan</p>
-                        <p className="text-sm text-[#B0C4BF]">Manage via web portal</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-2xl font-bold text-gold">${profile?.tier_info?.price || 0}</p>
-                        <p className="text-sm text-[#B0C4BF]">per month</p>
-                      </>
-                    )}
+                    <p className="text-2xl font-bold text-gold">${profile?.tier_info?.price || 0}</p>
+                    <p className="text-sm text-[#B0C4BF]">per month</p>
                   </div>
                 )}
               </div>

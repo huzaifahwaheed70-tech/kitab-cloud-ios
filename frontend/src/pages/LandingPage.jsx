@@ -4,19 +4,12 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { shouldHidePrices } from '../utils/platform';
 
 const LandingPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
-  const [hidePrices, setHidePrices] = useState(false);
-
-  // Check if we're on iOS native app (hide prices for Apple compliance)
-  useEffect(() => {
-    setHidePrices(shouldHidePrices());
-  }, []);
 
   // Auto-redirect to library if already logged in
   useEffect(() => {
@@ -197,11 +190,8 @@ const LandingPage = () => {
                   <div className="p-3">
                     <h3 className="font-serif text-sm text-[#FDFBF7] line-clamp-2 mb-1">{book.title}</h3>
                     <p className="text-xs text-gold font-mono">{book.darussalam_code}</p>
-                    {book.pdf_price && !hidePrices && (
+                    {book.pdf_price && (
                       <p className="text-xs text-[#B0C4BF] mt-1">PDF: ${book.pdf_price}</p>
-                    )}
-                    {book.pdf_price && hidePrices && (
-                      <p className="text-xs text-gold mt-1">PDF Available</p>
                     )}
                   </div>
                 </div>
@@ -257,8 +247,6 @@ const LandingPage = () => {
                 <div className="mb-4">
                   {tier.perBook ? (
                     <span className="text-[#B0C4BF] text-sm">Pay per book</span>
-                  ) : hidePrices ? (
-                    <span className="text-gold text-sm">Monthly Plan</span>
                   ) : (
                     <>
                       <span className="text-3xl font-bold text-gold">${tier.price}</span>
