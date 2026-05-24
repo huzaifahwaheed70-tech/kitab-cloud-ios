@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
@@ -15,6 +16,13 @@ const PricingPage = () => {
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
+  
+  // Discount code state
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountInfo, setDiscountInfo] = useState(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [visibleDiscounts, setVisibleDiscounts] = useState([]);
+  const [selectedTierForDiscount, setSelectedTierForDiscount] = useState(null);
 
   // Default features for each tier
   const tierFeatures = {
@@ -27,7 +35,55 @@ const PricingPage = () => {
 
   useEffect(() => {
     fetchTiers();
+    fetchVisibleDiscounts();
   }, []);
+
+  const fetchVisibleDiscounts = async () => {
+    try {
+      const response = await axios.get(`${API}/discount/visible`);
+      setVisibleDiscounts(response.data.discounts || []);
+    } catch (error) {
+      console.error('Error fetching visible discounts:', error);
+    }
+  };
+
+  const applyDiscountCode = async (tierNum) => {
+    if (!discountCode.trim()) {
+      toast.error('Please enter a discount code');
+      return;
+    }
+    
+    if (!token) {
+      toast.error('Please login to apply discount code');
+      return;
+    }
+    
+    setDiscountLoading(true);
+    setSelectedTierForDiscount(tierNum);
+    
+    try {
+      const response = await axios.post(
+        `${API}/discount/validate`,
+        { code: discountCode.trim(), tier: tierNum },
+        { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
+      );
+      
+      setDiscountInfo(response.data);
+      toast.success(`Discount applied: ${response.data.description}`);
+    } catch (error) {
+      console.error('Error validating discount:', error);
+      toast.error(error.response?.data?.detail || 'Invalid discount code');
+      setDiscountInfo(null);
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
+  const clearDiscount = () => {
+    setDiscountCode('');
+    setDiscountInfo(null);
+    setSelectedTierForDiscount(null);
+  };
 
   const fetchTiers = async () => {
     try {
@@ -101,10 +157,18 @@ const PricingPage = () => {
     try {
       // Use Stripe for all platforms
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(`${API}/payments/create-checkout`, {
+      
+      // Include discount code if applied and matches this tier
+      const requestData = {
         tier,
         origin_url: window.location.origin
-      }, { headers, withCredentials: true });
+      };
+      
+      if (discountInfo && selectedTierForDiscount === tier) {
+        requestData.discount_code = discountCode;
+      }
+      
+      const response = await axios.post(`${API}/payments/create-checkout`, requestData, { headers, withCredentials: true });
 
       // Open payment URL
       const result = await openPaymentUrl(response.data.url);
@@ -155,6 +219,30 @@ const PricingPage = () => {
         </div>
       </nav>
 
+      {/* Promotional Banner for Visible Discounts */}
+      {visibleDiscounts.length > 0 && (
+        <div className="bg-gradient-to-r from-gold/20 via-gold/10 to-gold/20 border-b border-gold/30">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              {visibleDiscounts.map((discount) => (
+                <div key={discount.discount_id} className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-gold" />
+                  <span className="text-gold font-medium">
+                    {discount.banner_text || `Use code ${discount.code} for ${discount.discount_type === 'percentage' ? `${discount.value}% off` : discount.discount_type === 'free_trial' ? `${discount.value} day free trial` : 'a discount'}!`}
+                  </span>
+                  <button
+                    onClick={() => { setDiscountCode(discount.code); toast.success(`Code "${discount.code}" added! Select a plan to apply.`); }}
+                    className="text-xs bg-gold/20 hover:bg-gold/30 text-gold px-2 py-1 rounded transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-6 text-center">
@@ -177,6 +265,62 @@ const PricingPage = () => {
         </div>
       </section>
 
+      {/* Discount Code Section */}
+      <section className="pb-8">
+        <div className="max-w-md mx-auto px-6">
+          <div className="glass-card p-4 rounded-lg border border-gold/30">
+            <div className="flex items-center gap-2 mb-3">
+              <Tag className="w-5 h-5 text-gold" />
+              <span className="text-[#FDFBF7] font-medium">Have a discount code?</span>
+            </div>
+            
+            {discountInfo ? (
+              <div className="bg-gold/10 border border-gold/30 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-gold font-mono font-bold">{discountInfo.code}</span>
+                  <button onClick={clearDiscount} className="text-[#B0C4BF] hover:text-red-400 text-sm">
+                    Remove
+                  </button>
+                </div>
+                <p className="text-sm text-[#FDFBF7]">{discountInfo.name}</p>
+                <p className="text-xs text-[#B0C4BF] mt-1">{discountInfo.description}</p>
+                {discountInfo.savings > 0 && (
+                  <p className="text-sm text-green-400 mt-2">
+                    You save ${discountInfo.savings.toFixed(2)} on your first month!
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Enter code"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                  className="bg-surface border-gold/30 text-[#FDFBF7] uppercase"
+                  data-testid="discount-code-input"
+                />
+                <Button
+                  onClick={() => {
+                    if (!user) {
+                      toast.error('Please login to apply discount code');
+                      return;
+                    }
+                    // Apply to recommended tier (tier 4) by default
+                    applyDiscountCode(4);
+                  }}
+                  disabled={discountLoading || !discountCode.trim()}
+                  className="bg-gold text-[#02120F] hover:bg-[#E9C85C] whitespace-nowrap"
+                  data-testid="apply-discount-btn"
+                >
+                  {discountLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Cards */}
       <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6">
@@ -189,7 +333,7 @@ const PricingPage = () => {
             {tiers.map((tier) => (
               <div 
                 key={tier.tier}
-                className={`rounded-sm border ${
+                className={`relative rounded-sm border ${
                   tier.featured 
                     ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold scale-105 lg:scale-110 shadow-lg shadow-gold/20' 
                     : 'bg-surface border-[rgba(212,175,55,0.2)]'
@@ -200,6 +344,13 @@ const PricingPage = () => {
                   {tier.featured && (
                     <div className="text-xs font-mono text-gold uppercase tracking-wider mb-2 text-center">
                       Popular Choice
+                    </div>
+                  )}
+                  
+                  {/* Discount Badge */}
+                  {tier.tier > 0 && visibleDiscounts.some(d => !d.applicable_tiers || d.applicable_tiers.includes(tier.tier)) && (
+                    <div className="absolute -top-3 right-4 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                      {visibleDiscounts.find(d => !d.applicable_tiers || d.applicable_tiers.includes(tier.tier))?.badge_text || 'DEAL'}
                     </div>
                   )}
                   

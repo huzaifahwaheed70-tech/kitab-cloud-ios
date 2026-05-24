@@ -511,6 +511,70 @@ class BookResponse(BaseModel):
 class PaymentCreate(BaseModel):
     tier: int = Field(ge=1, le=4)
     origin_url: str
+    discount_code: Optional[str] = None  # Optional discount code
+
+
+# Discount Code Models
+class DiscountCodeCreate(BaseModel):
+    code: str  # Unique code like "FREEM", "7DAYS"
+    name: str  # Display name like "First Month Free"
+    description: Optional[str] = None  # Description for admin
+    discount_type: str  # "percentage", "fixed_amount", "free_trial", "buy_x_get_y"
+    value: float  # Percentage (20 = 20%), fixed amount, trial days, or Y months free
+    buy_x_value: Optional[int] = None  # For buy_x_get_y: X months to pay
+    is_visible: bool = False  # Show on main page or keep secret
+    is_active: bool = True
+    usage_limit: Optional[int] = None  # Max total uses (None = unlimited)
+    per_user_limit: int = 1  # Max uses per user
+    applicable_tiers: Optional[List[int]] = None  # Which tiers it applies to (None = all)
+    valid_from: Optional[str] = None  # ISO date string
+    valid_until: Optional[str] = None  # ISO date string
+    banner_text: Optional[str] = None  # Text for homepage banner
+    badge_text: Optional[str] = None  # Text for pricing card badge
+
+
+class DiscountCodeUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    discount_type: Optional[str] = None
+    value: Optional[float] = None
+    buy_x_value: Optional[int] = None
+    is_visible: Optional[bool] = None
+    is_active: Optional[bool] = None
+    usage_limit: Optional[int] = None
+    per_user_limit: Optional[int] = None
+    applicable_tiers: Optional[List[int]] = None
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    banner_text: Optional[str] = None
+    badge_text: Optional[str] = None
+
+
+class DiscountCodeResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    discount_id: str
+    code: str
+    name: str
+    description: Optional[str] = None
+    discount_type: str
+    value: float
+    buy_x_value: Optional[int] = None
+    is_visible: bool
+    is_active: bool
+    usage_limit: Optional[int] = None
+    per_user_limit: int
+    used_count: int
+    applicable_tiers: Optional[List[int]] = None
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    banner_text: Optional[str] = None
+    badge_text: Optional[str] = None
+    created_at: str
+
+
+class DiscountValidateRequest(BaseModel):
+    code: str
+    tier: int
 
 
 # Apple StoreKit Models
@@ -1335,42 +1399,209 @@ async def create_checkout(payment: PaymentCreate, request: Request, user: dict =
     
     tier_info = tiers.get(tier_key) or tiers.get(str(tier_key))
     amount = tier_info["price"]
+    original_amount = amount
+    
+    # Handle discount code if provided
+    discount_data = None
+    stripe_coupon_id = None
+    trial_days = None
+    
+    if payment.discount_code:
+        code = payment.discount_code.upper()
+        discount = await db.discount_codes.find_one({"code": code, "is_active": True})
+        
+        if discount:
+            # Validate the discount
+            now = datetime.now(timezone.utc)
+            is_valid = True
+            
+            # Check date range
+            if discount.get("valid_from"):
+                valid_from = datetime.fromisoformat(discount["valid_from"].replace('Z', '+00:00'))
+                if now < valid_from:
+                    is_valid = False
+            
+            if discount.get("valid_until"):
+                valid_until = datetime.fromisoformat(discount["valid_until"].replace('Z', '+00:00'))
+                if now > valid_until:
+                    is_valid = False
+            
+            # Check usage limits
+            if discount.get("usage_limit") and discount.get("used_count", 0) >= discount["usage_limit"]:
+                is_valid = False
+            
+            # Check per-user limit
+            user_usage = await db.discount_usage.count_documents({
+                "discount_id": discount["discount_id"],
+                "user_id": user["user_id"]
+            })
+            if user_usage >= discount.get("per_user_limit", 1):
+                is_valid = False
+            
+            # Check tier applicability
+            if discount.get("applicable_tiers") and tier not in discount["applicable_tiers"]:
+                is_valid = False
+            
+            if is_valid:
+                discount_data = discount
+                stripe_coupon_id = discount.get("stripe_coupon_id")
+                
+                # Apply discount based on type
+                if discount["discount_type"] == "percentage":
+                    amount = amount * (1 - discount["value"] / 100)
+                elif discount["discount_type"] == "fixed_amount":
+                    amount = max(0, amount - discount["value"])
+                elif discount["discount_type"] == "free_trial":
+                    trial_days = int(discount["value"])
+                    amount = 0  # First charge is free during trial
+                elif discount["discount_type"] == "buy_x_get_y":
+                    # For buy_x_get_y, amount stays the same but we'll apply coupon
+                    pass
     
     success_url = f"{payment.origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{payment.origin_url}/pricing"
     
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY")
     webhook_url = f"{str(request.base_url)}api/webhook/stripe"
     
-    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
-    checkout_request = CheckoutSessionRequest(
-        amount=float(amount),
-        currency="usd",
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata={
-            "user_id": user["user_id"],
-            "tier": str(tier),
-            "tier_name": tier_info["name"]
+    # Create Stripe checkout session directly with coupon support
+    try:
+        stripe.api_key = stripe_secret_key
+        
+        line_items = [{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": f"Kitab Cloud - {tier_info['name']} Plan",
+                    "description": f"Monthly subscription for {tier_info['name']} tier"
+                },
+                "unit_amount": int(original_amount * 100),  # Stripe uses cents
+                "recurring": {"interval": "month"} if not trial_days else None
+            } if not trial_days else {
+                "currency": "usd",
+                "product_data": {
+                    "name": f"Kitab Cloud - {tier_info['name']} Plan",
+                    "description": f"Monthly subscription for {tier_info['name']} tier"
+                },
+                "unit_amount": int(original_amount * 100),
+            },
+            "quantity": 1
+        }]
+        
+        session_params = {
+            "payment_method_types": ["card"],
+            "line_items": line_items,
+            "mode": "subscription" if not trial_days else "payment",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "metadata": {
+                "user_id": user["user_id"],
+                "tier": str(tier),
+                "tier_name": tier_info["name"],
+                "discount_code": payment.discount_code.upper() if payment.discount_code else None,
+                "discount_id": discount_data["discount_id"] if discount_data else None
+            }
         }
-    )
-    
-    session = await stripe_checkout.create_checkout_session(checkout_request)
-    
-    # Create payment transaction record
-    await db.payment_transactions.insert_one({
-        "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
-        "session_id": session.session_id,
-        "user_id": user["user_id"],
-        "amount": amount,
-        "currency": "usd",
-        "tier": tier,
-        "payment_status": "initiated",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    return {"url": session.url, "session_id": session.session_id}
+        
+        # Add coupon if available
+        if stripe_coupon_id and not trial_days:
+            session_params["discounts"] = [{"coupon": stripe_coupon_id}]
+        
+        # Add trial period if free trial discount
+        if trial_days:
+            session_params["subscription_data"] = {
+                "trial_period_days": trial_days
+            }
+            session_params["mode"] = "subscription"
+            # Reconstruct line_items for subscription
+            session_params["line_items"] = [{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {
+                        "name": f"Kitab Cloud - {tier_info['name']} Plan",
+                        "description": f"Monthly subscription for {tier_info['name']} tier"
+                    },
+                    "unit_amount": int(original_amount * 100),
+                    "recurring": {"interval": "month"}
+                },
+                "quantity": 1
+            }]
+        
+        session = stripe.checkout.Session.create(**session_params)
+        
+        # Create payment transaction record
+        await db.payment_transactions.insert_one({
+            "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+            "session_id": session.id,
+            "user_id": user["user_id"],
+            "original_amount": original_amount,
+            "amount": amount,
+            "currency": "usd",
+            "tier": tier,
+            "discount_code": payment.discount_code.upper() if payment.discount_code else None,
+            "discount_id": discount_data["discount_id"] if discount_data else None,
+            "payment_status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Record discount usage if applied
+        if discount_data:
+            await db.discount_usage.insert_one({
+                "usage_id": f"usage_{uuid.uuid4().hex[:12]}",
+                "discount_id": discount_data["discount_id"],
+                "discount_code": discount_data["code"],
+                "user_id": user["user_id"],
+                "session_id": session.id,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            
+            # Increment used_count
+            await db.discount_codes.update_one(
+                {"discount_id": discount_data["discount_id"]},
+                {"$inc": {"used_count": 1}}
+            )
+        
+        return {
+            "url": session.url,
+            "session_id": session.id,
+            "discount_applied": discount_data["code"] if discount_data else None,
+            "original_amount": original_amount,
+            "final_amount": amount
+        }
+        
+    except Exception as e:
+        logger.error(f"Stripe checkout error: {e}")
+        # Fallback to emergent integrations checkout
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        
+        checkout_request = CheckoutSessionRequest(
+            amount=float(amount),
+            currency="usd",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "user_id": user["user_id"],
+                "tier": str(tier),
+                "tier_name": tier_info["name"]
+            }
+        )
+        
+        session = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Create payment transaction record
+        await db.payment_transactions.insert_one({
+            "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+            "session_id": session.session_id,
+            "user_id": user["user_id"],
+            "amount": amount,
+            "currency": "usd",
+            "tier": tier,
+            "payment_status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        return {"url": session.url, "session_id": session.session_id}
 
 
 @api_router.get("/payments/status/{session_id}")
@@ -2045,6 +2276,272 @@ async def reset_tiers(user: dict = Depends(get_current_user)):
     await db.settings.delete_one({"setting_id": "subscription_tiers"})
     logger.info(f"Tier settings reset to defaults by {user['user_id']}")
     return {"message": "Tier settings reset to defaults", "tiers": SUBSCRIPTION_TIERS}
+
+
+# ============== Discount Code Endpoints ==============
+
+import stripe
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+
+
+@api_router.post("/admin/discount-codes")
+async def create_discount_code(discount: DiscountCodeCreate, user: dict = Depends(get_current_user)):
+    """Create a new discount code (Admin only)"""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check if code already exists
+    existing = await db.discount_codes.find_one({"code": discount.code.upper()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Discount code already exists")
+    
+    # Create Stripe coupon if applicable
+    stripe_coupon_id = None
+    try:
+        if discount.discount_type == "percentage":
+            stripe_coupon = stripe.Coupon.create(
+                percent_off=discount.value,
+                duration="once",
+                name=discount.name,
+                id=f"DC_{discount.code.upper()}_{uuid.uuid4().hex[:6]}"
+            )
+            stripe_coupon_id = stripe_coupon.id
+        elif discount.discount_type == "fixed_amount":
+            stripe_coupon = stripe.Coupon.create(
+                amount_off=int(discount.value * 100),  # Stripe uses cents
+                currency="usd",
+                duration="once",
+                name=discount.name,
+                id=f"DC_{discount.code.upper()}_{uuid.uuid4().hex[:6]}"
+            )
+            stripe_coupon_id = stripe_coupon.id
+        elif discount.discount_type == "free_trial":
+            # For free trials, we'll handle it in checkout by adding trial days
+            pass
+        elif discount.discount_type == "buy_x_get_y":
+            # For buy X get Y, we create a coupon for 100% off Y months
+            # This will be applied after X months of payment
+            stripe_coupon = stripe.Coupon.create(
+                percent_off=100,
+                duration="repeating",
+                duration_in_months=int(discount.value),  # Y months free
+                name=discount.name,
+                id=f"DC_{discount.code.upper()}_{uuid.uuid4().hex[:6]}"
+            )
+            stripe_coupon_id = stripe_coupon.id
+        logger.info(f"Created Stripe coupon: {stripe_coupon_id}")
+    except Exception as e:
+        logger.warning(f"Failed to create Stripe coupon: {e}")
+    
+    discount_data = {
+        "discount_id": f"disc_{uuid.uuid4().hex[:12]}",
+        "code": discount.code.upper(),
+        "name": discount.name,
+        "description": discount.description,
+        "discount_type": discount.discount_type,
+        "value": discount.value,
+        "buy_x_value": discount.buy_x_value,
+        "is_visible": discount.is_visible,
+        "is_active": discount.is_active,
+        "usage_limit": discount.usage_limit,
+        "per_user_limit": discount.per_user_limit,
+        "used_count": 0,
+        "applicable_tiers": discount.applicable_tiers,
+        "valid_from": discount.valid_from,
+        "valid_until": discount.valid_until,
+        "banner_text": discount.banner_text,
+        "badge_text": discount.badge_text,
+        "stripe_coupon_id": stripe_coupon_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.discount_codes.insert_one(discount_data)
+    logger.info(f"Discount code created: {discount.code} by admin {user['user_id']}")
+    
+    return {k: v for k, v in discount_data.items() if k != "_id"}
+
+
+@api_router.get("/admin/discount-codes")
+async def list_discount_codes(user: dict = Depends(get_current_user)):
+    """List all discount codes (Admin only)"""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    codes = await db.discount_codes.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"discount_codes": codes}
+
+
+@api_router.get("/admin/discount-codes/{discount_id}")
+async def get_discount_code(discount_id: str, user: dict = Depends(get_current_user)):
+    """Get a specific discount code (Admin only)"""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    code = await db.discount_codes.find_one({"discount_id": discount_id}, {"_id": 0})
+    if not code:
+        raise HTTPException(status_code=404, detail="Discount code not found")
+    
+    return code
+
+
+@api_router.put("/admin/discount-codes/{discount_id}")
+async def update_discount_code(discount_id: str, update: DiscountCodeUpdate, user: dict = Depends(get_current_user)):
+    """Update a discount code (Admin only)"""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    existing = await db.discount_codes.find_one({"discount_id": discount_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Discount code not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    
+    if update_data:
+        await db.discount_codes.update_one(
+            {"discount_id": discount_id},
+            {"$set": update_data}
+        )
+    
+    updated = await db.discount_codes.find_one({"discount_id": discount_id}, {"_id": 0})
+    logger.info(f"Discount code updated: {discount_id} by admin {user['user_id']}")
+    
+    return updated
+
+
+@api_router.delete("/admin/discount-codes/{discount_id}")
+async def delete_discount_code(discount_id: str, user: dict = Depends(get_current_user)):
+    """Delete a discount code (Admin only)"""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    existing = await db.discount_codes.find_one({"discount_id": discount_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Discount code not found")
+    
+    # Try to delete Stripe coupon if exists
+    if existing.get("stripe_coupon_id"):
+        try:
+            stripe.Coupon.delete(existing["stripe_coupon_id"])
+        except Exception as e:
+            logger.warning(f"Failed to delete Stripe coupon: {e}")
+    
+    await db.discount_codes.delete_one({"discount_id": discount_id})
+    logger.info(f"Discount code deleted: {discount_id} by admin {user['user_id']}")
+    
+    return {"message": "Discount code deleted successfully"}
+
+
+@api_router.post("/discount/validate")
+async def validate_discount_code(request: DiscountValidateRequest, user: dict = Depends(get_current_user)):
+    """Validate a discount code and return discount details"""
+    code = request.code.upper()
+    tier = request.tier
+    
+    discount = await db.discount_codes.find_one({"code": code, "is_active": True}, {"_id": 0})
+    
+    if not discount:
+        raise HTTPException(status_code=404, detail="Invalid or expired discount code")
+    
+    # Check if code is within valid date range
+    now = datetime.now(timezone.utc)
+    if discount.get("valid_from"):
+        valid_from = datetime.fromisoformat(discount["valid_from"].replace('Z', '+00:00'))
+        if now < valid_from:
+            raise HTTPException(status_code=400, detail="This discount code is not yet active")
+    
+    if discount.get("valid_until"):
+        valid_until = datetime.fromisoformat(discount["valid_until"].replace('Z', '+00:00'))
+        if now > valid_until:
+            raise HTTPException(status_code=400, detail="This discount code has expired")
+    
+    # Check total usage limit
+    if discount.get("usage_limit") and discount.get("used_count", 0) >= discount["usage_limit"]:
+        raise HTTPException(status_code=400, detail="This discount code has reached its usage limit")
+    
+    # Check per-user limit
+    user_usage = await db.discount_usage.count_documents({
+        "discount_id": discount["discount_id"],
+        "user_id": user["user_id"]
+    })
+    if user_usage >= discount.get("per_user_limit", 1):
+        raise HTTPException(status_code=400, detail="You have already used this discount code")
+    
+    # Check if applicable to selected tier
+    if discount.get("applicable_tiers") and tier not in discount["applicable_tiers"]:
+        raise HTTPException(status_code=400, detail="This discount code is not valid for the selected plan")
+    
+    # Calculate discount amount
+    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
+    tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
+    tier_key = str(tier) if str(tier) in tiers else tier
+    tier_info = tiers.get(tier_key) or tiers.get(str(tier_key))
+    original_price = tier_info["price"]
+    
+    discount_info = {
+        "code": discount["code"],
+        "name": discount["name"],
+        "discount_type": discount["discount_type"],
+        "value": discount["value"],
+        "original_price": original_price,
+        "final_price": original_price,
+        "savings": 0,
+        "description": ""
+    }
+    
+    if discount["discount_type"] == "percentage":
+        savings = original_price * (discount["value"] / 100)
+        discount_info["final_price"] = original_price - savings
+        discount_info["savings"] = savings
+        discount_info["description"] = f"{int(discount['value'])}% off first month"
+    elif discount["discount_type"] == "fixed_amount":
+        discount_info["final_price"] = max(0, original_price - discount["value"])
+        discount_info["savings"] = min(original_price, discount["value"])
+        discount_info["description"] = f"${discount['value']} off first month"
+    elif discount["discount_type"] == "free_trial":
+        discount_info["final_price"] = 0
+        discount_info["savings"] = original_price
+        discount_info["trial_days"] = int(discount["value"])
+        discount_info["description"] = f"{int(discount['value'])} day free trial"
+    elif discount["discount_type"] == "buy_x_get_y":
+        buy_months = discount.get("buy_x_value", 1)
+        free_months = int(discount["value"])
+        discount_info["description"] = f"Pay {buy_months} month{'s' if buy_months > 1 else ''}, get {free_months} month{'s' if free_months > 1 else ''} free"
+        discount_info["buy_months"] = buy_months
+        discount_info["free_months"] = free_months
+    
+    return discount_info
+
+
+@api_router.get("/discount/visible")
+async def get_visible_discounts():
+    """Get all visible discount codes for homepage display (Public endpoint)"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Find active and visible codes within valid date range
+    query = {
+        "is_active": True,
+        "is_visible": True,
+        "$or": [
+            {"valid_from": None},
+            {"valid_from": {"$lte": now}}
+        ]
+    }
+    
+    discounts = await db.discount_codes.find(query, {"_id": 0, "stripe_coupon_id": 0}).to_list(20)
+    
+    # Filter out expired codes
+    valid_discounts = []
+    for d in discounts:
+        if d.get("valid_until"):
+            valid_until = datetime.fromisoformat(d["valid_until"].replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) > valid_until:
+                continue
+        # Check usage limit
+        if d.get("usage_limit") and d.get("used_count", 0) >= d["usage_limit"]:
+            continue
+        valid_discounts.append(d)
+    
+    return {"discounts": valid_discounts}
 
 
 # ============== User Settings Endpoints ==============

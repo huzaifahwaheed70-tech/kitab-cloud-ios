@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink } from 'lucide-react';
+import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 const LandingPage = () => {
@@ -10,6 +10,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
+  const [visibleDiscounts, setVisibleDiscounts] = useState([]);
 
   // Auto-redirect to library if already logged in
   useEffect(() => {
@@ -31,6 +32,19 @@ const LandingPage = () => {
       }
     };
     fetchBooks();
+  }, []);
+
+  // Fetch visible discounts
+  useEffect(() => {
+    const fetchDiscounts = async () => {
+      try {
+        const response = await axios.get(`${API}/discount/visible`);
+        setVisibleDiscounts(response.data.discounts || []);
+      } catch (error) {
+        console.error('Error fetching discounts:', error);
+      }
+    };
+    fetchDiscounts();
   }, []);
 
   const features = [
@@ -107,6 +121,25 @@ const LandingPage = () => {
           </div>
         </div>
       </nav>
+
+      {/* Promotional Banner for Visible Discounts */}
+      {visibleDiscounts.length > 0 && (
+        <div className="bg-gradient-to-r from-gold/20 via-gold/10 to-gold/20 border-b border-gold/30">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Tag className="w-4 h-4 text-gold" />
+              <span className="text-gold font-medium text-sm md:text-base">
+                {visibleDiscounts[0].banner_text || `Use code ${visibleDiscounts[0].code} for a special discount!`}
+              </span>
+              <Link to="/pricing">
+                <Button size="sm" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] text-xs ml-2">
+                  View Pricing
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative py-16 md:py-20 px-4 md:px-6">

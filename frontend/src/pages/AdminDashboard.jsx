@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
-  Search, Save, Settings, DollarSign, RefreshCw
+  Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -26,6 +26,7 @@ import {
 } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
+import { Switch } from '../components/ui/switch';
 
 const AdminDashboard = () => {
   const { token } = useAuth();
@@ -44,6 +45,29 @@ const AdminDashboard = () => {
   const [tierSettings, setTierSettings] = useState({});
   const [tierLoading, setTierLoading] = useState(false);
   const [tierSaving, setTierSaving] = useState(false);
+  
+  // Discount Codes State
+  const [discountCodes, setDiscountCodes] = useState([]);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState(null);
+  const [discountForm, setDiscountForm] = useState({
+    code: '',
+    name: '',
+    description: '',
+    discount_type: 'percentage',
+    value: '',
+    buy_x_value: '',
+    is_visible: false,
+    is_active: true,
+    usage_limit: '',
+    per_user_limit: 1,
+    applicable_tiers: [],
+    valid_from: '',
+    valid_until: '',
+    banner_text: '',
+    badge_text: ''
+  });
 
   // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -154,6 +178,133 @@ const AdminDashboard = () => {
       toast.error('Failed to reset tier settings');
     } finally {
       setTierSaving(false);
+    }
+  };
+
+  // Discount Code Functions
+  const fetchDiscountCodes = async () => {
+    setDiscountLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/discount-codes`, { headers, withCredentials: true });
+      setDiscountCodes(response.data.discount_codes || []);
+    } catch (error) {
+      console.error('Error fetching discount codes:', error);
+      toast.error('Failed to load discount codes');
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'discounts' && token) {
+      fetchDiscountCodes();
+    }
+  }, [activeTab, token]);
+
+  const resetDiscountForm = () => {
+    setDiscountForm({
+      code: '',
+      name: '',
+      description: '',
+      discount_type: 'percentage',
+      value: '',
+      buy_x_value: '',
+      is_visible: false,
+      is_active: true,
+      usage_limit: '',
+      per_user_limit: 1,
+      applicable_tiers: [],
+      valid_from: '',
+      valid_until: '',
+      banner_text: '',
+      badge_text: ''
+    });
+    setEditingDiscount(null);
+  };
+
+  const handleCreateDiscount = async (e) => {
+    e.preventDefault();
+    try {
+      const data = {
+        code: discountForm.code.toUpperCase(),
+        name: discountForm.name,
+        description: discountForm.description || null,
+        discount_type: discountForm.discount_type,
+        value: parseFloat(discountForm.value),
+        buy_x_value: discountForm.discount_type === 'buy_x_get_y' ? parseInt(discountForm.buy_x_value) : null,
+        is_visible: discountForm.is_visible,
+        is_active: discountForm.is_active,
+        usage_limit: discountForm.usage_limit ? parseInt(discountForm.usage_limit) : null,
+        per_user_limit: parseInt(discountForm.per_user_limit) || 1,
+        applicable_tiers: discountForm.applicable_tiers.length > 0 ? discountForm.applicable_tiers : null,
+        valid_from: discountForm.valid_from || null,
+        valid_until: discountForm.valid_until || null,
+        banner_text: discountForm.banner_text || null,
+        badge_text: discountForm.badge_text || null
+      };
+
+      if (editingDiscount) {
+        await axios.put(`${API}/admin/discount-codes/${editingDiscount.discount_id}`, data, { headers, withCredentials: true });
+        toast.success('Discount code updated!');
+      } else {
+        await axios.post(`${API}/admin/discount-codes`, data, { headers, withCredentials: true });
+        toast.success('Discount code created!');
+      }
+
+      setShowDiscountModal(false);
+      resetDiscountForm();
+      fetchDiscountCodes();
+    } catch (error) {
+      console.error('Error saving discount code:', error);
+      toast.error(error.response?.data?.detail || 'Failed to save discount code');
+    }
+  };
+
+  const handleEditDiscount = (discount) => {
+    setEditingDiscount(discount);
+    setDiscountForm({
+      code: discount.code,
+      name: discount.name,
+      description: discount.description || '',
+      discount_type: discount.discount_type,
+      value: discount.value.toString(),
+      buy_x_value: discount.buy_x_value?.toString() || '',
+      is_visible: discount.is_visible,
+      is_active: discount.is_active,
+      usage_limit: discount.usage_limit?.toString() || '',
+      per_user_limit: discount.per_user_limit || 1,
+      applicable_tiers: discount.applicable_tiers || [],
+      valid_from: discount.valid_from ? discount.valid_from.split('T')[0] : '',
+      valid_until: discount.valid_until ? discount.valid_until.split('T')[0] : '',
+      banner_text: discount.banner_text || '',
+      badge_text: discount.badge_text || ''
+    });
+    setShowDiscountModal(true);
+  };
+
+  const handleDeleteDiscount = async (discountId) => {
+    if (!window.confirm('Are you sure you want to delete this discount code?')) return;
+    
+    try {
+      await axios.delete(`${API}/admin/discount-codes/${discountId}`, { headers, withCredentials: true });
+      toast.success('Discount code deleted!');
+      fetchDiscountCodes();
+    } catch (error) {
+      console.error('Error deleting discount code:', error);
+      toast.error('Failed to delete discount code');
+    }
+  };
+
+  const toggleDiscountActive = async (discount) => {
+    try {
+      await axios.put(`${API}/admin/discount-codes/${discount.discount_id}`, {
+        is_active: !discount.is_active
+      }, { headers, withCredentials: true });
+      toast.success(`Discount code ${!discount.is_active ? 'activated' : 'deactivated'}!`);
+      fetchDiscountCodes();
+    } catch (error) {
+      console.error('Error toggling discount status:', error);
+      toast.error('Failed to update discount code');
     }
   };
 
@@ -356,7 +507,7 @@ const AdminDashboard = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6">
+          <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6 flex-wrap">
             <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">
               Books
             </TabsTrigger>
@@ -369,14 +520,18 @@ const AdminDashboard = () => {
             <TabsTrigger value="subscriptions" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-subscriptions">
               Subscriptions
             </TabsTrigger>
+            <TabsTrigger value="discounts" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-discounts">
+              <Tag className="w-4 h-4 mr-1" />
+              Discounts
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
               <Settings className="w-4 h-4 mr-1" />
               Settings
             </TabsTrigger>
           </TabsList>
 
-          {/* Search (hidden on settings tab) */}
-          {activeTab !== 'settings' && (
+          {/* Search (hidden on settings and discounts tab) */}
+          {activeTab !== 'settings' && activeTab !== 'discounts' && (
           <div className="relative mb-6 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
             <Input
@@ -767,6 +922,305 @@ const AdminDashboard = () => {
                 <div className="text-center py-12 text-[#B0C4BF]">No subscriptions yet</div>
               )}
             </div>
+          </TabsContent>
+
+          {/* Discounts Tab */}
+          <TabsContent value="discounts">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-serif text-2xl text-[#FDFBF7]">Discount Codes</h2>
+                  <p className="text-[#B0C4BF] text-sm mt-1">Create and manage promotional codes</p>
+                </div>
+                <Button
+                  onClick={() => { resetDiscountForm(); setShowDiscountModal(true); }}
+                  className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                  data-testid="create-discount-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Discount Code
+                </Button>
+              </div>
+
+              {discountLoading ? (
+                <div className="text-center py-12 text-[#B0C4BF]">Loading discount codes...</div>
+              ) : discountCodes.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-[rgba(212,175,55,0.3)] rounded-lg">
+                  <Tag className="w-12 h-12 mx-auto text-[#B0C4BF] mb-4" />
+                  <p className="text-[#B0C4BF]">No discount codes yet</p>
+                  <p className="text-sm text-[#B0C4BF]/60">Create your first discount code to offer promotions</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {discountCodes.map((discount) => (
+                    <div
+                      key={discount.discount_id}
+                      className={`glass-card p-4 rounded-lg border ${discount.is_active ? 'border-gold/30' : 'border-[rgba(212,175,55,0.1)] opacity-60'}`}
+                      data-testid={`discount-${discount.code}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-mono text-lg text-gold font-bold">{discount.code}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${discount.is_visible ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                              {discount.is_visible ? 'Visible' : 'Secret'}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${discount.is_active ? 'bg-gold/20 text-gold' : 'bg-red-500/20 text-red-400'}`}>
+                              {discount.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <h3 className="text-[#FDFBF7] font-medium">{discount.name}</h3>
+                          <p className="text-sm text-[#B0C4BF] mt-1">
+                            {discount.discount_type === 'percentage' && `${discount.value}% off`}
+                            {discount.discount_type === 'fixed_amount' && `$${discount.value} off`}
+                            {discount.discount_type === 'free_trial' && `${discount.value} day free trial`}
+                            {discount.discount_type === 'buy_x_get_y' && `Buy ${discount.buy_x_value} month, get ${discount.value} month free`}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-[#B0C4BF]/70">
+                            <span>Used: {discount.used_count || 0}{discount.usage_limit ? `/${discount.usage_limit}` : ''}</span>
+                            {discount.valid_until && <span>Expires: {new Date(discount.valid_until).toLocaleDateString()}</span>}
+                          </div>
+                          {discount.banner_text && (
+                            <p className="text-xs text-gold/70 mt-2 italic">Banner: "{discount.banner_text}"</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleDiscountActive(discount)}
+                            className="text-[#B0C4BF] hover:text-gold"
+                            title={discount.is_active ? 'Deactivate' : 'Activate'}
+                          >
+                            {discount.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditDiscount(discount)}
+                            className="text-[#B0C4BF] hover:text-gold"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDiscount(discount.discount_id)}
+                            className="text-[#B0C4BF] hover:text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Discount Code Modal */}
+            <Dialog open={showDiscountModal} onOpenChange={(open) => { setShowDiscountModal(open); if (!open) resetDiscountForm(); }}>
+              <DialogContent className="bg-[#02120F] border-gold/30 text-[#FDFBF7] max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-xl">
+                    {editingDiscount ? 'Edit Discount Code' : 'Create Discount Code'}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateDiscount} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Code *</Label>
+                      <Input
+                        value={discountForm.code}
+                        onChange={(e) => setDiscountForm({ ...discountForm, code: e.target.value.toUpperCase() })}
+                        placeholder="e.g., WELCOME20"
+                        className="bg-surface border-gold/30 uppercase"
+                        required
+                        disabled={!!editingDiscount}
+                      />
+                    </div>
+                    <div>
+                      <Label>Name *</Label>
+                      <Input
+                        value={discountForm.name}
+                        onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
+                        placeholder="e.g., Welcome Discount"
+                        className="bg-surface border-gold/30"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Description (Internal)</Label>
+                    <Textarea
+                      value={discountForm.description}
+                      onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
+                      placeholder="Internal notes about this discount"
+                      className="bg-surface border-gold/30"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Discount Type *</Label>
+                      <Select
+                        value={discountForm.discount_type}
+                        onValueChange={(value) => setDiscountForm({ ...discountForm, discount_type: value })}
+                      >
+                        <SelectTrigger className="bg-surface border-gold/30">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#02120F] border-gold/30">
+                          <SelectItem value="percentage">Percentage Off</SelectItem>
+                          <SelectItem value="fixed_amount">Fixed Amount Off</SelectItem>
+                          <SelectItem value="free_trial">Free Trial (Days)</SelectItem>
+                          <SelectItem value="buy_x_get_y">Buy X Get Y Free</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>
+                        {discountForm.discount_type === 'percentage' ? 'Percentage (%)' :
+                         discountForm.discount_type === 'fixed_amount' ? 'Amount ($)' :
+                         discountForm.discount_type === 'free_trial' ? 'Trial Days' :
+                         'Free Months (Y)'} *
+                      </Label>
+                      <Input
+                        type="number"
+                        value={discountForm.value}
+                        onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
+                        placeholder={discountForm.discount_type === 'percentage' ? '20' : '7'}
+                        className="bg-surface border-gold/30"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {discountForm.discount_type === 'buy_x_get_y' && (
+                    <div>
+                      <Label>Paid Months (X) *</Label>
+                      <Input
+                        type="number"
+                        value={discountForm.buy_x_value}
+                        onChange={(e) => setDiscountForm({ ...discountForm, buy_x_value: e.target.value })}
+                        placeholder="1"
+                        className="bg-surface border-gold/30"
+                        required
+                      />
+                      <p className="text-xs text-[#B0C4BF] mt-1">User pays for X months, then gets Y months free</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Usage Limit (Total)</Label>
+                      <Input
+                        type="number"
+                        value={discountForm.usage_limit}
+                        onChange={(e) => setDiscountForm({ ...discountForm, usage_limit: e.target.value })}
+                        placeholder="Unlimited"
+                        className="bg-surface border-gold/30"
+                      />
+                    </div>
+                    <div>
+                      <Label>Per User Limit</Label>
+                      <Input
+                        type="number"
+                        value={discountForm.per_user_limit}
+                        onChange={(e) => setDiscountForm({ ...discountForm, per_user_limit: parseInt(e.target.value) || 1 })}
+                        placeholder="1"
+                        className="bg-surface border-gold/30"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Valid From</Label>
+                      <Input
+                        type="date"
+                        value={discountForm.valid_from}
+                        onChange={(e) => setDiscountForm({ ...discountForm, valid_from: e.target.value })}
+                        className="bg-surface border-gold/30"
+                      />
+                    </div>
+                    <div>
+                      <Label>Valid Until</Label>
+                      <Input
+                        type="date"
+                        value={discountForm.valid_until}
+                        onChange={(e) => setDiscountForm({ ...discountForm, valid_until: e.target.value })}
+                        className="bg-surface border-gold/30"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gold/20 pt-4">
+                    <h4 className="text-sm font-medium text-gold mb-3">Display Options</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Show on Homepage</Label>
+                          <p className="text-xs text-[#B0C4BF]">Display banner and badge on pricing pages</p>
+                        </div>
+                        <Switch
+                          checked={discountForm.is_visible}
+                          onCheckedChange={(checked) => setDiscountForm({ ...discountForm, is_visible: checked })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Active</Label>
+                          <p className="text-xs text-[#B0C4BF]">Code can be used at checkout</p>
+                        </div>
+                        <Switch
+                          checked={discountForm.is_active}
+                          onCheckedChange={(checked) => setDiscountForm({ ...discountForm, is_active: checked })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {discountForm.is_visible && (
+                    <div className="space-y-4 border-t border-gold/20 pt-4">
+                      <div>
+                        <Label>Banner Text</Label>
+                        <Input
+                          value={discountForm.banner_text}
+                          onChange={(e) => setDiscountForm({ ...discountForm, banner_text: e.target.value })}
+                          placeholder="Use code WELCOME20 for 20% off!"
+                          className="bg-surface border-gold/30"
+                        />
+                      </div>
+                      <div>
+                        <Label>Pricing Badge Text</Label>
+                        <Input
+                          value={discountForm.badge_text}
+                          onChange={(e) => setDiscountForm({ ...discountForm, badge_text: e.target.value })}
+                          placeholder="20% OFF"
+                          className="bg-surface border-gold/30"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => { setShowDiscountModal(false); resetDiscountForm(); }}
+                      className="border-gold/30"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-gold text-[#02120F] hover:bg-[#E9C85C]">
+                      {editingDiscount ? 'Update' : 'Create'} Discount Code
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Settings Tab */}
