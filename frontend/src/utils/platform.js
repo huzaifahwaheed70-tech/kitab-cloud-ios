@@ -36,7 +36,7 @@ export const shouldDisablePurchases = () => {
  * Get the website URL for purchases
  */
 export const getWebsiteUrl = () => {
-  return 'https://duskitab.com';
+  return 'https://kitab-cloud.emergent.host';
 };
 
 /**
