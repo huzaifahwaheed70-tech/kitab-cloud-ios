@@ -163,7 +163,7 @@ const LandingPage = () => {
               : 'Access the complete Dar-Us-Salam digital collection. Subscribe monthly or buy individual books.'
             }
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4">
             {isIOSApp ? (
               <>
                 <Link to="/login">

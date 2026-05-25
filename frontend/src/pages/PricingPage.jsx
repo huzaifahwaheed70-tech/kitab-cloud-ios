@@ -267,7 +267,7 @@ const PricingPage = () => {
             }
           </p>
           
-          {/* iOS App - Website Link */}
+          {/* iOS App - Website Link (tappable) */}
           {isIOSApp && (
             <div className="mt-8">
               <a 

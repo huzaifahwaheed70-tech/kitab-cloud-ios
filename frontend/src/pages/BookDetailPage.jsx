@@ -847,7 +847,7 @@ const BookDetailPage = () => {
                   </Button>
                 )}
                 
-                {/* iOS - Show website link for purchases */}
+                {/* iOS - Tappable link for purchases */}
                 {isIOSApp && book.pdf_price && !hasPurchased && (
                   <a 
                     href={`${getWebsiteUrl()}/book/${bookId}`}
