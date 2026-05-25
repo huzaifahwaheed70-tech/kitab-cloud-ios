@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
+import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -16,6 +17,7 @@ const PricingPage = () => {
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
+  const [isIOSApp, setIsIOSApp] = useState(false);
   
   // Discount code state
   const [discountCode, setDiscountCode] = useState('');
@@ -23,6 +25,11 @@ const PricingPage = () => {
   const [discountLoading, setDiscountLoading] = useState(false);
   const [visibleDiscounts, setVisibleDiscounts] = useState([]);
   const [selectedTierForDiscount, setSelectedTierForDiscount] = useState(null);
+
+  // Check if iOS app (disable purchases)
+  useEffect(() => {
+    setIsIOSApp(shouldDisablePurchases());
+  }, []);
 
   // Default features for each tier
   const tierFeatures = {
@@ -35,7 +42,10 @@ const PricingPage = () => {
 
   useEffect(() => {
     fetchTiers();
-    fetchVisibleDiscounts();
+    // Only fetch discounts if not iOS (no purchases on iOS)
+    if (!shouldDisablePurchases()) {
+      fetchVisibleDiscounts();
+    }
   }, []);
 
   const fetchVisibleDiscounts = async () => {
@@ -219,8 +229,8 @@ const PricingPage = () => {
         </div>
       </nav>
 
-      {/* Promotional Banner for Visible Discounts */}
-      {visibleDiscounts.length > 0 && (
+      {/* Promotional Banner for Visible Discounts - Hide on iOS */}
+      {!isIOSApp && visibleDiscounts.length > 0 && (
         <div className="bg-gradient-to-r from-gold/20 via-gold/10 to-gold/20 border-b border-gold/30">
           <div className="max-w-7xl mx-auto px-6 py-3">
             <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -248,11 +258,32 @@ const PricingPage = () => {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Plans</p>
           <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] tracking-tight mb-6">
-            Choose Your Access Level
+            {isIOSApp ? 'View Our Plans' : 'Choose Your Access Level'}
           </h1>
           <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">
-            Subscribe monthly to read books, or buy individual PDFs without a subscription.
+            {isIOSApp 
+              ? 'To subscribe or purchase books, please visit our website. Then log in here to access your content.'
+              : 'Subscribe monthly to read books, or buy individual PDFs without a subscription.'
+            }
           </p>
+          
+          {/* iOS App - Website Link */}
+          {isIOSApp && (
+            <div className="mt-8">
+              <a 
+                href={`${getWebsiteUrl()}/pricing`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-6 py-3 rounded-lg transition-colors"
+              >
+                <ExternalLink className="w-5 h-5" />
+                Visit Website to Subscribe
+              </a>
+              <p className="text-sm text-[#B0C4BF] mt-4">
+                Already have a subscription? <Link to="/login" className="text-gold hover:underline">Log in</Link> to access your books.
+              </p>
+            </div>
+          )}
           
           {userTier > 0 && (
             <div className="mt-8 inline-flex items-center gap-2 bg-gold/10 border border-gold/30 rounded-full px-4 py-2">
@@ -265,7 +296,8 @@ const PricingPage = () => {
         </div>
       </section>
 
-      {/* Discount Code Section */}
+      {/* Discount Code Section - Hide on iOS */}
+      {!isIOSApp && (
       <section className="pb-8">
         <div className="max-w-md mx-auto px-6">
           <div className="glass-card p-4 rounded-lg border border-gold/30">
@@ -320,15 +352,67 @@ const PricingPage = () => {
           </div>
         </div>
       </section>
+      )}
 
-      {/* Pricing Cards */}
+      {/* Pricing Cards - Show features only on iOS, full cards on web */}
       <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6">
           {tiersLoading ? (
             <div className="flex justify-center py-20">
               <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
             </div>
+          ) : isIOSApp ? (
+            /* iOS App - Feature comparison only, no purchase buttons */
+            <div className="space-y-8">
+              <p className="text-center text-[#B0C4BF] mb-8">
+                Browse our subscription tiers below. Visit our website to subscribe.
+              </p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {tiers.filter(t => t.tier > 0).map((tier) => (
+                  <div 
+                    key={tier.tier}
+                    className={`rounded-lg border p-6 ${
+                      tier.featured 
+                        ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold' 
+                        : 'bg-surface border-[rgba(212,175,55,0.2)]'
+                    } ${userTier === tier.tier ? 'ring-2 ring-gold' : ''}`}
+                  >
+                    <div className={`tier-badge ${tier.color} inline-block mb-3`}>
+                      Tier {tier.tier}
+                    </div>
+                    <h3 className="font-serif text-xl font-semibold text-[#FDFBF7] mb-4">
+                      {tier.name}
+                    </h3>
+                    <ul className="space-y-2">
+                      {tier.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
+                          <Check className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    {userTier === tier.tier && (
+                      <div className="mt-4 text-center text-gold text-sm font-medium">
+                        ✓ Your Current Plan
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="text-center mt-8">
+                <a 
+                  href={`${getWebsiteUrl()}/pricing`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8 py-4 rounded-lg transition-colors text-lg"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                  Subscribe on Website
+                </a>
+              </div>
+            </div>
           ) : (
+          /* Web/Android - Full pricing cards with purchase buttons */
           <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
             {tiers.map((tier) => (
               <div 

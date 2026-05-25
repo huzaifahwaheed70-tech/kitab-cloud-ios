@@ -4,6 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
 
 const LandingPage = () => {
   const { user, loading } = useAuth();
@@ -11,6 +12,12 @@ const LandingPage = () => {
   const [books, setBooks] = useState([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
   const [visibleDiscounts, setVisibleDiscounts] = useState([]);
+  const [isIOSApp, setIsIOSApp] = useState(false);
+
+  // Check if iOS app
+  useEffect(() => {
+    setIsIOSApp(shouldDisablePurchases());
+  }, []);
 
   // Auto-redirect to library if already logged in
   useEffect(() => {
@@ -34,17 +41,19 @@ const LandingPage = () => {
     fetchBooks();
   }, []);
 
-  // Fetch visible discounts
+  // Fetch visible discounts - only on web, not iOS
   useEffect(() => {
-    const fetchDiscounts = async () => {
-      try {
-        const response = await axios.get(`${API}/discount/visible`);
-        setVisibleDiscounts(response.data.discounts || []);
-      } catch (error) {
-        console.error('Error fetching discounts:', error);
-      }
-    };
-    fetchDiscounts();
+    if (!shouldDisablePurchases()) {
+      const fetchDiscounts = async () => {
+        try {
+          const response = await axios.get(`${API}/discount/visible`);
+          setVisibleDiscounts(response.data.discounts || []);
+        } catch (error) {
+          console.error('Error fetching discounts:', error);
+        }
+      };
+      fetchDiscounts();
+    }
   }, []);
 
   const features = [
@@ -122,8 +131,8 @@ const LandingPage = () => {
         </div>
       </nav>
 
-      {/* Promotional Banner for Visible Discounts */}
-      {visibleDiscounts.length > 0 && (
+      {/* Promotional Banner for Visible Discounts - Hide on iOS */}
+      {!isIOSApp && visibleDiscounts.length > 0 && (
         <div className="bg-gradient-to-r from-gold/20 via-gold/10 to-gold/20 border-b border-gold/30">
           <div className="max-w-7xl mx-auto px-6 py-3">
             <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -149,20 +158,42 @@ const LandingPage = () => {
             <span className="text-gold block">Library</span>
           </h1>
           <p className="text-base md:text-lg text-[#B0C4BF] max-w-2xl mx-auto mb-8 px-2">
-            Access the complete Dar-Us-Salam digital collection. Subscribe monthly or buy individual books.
+            {isIOSApp 
+              ? 'Access the complete Dar-Us-Salam digital collection. Log in to access your subscribed content.'
+              : 'Access the complete Dar-Us-Salam digital collection. Subscribe monthly or buy individual books.'
+            }
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
-            <Link to="/register">
-              <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8 min-h-[48px] w-full sm:w-auto" data-testid="hero-cta">
-                Start Reading
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
-            <a href="#browse-books">
-              <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 min-h-[48px] w-full sm:w-auto">
-                Browse Books
-              </Button>
-            </a>
+            {isIOSApp ? (
+              <>
+                <Link to="/login">
+                  <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8 min-h-[48px] w-full sm:w-auto" data-testid="hero-cta">
+                    Log In
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </Link>
+                <a href={`${getWebsiteUrl()}/pricing`} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 min-h-[48px] w-full sm:w-auto">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Subscribe on Website
+                  </Button>
+                </a>
+              </>
+            ) : (
+              <>
+                <Link to="/register">
+                  <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8 min-h-[48px] w-full sm:w-auto" data-testid="hero-cta">
+                    Start Reading
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </Link>
+                <a href="#browse-books">
+                  <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 min-h-[48px] w-full sm:w-auto">
+                    Browse Books
+                  </Button>
+                </a>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -223,7 +254,7 @@ const LandingPage = () => {
                   <div className="p-3">
                     <h3 className="font-serif text-sm text-[#FDFBF7] line-clamp-2 mb-1">{book.title}</h3>
                     <p className="text-xs text-gold font-mono">{book.darussalam_code}</p>
-                    {book.pdf_price && (
+                    {!isIOSApp && book.pdf_price && (
                       <p className="text-xs text-[#B0C4BF] mt-1">PDF: ${book.pdf_price}</p>
                     )}
                   </div>
@@ -233,12 +264,21 @@ const LandingPage = () => {
           )}
           
           <div className="text-center mt-8">
-            <Link to="/register">
-              <Button variant="outline" className="border-gold text-gold hover:bg-gold/10">
-                View All Books
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+            {isIOSApp ? (
+              <Link to="/login">
+                <Button variant="outline" className="border-gold text-gold hover:bg-gold/10">
+                  Log In to Browse
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/register">
+                <Button variant="outline" className="border-gold text-gold hover:bg-gold/10">
+                  View All Books
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -261,51 +301,95 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Pricing Section - Hide prices on iOS, show website link */}
       <section className="py-16 px-6 bg-[#082E26]/30">
         <div className="max-w-7xl mx-auto">
-          <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] text-center mb-4">Simple Pricing</h2>
-          <p className="text-[#B0C4BF] text-center mb-12">Choose the plan that fits your reading goals</p>
+          <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] text-center mb-4">
+            {isIOSApp ? 'Subscription Plans' : 'Simple Pricing'}
+          </h2>
+          <p className="text-[#B0C4BF] text-center mb-12">
+            {isIOSApp 
+              ? 'Visit our website to subscribe, then log in here to access your books'
+              : 'Choose the plan that fits your reading goals'
+            }
+          </p>
           
-          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {tiers.map((tier) => (
-              <div 
-                key={tier.tier}
-                className={`glass-card rounded-sm p-6 ${tier.featured ? 'border-gold ring-2 ring-gold/20' : ''}`}
-              >
-                {tier.featured && (
-                  <span className="text-xs font-semibold text-gold mb-2 block">RECOMMENDED</span>
-                )}
-                <h3 className="font-serif text-lg text-[#FDFBF7] mb-1">{tier.name}</h3>
-                <div className="mb-4">
-                  {tier.perBook ? (
-                    <span className="text-[#B0C4BF] text-sm">Pay per book</span>
-                  ) : (
-                    <>
-                      <span className="text-3xl font-bold text-gold">${tier.price}</span>
-                      <span className="text-[#B0C4BF]">/mo</span>
-                    </>
-                  )}
-                </div>
-                <ul className="space-y-2 mb-6">
-                  {tier.features.map((feature, i) => (
-                    <li key={i} className="text-sm text-[#B0C4BF] flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-gold rounded-full"></span>
-                      {feature}
-                    </li>
-                  ))}
+          {isIOSApp ? (
+            /* iOS - Simple feature list with website link */
+            <div className="max-w-lg mx-auto text-center">
+              <div className="glass-card rounded-lg p-8 mb-6">
+                <h3 className="font-serif text-xl text-[#FDFBF7] mb-4">Our Plans Include:</h3>
+                <ul className="space-y-3 text-left mb-6">
+                  <li className="text-[#B0C4BF] flex items-center gap-2">
+                    <span className="w-2 h-2 bg-gold rounded-full"></span>
+                    Basic - Monthly book allowance
+                  </li>
+                  <li className="text-[#B0C4BF] flex items-center gap-2">
+                    <span className="w-2 h-2 bg-gold rounded-full"></span>
+                    Standard - Expanded reading access
+                  </li>
+                  <li className="text-[#B0C4BF] flex items-center gap-2">
+                    <span className="w-2 h-2 bg-gold rounded-full"></span>
+                    Advanced - Volume books & in-book search
+                  </li>
+                  <li className="text-[#B0C4BF] flex items-center gap-2">
+                    <span className="w-2 h-2 bg-gold rounded-full"></span>
+                    Premium - Unlimited access to all books
+                  </li>
                 </ul>
-                <Link to="/register">
-                  <Button 
-                    className={`w-full ${tier.featured ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' : 'bg-[#082E26] text-[#FDFBF7] hover:bg-[#0A3D33]'}`}
-                    size="sm"
-                  >
-                    Get Started
+                <a href={`${getWebsiteUrl()}/pricing`} target="_blank" rel="noopener noreferrer">
+                  <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] w-full">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Plans & Subscribe on Website
                   </Button>
-                </Link>
+                </a>
               </div>
-            ))}
-          </div>
+              <p className="text-sm text-[#B0C4BF]">
+                Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to start reading
+              </p>
+            </div>
+          ) : (
+            /* Web/Android - Full pricing grid */
+            <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {tiers.map((tier) => (
+                <div 
+                  key={tier.tier}
+                  className={`glass-card rounded-sm p-6 ${tier.featured ? 'border-gold ring-2 ring-gold/20' : ''}`}
+                >
+                  {tier.featured && (
+                    <span className="text-xs font-semibold text-gold mb-2 block">RECOMMENDED</span>
+                  )}
+                  <h3 className="font-serif text-lg text-[#FDFBF7] mb-1">{tier.name}</h3>
+                  <div className="mb-4">
+                    {tier.perBook ? (
+                      <span className="text-[#B0C4BF] text-sm">Pay per book</span>
+                    ) : (
+                      <>
+                        <span className="text-3xl font-bold text-gold">${tier.price}</span>
+                        <span className="text-[#B0C4BF]">/mo</span>
+                      </>
+                    )}
+                  </div>
+                  <ul className="space-y-2 mb-6">
+                    {tier.features.map((feature, i) => (
+                      <li key={i} className="text-sm text-[#B0C4BF] flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-gold rounded-full"></span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link to="/register">
+                    <Button 
+                      className={`w-full ${tier.featured ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' : 'bg-[#082E26] text-[#FDFBF7] hover:bg-[#0A3D33]'}`}
+                      size="sm"
+                    >
+                      Get Started
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

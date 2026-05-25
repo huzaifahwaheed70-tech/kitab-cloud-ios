@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
+import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -41,8 +42,14 @@ const BookDetailPage = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
+  const [isIOSApp, setIsIOSApp] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
+  
+  // Check if iOS app (disable purchases)
+  useEffect(() => {
+    setIsIOSApp(shouldDisablePurchases());
+  }, []);
   const canSearch = userTier >= 3;
 
   useEffect(() => {
@@ -737,18 +744,24 @@ const BookDetailPage = () => {
                 </p>
               )}
 
-              {/* Info */}
+              {/* Info - Hide prices on iOS */}
               <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
-                {book.original_price && (
+                {book.original_price && !isIOSApp && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">Physical Book</p>
                     <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
                   </div>
                 )}
-                {book.pdf_price && (
+                {book.pdf_price && !isIOSApp && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">PDF</p>
                     <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
+                  </div>
+                )}
+                {isIOSApp && (book.original_price || book.pdf_price) && (
+                  <div>
+                    <p className="text-[#B0C4BF] text-sm">Purchase Options</p>
+                    <p className="text-gold text-sm">Available on our website</p>
                   </div>
                 )}
               </div>
@@ -756,11 +769,24 @@ const BookDetailPage = () => {
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4 pt-4">
                 {isLocked ? (
-                  <Link to="/pricing">
-                    <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
-                      Upgrade to Access
-                    </Button>
-                  </Link>
+                  isIOSApp ? (
+                    <a 
+                      href={`${getWebsiteUrl()}/pricing`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
+                        <ExternalLink className="w-5 h-5 mr-2" />
+                        Subscribe on Website
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link to="/pricing">
+                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
+                        Upgrade to Access
+                      </Button>
+                    </Link>
+                  )
                 ) : book.pdf_url ? (
                   canRead || hasPurchased ? (
                     <Button
@@ -782,6 +808,17 @@ const BookDetailPage = () => {
                         </>
                       )}
                     </Button>
+                  ) : isIOSApp ? (
+                    <a 
+                      href={`${getWebsiteUrl()}/pricing`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-btn">
+                        <ExternalLink className="w-5 h-5 mr-2" />
+                        Subscribe on Website
+                      </Button>
+                    </a>
                   ) : (
                     <Link to="/pricing">
                       <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-btn">
@@ -795,8 +832,8 @@ const BookDetailPage = () => {
                   </Button>
                 )}
 
-                {/* Buy PDF button - for guests, opens external store */}
-                {book.pdf_price && !hasPurchased && (
+                {/* Buy PDF button - Hide on iOS, for web/Android only */}
+                {!isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button
                     size="lg"
                     variant="outline"
@@ -808,6 +845,25 @@ const BookDetailPage = () => {
                     <ShoppingCart className="w-5 h-5 mr-2" />
                     {purchaseLoading ? 'Processing...' : (user?.is_guest ? `Buy on Website ($${book.pdf_price})` : `Buy PDF ($${book.pdf_price})`)}
                   </Button>
+                )}
+                
+                {/* iOS - Show website link for purchases */}
+                {isIOSApp && book.pdf_price && !hasPurchased && (
+                  <a 
+                    href={`${getWebsiteUrl()}/book/${bookId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-gold text-gold hover:bg-gold/10"
+                      data-testid="buy-on-website-btn"
+                    >
+                      <ExternalLink className="w-5 h-5 mr-2" />
+                      Purchase on Website
+                    </Button>
+                  </a>
                 )}
 
                 {/* Download PDF button - shown after purchase */}
