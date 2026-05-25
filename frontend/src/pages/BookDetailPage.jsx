@@ -744,24 +744,18 @@ const BookDetailPage = () => {
                 </p>
               )}
 
-              {/* Info - Hide prices on iOS */}
+              {/* Info */}
               <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
-                {book.original_price && !isIOSApp && (
+                {book.original_price && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">Physical Book</p>
                     <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
                   </div>
                 )}
-                {book.pdf_price && !isIOSApp && (
+                {book.pdf_price && (
                   <div>
                     <p className="text-[#B0C4BF] text-sm">PDF</p>
                     <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
-                  </div>
-                )}
-                {isIOSApp && (book.original_price || book.pdf_price) && (
-                  <div>
-                    <p className="text-[#B0C4BF] text-sm">Purchase Options</p>
-                    <p className="text-gold text-sm">Available on our website</p>
                   </div>
                 )}
               </div>
