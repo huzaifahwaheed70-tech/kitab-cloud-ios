@@ -2,6 +2,11 @@
 <resources>
     <string name="app_name">Kitab Cloud</string>
     <string name="title_activity_main">Kitab Cloud</string>
+<<<<<<< HEAD
     <string name="package_name">com.darussalam.kitabcloud</string>
     <string name="custom_url_scheme">com.darussalam.kitabcloud</string>
+=======
+    <string name="package_name">host.emergent.kitabcloud</string>
+    <string name="custom_url_scheme">host.emergent.kitabcloud</string>
+>>>>>>> origin/main
 </resources>
