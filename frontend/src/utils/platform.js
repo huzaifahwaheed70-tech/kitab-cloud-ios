@@ -33,6 +33,14 @@ export const shouldDisablePurchases = () => {
 };
 
 /**
+ * Check if prices should be hidden (iOS App Store compliance)
+ * Apple doesn't want any prices shown in iOS apps that don't use IAP
+ */
+export const shouldHidePrices = () => {
+  return isIOSNativeApp();
+};
+
+/**
  * Get the website URL for purchases
  */
 export const getWebsiteUrl = () => {

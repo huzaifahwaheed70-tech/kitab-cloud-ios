@@ -6,6 +6,26 @@ import './App.css';
 import { Capacitor } from '@capacitor/core';
 import { initStore } from './purchase';
 
+// OneSignal Push Notifications
+import { 
+  initializeOneSignal, 
+  setUserForNotifications, 
+  clearUserForNotifications,
+  updateUserTags 
+} from './utils/onesignal';
+
+// Global error handler for uncaught errors
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error('[App] Global error:', { message, source, lineno, colno, error });
+  return false;
+};
+
+// Handle unhandled promise rejections
+window.onunhandledrejection = function(event) {
+  console.error('[App] Unhandled promise rejection:', event.reason);
+};
+
+// Pages
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -38,6 +58,11 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
 
+  // Initialize OneSignal on mount
+  useEffect(() => {
+    initializeOneSignal().catch(console.error);
+  }, []);
+
   const checkAuth = useCallback(async () => {
     if (window.location.hash?.includes('session_id=')) {
       setLoading(false);
@@ -51,6 +76,13 @@ const AuthProvider = ({ children }) => {
         });
         setUser(response.data);
         setToken(storedToken);
+        
+        // Set user for OneSignal notifications
+        setUserForNotifications(
+          response.data.user_id, 
+          response.data.email, 
+          response.data.subscription_tier
+        ).catch(console.error);
       } else if (Capacitor.getPlatform() !== 'ios') {
         const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
         setUser(response.data);
@@ -74,6 +106,10 @@ const AuthProvider = ({ children }) => {
     localStorage.setItem('auth_token', newToken);
     setToken(newToken);
     setUser(userData);
+    
+    // Set user for OneSignal
+    setUserForNotifications(userData.user_id, userData.email, userData.subscription_tier).catch(console.error);
+    
     return userData;
   };
 
@@ -83,6 +119,10 @@ const AuthProvider = ({ children }) => {
     localStorage.setItem('auth_token', newToken);
     setToken(newToken);
     setUser(userData);
+    
+    // Set user for OneSignal
+    setUserForNotifications(userData.user_id, userData.email, userData.subscription_tier).catch(console.error);
+    
     return userData;
   };
 
@@ -100,6 +140,9 @@ const AuthProvider = ({ children }) => {
     localStorage.removeItem('auth_token');
     setToken(null);
     setUser(null);
+    
+    // Clear OneSignal user association
+    clearUserForNotifications().catch(console.error);
   };
 
   const refreshUser = async () => {
@@ -110,6 +153,14 @@ const AuthProvider = ({ children }) => {
         withCredentials: true
       });
       setUser(response.data);
+      
+      // Update OneSignal tags if subscription changed
+      if (response.data) {
+        updateUserTags({
+          subscription_tier: String(response.data.subscription_tier || 0),
+          is_subscribed: response.data.subscription_tier > 0 ? 'true' : 'false',
+        }).catch(console.error);
+      }
     } catch (error) {
       console.error('Refresh user error:', error);
     }

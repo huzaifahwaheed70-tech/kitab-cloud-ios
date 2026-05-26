@@ -1,0 +1,9 @@
+{
+  "INSTRUCTIONS": "Replace this file with your actual google-services.json from Firebase Console",
+  "Steps": [
+    "1. Go to Firebase Console → Project Settings → Your Apps → Android app",
+    "2. Download google-services.json",
+    "3. Replace this placeholder file with the downloaded file",
+    "4. Rename to google-services.json (remove .placeholder)"
+  ]
+}

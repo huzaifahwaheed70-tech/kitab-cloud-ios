@@ -172,12 +172,11 @@ const LandingPage = () => {
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </Link>
-                <a href={`${getWebsiteUrl()}/pricing`} target="_blank" rel="noopener noreferrer">
+                <Link to="/library">
                   <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 min-h-[48px] w-full sm:w-auto">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Subscribe on Website
+                    Browse Library
                   </Button>
-                </a>
+                </Link>
               </>
             ) : (
               <>
@@ -315,7 +314,7 @@ const LandingPage = () => {
           </p>
           
           {isIOSApp ? (
-            /* iOS - Simple feature list with website link */
+            /* iOS - Simple feature list without external links */
             <div className="max-w-lg mx-auto text-center">
               <div className="glass-card rounded-lg p-8 mb-6">
                 <h3 className="font-serif text-xl text-[#FDFBF7] mb-4">Our Plans Include:</h3>
@@ -337,12 +336,10 @@ const LandingPage = () => {
                     Premium - Unlimited access to all books
                   </li>
                 </ul>
-                <a href={`${getWebsiteUrl()}/pricing`} target="_blank" rel="noopener noreferrer">
-                  <Button className="bg-gold text-[#02120F] hover:bg-[#E9C85C] w-full">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Plans & Subscribe on Website
-                  </Button>
-                </a>
+                <div className="bg-surface border border-gold/30 rounded-lg p-4">
+                  <p className="text-[#FDFBF7] mb-2">To subscribe, visit:</p>
+                  <p className="text-gold font-mono">kitab-cloud.emergent.host</p>
+                </div>
               </div>
               <p className="text-sm text-[#B0C4BF]">
                 Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to start reading
