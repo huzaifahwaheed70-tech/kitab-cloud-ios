@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App.js';
 import axios from 'axios';
-<<<<<<< HEAD
-import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2, Ticket } from 'lucide-react';
-=======
-import { BookOpen, Check, ArrowRight, ArrowLeft } from 'lucide-react';
->>>>>>> origin/main
+import { BookOpen, Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input'; // Added to prevent runtime errors with the discount text field
 import { toast } from 'sonner';
-<<<<<<< HEAD
+import { Capacitor } from '@capacitor/core';
+import { buySubscription } from '../purchase';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
 import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
@@ -19,20 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-=======
-import { Capacitor } from '@capacitor/core';
-import { buySubscription } from '../purchase';
->>>>>>> origin/main
 
 const PricingPage = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
-<<<<<<< HEAD
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
-  const [tiers, setTiers] = useState([]);
-  const [tiersLoading, setTiersLoading] = useState(true);
-  const [isIOSApp, setIsIOSApp] = useState(false);
+  const [tiersLoading, setTiersLoading] = useState(false); // Set to false if tiers array is static below
   
   // Discount code state
   const [discountCode, setDiscountCode] = useState('');
@@ -47,11 +38,11 @@ const PricingPage = () => {
   const [popupDiscountCode, setPopupDiscountCode] = useState('');
   const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
   const [popupLoading, setPopupLoading] = useState(false);
-=======
->>>>>>> origin/main
 
   const platform = Capacitor.getPlatform();
   const isIOS = platform === 'ios';
+  // Use platform checks to flag native apps if you have custom logic, or rely on isIOS
+  const isIOSApp = isIOS; 
 
   const tiers = [
     {
@@ -93,7 +84,7 @@ const PricingPage = () => {
     }
   ];
 
-  // Show discount popup before checkout
+  // Show discount popup or direct layout route before checkout
   const initiateSubscribe = (tier) => {
     if (tier === 0) {
       navigate(user ? '/library' : '/register');
@@ -116,12 +107,28 @@ const PricingPage = () => {
       return;
     }
 
-<<<<<<< HEAD
-    // Show discount popup before proceeding to checkout
+    // iOS Native App route directly uses App Store In-App Purchases (Discounts bypass Apple guidelines if web-linked)
+    if (isIOS) {
+      handleNativeApplePurchase(tier);
+      return;
+    }
+
+    // Show discount popup before proceeding to web checkout
     setPendingTier(tier);
-    setPopupDiscountCode(discountCode || ''); // Pre-fill if already entered
+    setPopupDiscountCode(discountCode || ''); 
     setPopupDiscountInfo(discountInfo);
     setShowDiscountPopup(true);
+  };
+
+  const handleNativeApplePurchase = async (tier) => {
+    setLoading(tier);
+    try {
+      await buySubscription(tier);
+      setLoading(null);
+    } catch (error) {
+      toast.error('Failed to initiate Apple purchase');
+      setLoading(null);
+    }
   };
 
   // Validate discount code in popup
@@ -151,7 +158,7 @@ const PricingPage = () => {
     }
   };
 
-  // Proceed to checkout from popup
+  // Proceed to checkout from popup (Web / Android / Capacitor Non-iOS)
   const proceedToCheckout = async (withDiscount = false) => {
     if (!pendingTier) return;
     
@@ -163,38 +170,14 @@ const PricingPage = () => {
       
       const requestData = {
         tier: pendingTier,
-        origin_url: window.location.origin
+        origin_url: 'https://kitab-cloud.emergent.host'
       };
       
-      // Include discount code if applied
       if (withDiscount && popupDiscountInfo) {
         requestData.discount_code = popupDiscountCode;
       }
       
       const response = await axios.post(`${API}/payments/create-checkout`, requestData, { headers, withCredentials: true });
-=======
-    setLoading(tier);
->>>>>>> origin/main
-
-    if (isIOS) {
-      try {
-        await buySubscription(tier);
-        setLoading(null);
-      } catch (error) {
-        toast.error('Failed to initiate Apple purchase');
-        setLoading(null);
-      }
-      return;
-    }
-
-    try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      const response = await axios.post(`${API}/payments/create-checkout`, {
-        tier,
-        origin_url: 'https://kitab-cloud.emergent.host'
-      }, { headers, withCredentials: true });
-
       const checkoutUrl = response.data.url;
 
       if (Capacitor.getPlatform() !== 'web') {
@@ -202,16 +185,14 @@ const PricingPage = () => {
       } else {
         window.location.href = checkoutUrl;
       }
-
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to start checkout');
+    } finally {
       setLoading(null);
+      setPendingTier(null);
+      setPopupDiscountCode('');
+      setPopupDiscountInfo(null);
     }
-    
-    // Reset popup state
-    setPendingTier(null);
-    setPopupDiscountCode('');
-    setPopupDiscountInfo(null);
   };
 
   // Legacy handler for backward compatibility
@@ -256,7 +237,6 @@ const PricingPage = () => {
       <section className="py-16 md:py-24 text-center">
         <div className="max-w-7xl mx-auto px-6">
           <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Plans</p>
-<<<<<<< HEAD
           <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] tracking-tight mb-6">
             {isIOSApp ? 'Access Your Books' : 'Choose Your Access Level'}
           </h1>
@@ -267,21 +247,8 @@ const PricingPage = () => {
             }
           </p>
           
-          {/* iOS App - Simple message (no external links or buttons) */}
-          {isIOSApp && (
-            <div className="mt-8">
-              <div className="inline-block bg-surface border border-gold/30 rounded-lg p-6 max-w-md">
-                <p className="text-[#FDFBF7] mb-4">
-                  To subscribe or purchase books, visit our website:
-                </p>
-                <p className="text-gold font-mono text-lg mb-4">
-                  kitab-cloud.emergent.host
-                </p>
-                <p className="text-sm text-[#B0C4BF]">
-                  Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to access your books.
-                </p>
-              </div>
-            </div>
+          {isIOS && (
+            <p className="text-sm text-gold mt-4">Subscriptions are processed securely through Apple.</p>
           )}
           
           {userTier > 0 && (
@@ -291,108 +258,65 @@ const PricingPage = () => {
                 You're currently on <span className="font-bold">Tier {userTier}</span>
               </span>
             </div>
-=======
-          <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] mb-6">Choose Your Access Level</h1>
-          <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">Subscribe monthly to read books, or buy individual PDFs.</p>
-          {isIOS && (
-            <p className="text-sm text-gold mt-4">Subscriptions are processed securely through Apple.</p>
->>>>>>> origin/main
           )}
         </div>
       </section>
 
       <section className="pb-24">
-<<<<<<< HEAD
         <div className="max-w-7xl mx-auto px-6">
           {tiersLoading ? (
             <div className="flex justify-center py-20">
               <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
             </div>
-          ) : isIOSApp ? (
-            /* iOS App - Feature comparison only, no prices, no purchase buttons */
-            <div className="space-y-8">
-              <p className="text-center text-[#B0C4BF] mb-8">
-                Browse our subscription tiers below. Visit kitab-cloud.emergent.host to subscribe.
-              </p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {tiers.filter(t => t.tier > 0).map((tier) => (
-                  <div 
-                    key={tier.tier}
-                    className={`rounded-lg border p-6 ${
-                      tier.featured 
-                        ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold' 
-                        : 'bg-surface border-[rgba(212,175,55,0.2)]'
-                    } ${userTier === tier.tier ? 'ring-2 ring-gold' : ''}`}
-                  >
+          ) : (
+            <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {tiers.map((tier) => (
+                <div 
+                  key={tier.tier}
+                  className={`relative rounded-sm border p-6 flex flex-col justify-between ${
+                    tier.featured 
+                      ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold scale-105 lg:scale-110 shadow-lg shadow-gold/20' 
+                      : 'bg-surface border-[rgba(212,175,55,0.2)]'
+                  } ${userTier === tier.tier ? 'ring-2 ring-gold' : ''}`}
+                  data-testid={`pricing-tier-${tier.tier}`}
+                >
+                  <div>
                     <div className={`tier-badge ${tier.color} inline-block mb-3`}>
-                      Tier {tier.tier}
+                      {tier.tier === 0 ? 'No Sub' : `Tier ${tier.tier}`}
                     </div>
-                    <h3 className="font-serif text-xl font-semibold text-[#FDFBF7] mb-4">
-                      {tier.name}
-                    </h3>
-                    <ul className="space-y-2">
-                      {tier.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
-                          <Check className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
-                          {feature}
+                    <h3 className="font-serif text-2xl font-semibold text-[#FDFBF7] mb-2">{tier.name}</h3>
+                    <div className="text-4xl font-bold text-gold mb-6">
+                      ${tier.price}<span className="text-base text-[#B0C4BF]">/mo</span>
+                    </div>
+                    <ul className="space-y-3 mb-6">
+                      {tier.features.map((f, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
+                          <Check className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" /> <span>{f}</span>
                         </li>
                       ))}
                     </ul>
-                    {userTier === tier.tier && (
-                      <div className="mt-4 text-center text-gold text-sm font-medium">
-                        ✓ Your Current Plan
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
+                  
+                  <Button
+                    onClick={() => handleSubscribe(tier.tier)}
+                    disabled={loading === tier.tier || (tier.tier !== 0 && userTier >= tier.tier)}
+                    className="w-full bg-gold text-[#02120F] mt-auto flex items-center justify-center gap-1"
+                  >
+                    {loading === tier.tier ? 'Processing...' : (
+                      <>
+                        {isIOS ? 'Subscribe with Apple' : 'Subscribe'}
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
             </div>
-          ) : (
-          /* Web/Android - Full pricing cards with purchase buttons */
-          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {tiers.map((tier) => (
-              <div 
-                key={tier.tier}
-                className={`relative rounded-sm border ${
-                  tier.featured 
-                    ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold scale-105 lg:scale-110 shadow-lg shadow-gold/20' 
-                    : 'bg-surface border-[rgba(212,175,55,0.2)]'
-                } ${userTier === tier.tier ? 'ring-2 ring-gold' : ''}`}
-                data-testid={`pricing-tier-${tier.tier}`}
-=======
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-3 lg:grid-cols-5 gap-6">
-          {tiers.map((tier) => (
-            <div key={tier.tier} className={`rounded-sm border p-6 ${tier.featured ? 'bg-gold/10 border-gold' : 'bg-surface border-gold/20'}`}>
-              <div className={`tier-badge ${tier.color} mb-3`}>{tier.tier === 0 ? 'No Sub' : `Tier ${tier.tier}`}</div>
-              <h3 className="font-serif text-2xl font-semibold text-[#FDFBF7] mb-2">{tier.name}</h3>
-              <div className="text-4xl font-bold text-gold mb-6">${tier.price}<span className="text-base text-[#B0C4BF]">/mo</span></div>
-              <ul className="space-y-3 mb-6">
-                {tier.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
-                    <Check className="w-4 h-4 text-gold" /> {f}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                onClick={() => handleSubscribe(tier.tier)}
-                disabled={loading === tier.tier || (tier.tier !== 0 && userTier >= tier.tier)}
-                className="w-full bg-gold text-[#02120F]"
->>>>>>> origin/main
-              >
-                {loading === tier.tier ? 'Processing...' : (
-                  <>
-                    {isIOS ? 'Subscribe with Apple' : 'Subscribe'}
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </>
-                )}
-              </Button>
-            </div>
-          ))}
+          )}
         </div>
       </section>
-<<<<<<< HEAD
 
-      {/* FAQ */}
+      {/* FAQ Section */}
       <section className="pb-24">
         <div className="max-w-3xl mx-auto px-6">
           <h2 className="font-serif text-3xl text-[#FDFBF7] text-center mb-12">
@@ -400,7 +324,7 @@ const PricingPage = () => {
           </h2>
           
           <div className="space-y-6">
-            <div className="glass-card rounded-sm p-6">
+            <div className="glass-card rounded-sm p-6 bg-surface border border-gold/10">
               <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">How does the monthly book limit work?</h3>
               <p className="text-[#B0C4BF]">
                 Each month you can add books to your reading list up to your tier's limit. At the start of the next 
@@ -408,7 +332,7 @@ const PricingPage = () => {
               </p>
             </div>
             
-            <div className="glass-card rounded-sm p-6">
+            <div className="glass-card rounded-sm p-6 bg-surface border border-gold/10">
               <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">Can I buy PDFs without subscribing?</h3>
               <p className="text-[#B0C4BF]">
                 Yes! With Tier 0 (Pay Per Book), you can purchase individual PDFs and own them forever without 
@@ -416,7 +340,7 @@ const PricingPage = () => {
               </p>
             </div>
             
-            <div className="glass-card rounded-sm p-6">
+            <div className="glass-card rounded-sm p-6 bg-surface border border-gold/10">
               <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">What are Volume and Advanced books?</h3>
               <p className="text-[#B0C4BF]">
                 Volume books are multi-volume collections available for Tier 3 and above. Advanced books are 
@@ -424,7 +348,7 @@ const PricingPage = () => {
               </p>
             </div>
             
-            <div className="glass-card rounded-sm p-6">
+            <div className="glass-card rounded-sm p-6 bg-surface border border-gold/10">
               <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">How do I cancel my subscription?</h3>
               <p className="text-[#B0C4BF]">
                 Contact us at sales@dar-us-salam.com to cancel. Your access continues until the end of your 
@@ -518,7 +442,6 @@ const PricingPage = () => {
               </div>
             )}
             
-            {/* Available discounts hint */}
             {visibleDiscounts.length > 0 && !popupDiscountInfo && (
               <div className="text-xs text-[#B0C4BF] bg-[#082E26] rounded p-2">
                 <span className="text-gold">Tip:</span> Try code{' '}
@@ -554,7 +477,7 @@ const PricingPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* iOS Payment Modal - Shows tappable link to open in external browser */}
+      {/* iOS Payment Modal */}
       {paymentModal.show && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
@@ -574,7 +497,6 @@ const PricingPage = () => {
                 Tap the button below to open secure checkout in your browser.
               </p>
               
-              {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
               <a 
                 href={paymentModal.url}
                 target="_blank"
@@ -597,8 +519,6 @@ const PricingPage = () => {
           </div>
         </div>
       )}
-=======
->>>>>>> origin/main
     </div>
   );
 };
