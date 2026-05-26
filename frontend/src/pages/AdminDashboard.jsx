@@ -2,16 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-<<<<<<< HEAD
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
   Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff,
-  Bell, Send, Loader2
-=======
-import {
-  BookOpen, Users, ArrowLeft, Plus, Edit, Trash2,
-  Search, Save, Library
->>>>>>> origin/main
+  Bell, Send, Loader2, BookOpen
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -46,7 +40,6 @@ const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [userDetails, setUserDetails] = useState(null);
-<<<<<<< HEAD
   
   // Tier Settings State
   const [tierSettings, setTierSettings] = useState({});
@@ -88,8 +81,6 @@ const AdminDashboard = () => {
   const [notificationHistoryLoading, setNotificationHistoryLoading] = useState(false);
 
   // Book Form State
-=======
->>>>>>> origin/main
   const [showBookModal, setShowBookModal] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
   const [bookForm, setBookForm] = useState({
@@ -136,8 +127,8 @@ const AdminDashboard = () => {
     }
   };
 
-<<<<<<< HEAD
   const fetchTierSettings = async () => {
+    const headers = getAuthHeaders();
     setTierLoading(true);
     try {
       const response = await axios.get(`${API}/admin/tiers`, { headers, withCredentials: true });
@@ -166,6 +157,7 @@ const AdminDashboard = () => {
   };
 
   const saveTierSettings = async () => {
+    const headers = getAuthHeaders();
     setTierSaving(true);
     try {
       await axios.put(`${API}/admin/tiers`, { tiers: tierSettings }, { headers, withCredentials: true });
@@ -181,6 +173,7 @@ const AdminDashboard = () => {
   const resetTierSettings = async () => {
     if (!window.confirm('Are you sure you want to reset all tier settings to defaults?')) return;
     
+    const headers = getAuthHeaders();
     setTierSaving(true);
     try {
       const response = await axios.post(`${API}/admin/tiers/reset`, {}, { headers, withCredentials: true });
@@ -196,6 +189,7 @@ const AdminDashboard = () => {
 
   // Discount Code Functions
   const fetchDiscountCodes = async () => {
+    const headers = getAuthHeaders();
     setDiscountLoading(true);
     try {
       const response = await axios.get(`${API}/admin/discount-codes`, { headers, withCredentials: true });
@@ -222,6 +216,7 @@ const AdminDashboard = () => {
   }, [activeTab, token]);
 
   const fetchNotificationHistory = async () => {
+    const headers = getAuthHeaders();
     setNotificationHistoryLoading(true);
     try {
       const response = await axios.get(`${API}/admin/notifications/history`, { headers, withCredentials: true });
@@ -240,6 +235,7 @@ const AdminDashboard = () => {
       return;
     }
     
+    const headers = getAuthHeaders();
     setNotificationSending(true);
     try {
       const response = await axios.post(
@@ -291,6 +287,7 @@ const AdminDashboard = () => {
 
   const handleCreateDiscount = async (e) => {
     e.preventDefault();
+    const headers = getAuthHeaders();
     try {
       const data = {
         code: discountForm.code.toUpperCase(),
@@ -352,6 +349,7 @@ const AdminDashboard = () => {
   const handleDeleteDiscount = async (discountId) => {
     if (!window.confirm('Are you sure you want to delete this discount code?')) return;
     
+    const headers = getAuthHeaders();
     try {
       await axios.delete(`${API}/admin/discount-codes/${discountId}`, { headers, withCredentials: true });
       toast.success('Discount code deleted!');
@@ -363,6 +361,7 @@ const AdminDashboard = () => {
   };
 
   const toggleDiscountActive = async (discount) => {
+    const headers = getAuthHeaders();
     try {
       await axios.put(`${API}/admin/discount-codes/${discount.discount_id}`, {
         is_active: !discount.is_active
@@ -375,8 +374,6 @@ const AdminDashboard = () => {
     }
   };
 
-=======
->>>>>>> origin/main
   const fetchUserDetails = async (userId) => {
     try {
       const headers = getAuthHeaders();
@@ -568,7 +565,6 @@ const AdminDashboard = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-<<<<<<< HEAD
           <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6 flex-wrap">
             <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">
               Books
@@ -598,26 +594,18 @@ const AdminDashboard = () => {
 
           {/* Search (hidden on settings, discounts, and notifications tab) */}
           {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'notifications' && (
-=======
-          <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6">
-            <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">Books</TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-users">Users</TabsTrigger>
-            <TabsTrigger value="purchases" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-purchases">Purchases</TabsTrigger>
-            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-subscriptions">Subscriptions</TabsTrigger>
-          </TabsList>
-
->>>>>>> origin/main
-          <div className="relative mb-6 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
-            <Input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
-              data-testid="admin-search"
-            />
-          </div>
+            <div className="relative mb-6 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
+              <Input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+                data-testid="admin-search"
+              />
+            </div>
+          )}
 
           <TabsContent value="books">
             <div className="flex items-center justify-between mb-6">
@@ -743,756 +731,6 @@ const AdminDashboard = () => {
               )}
             </div>
           </TabsContent>
-
-          <TabsContent value="users">
-            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">Users Management</h2>
-            <div className="space-y-4">
-              {filteredUsers.map((user) => (
-                <div key={user.user_id} className="glass-card rounded-sm p-4 flex items-center gap-4" data-testid={`admin-user-${user.user_id}`}>
-                  <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center flex-shrink-0">
-                    {user.picture ? (
-                      <img src={user.picture} alt="" className="w-10 h-10 rounded-full" />
-                    ) : (
-                      <Users className="w-5 h-5 text-gold" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-[#FDFBF7] font-medium">{user.name}</h3>
-                      {user.is_admin && (
-                        <span className="px-2 py-0.5 bg-gold/20 text-gold text-xs rounded-sm">Admin</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-[#B0C4BF] truncate">{user.email}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" onClick={() => fetchUserDetails(user.user_id)} className="border-[rgba(212,175,55,0.2)] text-[#B0C4BF] hover:text-gold">
-                      Details
-                    </Button>
-                    <Select value={String(user.subscription_tier)} onValueChange={(v) => handleUpdateUserTier(user.user_id, parseInt(v))}>
-                      <SelectTrigger className="w-24 bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
-                        {[0, 1, 2, 3, 4, 5].map(t => (
-                          <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">Tier {t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant={user.is_admin ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleToggleAdmin(user.user_id, !user.is_admin)}
-                      className={user.is_admin ? 'bg-gold text-[#02120F]' : 'border-[rgba(212,175,55,0.2)] text-[#B0C4BF]'}
-                    >
-                      {user.is_admin ? 'Admin' : 'Make Admin'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {filteredUsers.length === 0 && (
-                <div className="text-center py-12 text-[#B0C4BF]">No users found</div>
-              )}
-            </div>
-
-            {selectedUser && userDetails && (
-              <Dialog open={!!selectedUser} onOpenChange={() => { setSelectedUser(null); setUserDetails(null); }}>
-                <DialogContent className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] max-w-2xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="font-serif text-xl">User Details</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-[#B0C4BF]">Email</p>
-                        <p className="text-[#FDFBF7]">{userDetails.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#B0C4BF]">Name</p>
-                        <p className="text-[#FDFBF7]">{userDetails.name || 'Not set'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#B0C4BF]">Tier</p>
-                        <p className="text-[#FDFBF7]">Tier {userDetails.subscription_tier}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#B0C4BF]">Admin</p>
-                        <p className="text-[#FDFBF7]">{userDetails.is_admin ? 'Yes' : 'No'}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#B0C4BF] mb-2">Favorite Books ({userDetails.favorites?.length || 0})</p>
-                      <div className="flex flex-wrap gap-2">
-                        {userDetails.favorites?.map(book => (
-                          <span key={book.book_id} className="px-2 py-1 bg-[#082E26] rounded text-sm">{book.title}</span>
-                        ))}
-                        {(!userDetails.favorites || userDetails.favorites.length === 0) && (
-                          <span className="text-[#B0C4BF] text-sm">No favorites</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#B0C4BF] mb-2">PDF Purchases ({userDetails.purchases?.length || 0})</p>
-                      {userDetails.purchases?.map((purchase, i) => (
-                        <div key={i} className="flex justify-between items-center py-2 border-b border-[rgba(212,175,55,0.1)]">
-                          <span className="text-sm">{purchase.book_title}</span>
-                          <span className="text-gold text-sm">${purchase.amount}</span>
-                        </div>
-                      ))}
-                      {(!userDetails.purchases || userDetails.purchases.length === 0) && (
-                        <span className="text-[#B0C4BF] text-sm">No purchases</span>
-                      )}
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-          </TabsContent>
-
-          <TabsContent value="purchases">
-            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">PDF Purchases</h2>
-            <div className="space-y-3">
-              {purchases.map((purchase, index) => (
-                <div key={index} className="glass-card rounded-sm p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-[#FDFBF7] font-medium">{purchase.book_title}</p>
-                    <p className="text-sm text-[#B0C4BF]">{purchase.user_email}</p>
-                    <p className="text-xs text-[#B0C4BF]">{new Date(purchase.purchased_at).toLocaleDateString()}</p>
-                  </div>
-                  <span className="text-gold font-medium">${purchase.amount}</span>
-                </div>
-              ))}
-              {purchases.length === 0 && (
-                <div className="text-center py-12 text-[#B0C4BF]">No purchases yet</div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="subscriptions">
-            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">Subscription Payments</h2>
-            <div className="space-y-3">
-              {subscriptions.map((sub, index) => (
-                <div key={index} className="glass-card rounded-sm p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-[#FDFBF7] font-medium">{sub.user_email || sub.user_name}</p>
-                    <p className="text-sm text-[#B0C4BF]">Tier {sub.tier} subscription</p>
-                    <p className="text-xs text-[#B0C4BF]">{new Date(sub.created_at).toLocaleDateString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-gold font-medium">${sub.amount}</span>
-                    <p className={`text-xs ${sub.payment_status === 'paid' ? 'text-green-400' : 'text-yellow-400'}`}>
-                      {sub.payment_status}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {subscriptions.length === 0 && (
-                <div className="text-center py-12 text-[#B0C4BF]">No subscriptions yet</div>
-              )}
-            </div>
-          </TabsContent>
-<<<<<<< HEAD
-
-          {/* Discounts Tab */}
-          <TabsContent value="discounts">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-serif text-2xl text-[#FDFBF7]">Discount Codes</h2>
-                  <p className="text-[#B0C4BF] text-sm mt-1">Create and manage promotional codes</p>
-                </div>
-                <Button
-                  onClick={() => { resetDiscountForm(); setShowDiscountModal(true); }}
-                  className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                  data-testid="create-discount-btn"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Discount Code
-                </Button>
-              </div>
-
-              {discountLoading ? (
-                <div className="text-center py-12 text-[#B0C4BF]">Loading discount codes...</div>
-              ) : discountCodes.length === 0 ? (
-                <div className="text-center py-12 border border-dashed border-[rgba(212,175,55,0.3)] rounded-lg">
-                  <Tag className="w-12 h-12 mx-auto text-[#B0C4BF] mb-4" />
-                  <p className="text-[#B0C4BF]">No discount codes yet</p>
-                  <p className="text-sm text-[#B0C4BF]/60">Create your first discount code to offer promotions</p>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {discountCodes.map((discount) => (
-                    <div
-                      key={discount.discount_id}
-                      className={`glass-card p-4 rounded-lg border ${discount.is_active ? 'border-gold/30' : 'border-[rgba(212,175,55,0.1)] opacity-60'}`}
-                      data-testid={`discount-${discount.code}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="font-mono text-lg text-gold font-bold">{discount.code}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${discount.is_visible ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                              {discount.is_visible ? 'Visible' : 'Secret'}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${discount.is_active ? 'bg-gold/20 text-gold' : 'bg-red-500/20 text-red-400'}`}>
-                              {discount.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                          </div>
-                          <h3 className="text-[#FDFBF7] font-medium">{discount.name}</h3>
-                          <p className="text-sm text-[#B0C4BF] mt-1">
-                            {discount.discount_type === 'percentage' && `${discount.value}% off`}
-                            {discount.discount_type === 'fixed_amount' && `$${discount.value} off`}
-                            {discount.discount_type === 'free_trial' && `${discount.value} day free trial`}
-                            {discount.discount_type === 'buy_x_get_y' && `Buy ${discount.buy_x_value} month, get ${discount.value} month free`}
-                          </p>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-[#B0C4BF]/70">
-                            <span>Used: {discount.used_count || 0}{discount.usage_limit ? `/${discount.usage_limit}` : ''}</span>
-                            {discount.valid_until && <span>Expires: {new Date(discount.valid_until).toLocaleDateString()}</span>}
-                          </div>
-                          {discount.banner_text && (
-                            <p className="text-xs text-gold/70 mt-2 italic">Banner: "{discount.banner_text}"</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleDiscountActive(discount)}
-                            className="text-[#B0C4BF] hover:text-gold"
-                            title={discount.is_active ? 'Deactivate' : 'Activate'}
-                          >
-                            {discount.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditDiscount(discount)}
-                            className="text-[#B0C4BF] hover:text-gold"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteDiscount(discount.discount_id)}
-                            className="text-[#B0C4BF] hover:text-red-400"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Discount Code Modal */}
-            <Dialog open={showDiscountModal} onOpenChange={(open) => { setShowDiscountModal(open); if (!open) resetDiscountForm(); }}>
-              <DialogContent className="bg-[#02120F] border-gold/30 text-[#FDFBF7] max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="font-serif text-xl">
-                    {editingDiscount ? 'Edit Discount Code' : 'Create Discount Code'}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleCreateDiscount} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Code *</Label>
-                      <Input
-                        value={discountForm.code}
-                        onChange={(e) => setDiscountForm({ ...discountForm, code: e.target.value.toUpperCase() })}
-                        placeholder="e.g., WELCOME20"
-                        className="bg-surface border-gold/30 uppercase"
-                        required
-                        disabled={!!editingDiscount}
-                      />
-                    </div>
-                    <div>
-                      <Label>Name *</Label>
-                      <Input
-                        value={discountForm.name}
-                        onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
-                        placeholder="e.g., Welcome Discount"
-                        className="bg-surface border-gold/30"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Description (Internal)</Label>
-                    <Textarea
-                      value={discountForm.description}
-                      onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
-                      placeholder="Internal notes about this discount"
-                      className="bg-surface border-gold/30"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Discount Type *</Label>
-                      <Select
-                        value={discountForm.discount_type}
-                        onValueChange={(value) => setDiscountForm({ ...discountForm, discount_type: value })}
-                      >
-                        <SelectTrigger className="bg-surface border-gold/30">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#02120F] border-gold/30">
-                          <SelectItem value="percentage">Percentage Off</SelectItem>
-                          <SelectItem value="fixed_amount">Fixed Amount Off</SelectItem>
-                          <SelectItem value="free_trial">Free Trial (Days)</SelectItem>
-                          <SelectItem value="buy_x_get_y">Buy X Get Y Free</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>
-                        {discountForm.discount_type === 'percentage' ? 'Percentage (%)' :
-                         discountForm.discount_type === 'fixed_amount' ? 'Amount ($)' :
-                         discountForm.discount_type === 'free_trial' ? 'Trial Days' :
-                         'Free Months (Y)'} *
-                      </Label>
-                      <Input
-                        type="number"
-                        value={discountForm.value}
-                        onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
-                        placeholder={discountForm.discount_type === 'percentage' ? '20' : '7'}
-                        className="bg-surface border-gold/30"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {discountForm.discount_type === 'buy_x_get_y' && (
-                    <div>
-                      <Label>Paid Months (X) *</Label>
-                      <Input
-                        type="number"
-                        value={discountForm.buy_x_value}
-                        onChange={(e) => setDiscountForm({ ...discountForm, buy_x_value: e.target.value })}
-                        placeholder="1"
-                        className="bg-surface border-gold/30"
-                        required
-                      />
-                      <p className="text-xs text-[#B0C4BF] mt-1">User pays for X months, then gets Y months free</p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Usage Limit (Total)</Label>
-                      <Input
-                        type="number"
-                        value={discountForm.usage_limit}
-                        onChange={(e) => setDiscountForm({ ...discountForm, usage_limit: e.target.value })}
-                        placeholder="Unlimited"
-                        className="bg-surface border-gold/30"
-                      />
-                    </div>
-                    <div>
-                      <Label>Per User Limit</Label>
-                      <Input
-                        type="number"
-                        value={discountForm.per_user_limit}
-                        onChange={(e) => setDiscountForm({ ...discountForm, per_user_limit: parseInt(e.target.value) || 1 })}
-                        placeholder="1"
-                        className="bg-surface border-gold/30"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Valid From</Label>
-                      <Input
-                        type="date"
-                        value={discountForm.valid_from}
-                        onChange={(e) => setDiscountForm({ ...discountForm, valid_from: e.target.value })}
-                        className="bg-surface border-gold/30"
-                      />
-                    </div>
-                    <div>
-                      <Label>Valid Until</Label>
-                      <Input
-                        type="date"
-                        value={discountForm.valid_until}
-                        onChange={(e) => setDiscountForm({ ...discountForm, valid_until: e.target.value })}
-                        className="bg-surface border-gold/30"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gold/20 pt-4">
-                    <h4 className="text-sm font-medium text-gold mb-3">Display Options</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Show on Homepage</Label>
-                          <p className="text-xs text-[#B0C4BF]">Display banner and badge on pricing pages</p>
-                        </div>
-                        <Switch
-                          checked={discountForm.is_visible}
-                          onCheckedChange={(checked) => setDiscountForm({ ...discountForm, is_visible: checked })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Active</Label>
-                          <p className="text-xs text-[#B0C4BF]">Code can be used at checkout</p>
-                        </div>
-                        <Switch
-                          checked={discountForm.is_active}
-                          onCheckedChange={(checked) => setDiscountForm({ ...discountForm, is_active: checked })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {discountForm.is_visible && (
-                    <div className="space-y-4 border-t border-gold/20 pt-4">
-                      <div>
-                        <Label>Banner Text</Label>
-                        <Input
-                          value={discountForm.banner_text}
-                          onChange={(e) => setDiscountForm({ ...discountForm, banner_text: e.target.value })}
-                          placeholder="Use code WELCOME20 for 20% off!"
-                          className="bg-surface border-gold/30"
-                        />
-                      </div>
-                      <div>
-                        <Label>Pricing Badge Text</Label>
-                        <Input
-                          value={discountForm.badge_text}
-                          onChange={(e) => setDiscountForm({ ...discountForm, badge_text: e.target.value })}
-                          placeholder="20% OFF"
-                          className="bg-surface border-gold/30"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => { setShowDiscountModal(false); resetDiscountForm(); }}
-                      className="border-gold/30"
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="bg-gold text-[#02120F] hover:bg-[#E9C85C]">
-                      {editingDiscount ? 'Update' : 'Create'} Discount Code
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
-
-          {/* Notifications Tab */}
-          <TabsContent value="notifications">
-            <div className="max-w-4xl space-y-8">
-              {/* Send Notification Form */}
-              <div className="glass-card rounded-lg p-6 border border-gold/30">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
-                    <Send className="w-5 h-5 text-gold" />
-                  </div>
-                  <div>
-                    <h2 className="font-serif text-xl text-[#FDFBF7]">Send Push Notification</h2>
-                    <p className="text-[#B0C4BF] text-sm">Send notifications to your users' devices</p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSendNotification} className="space-y-4">
-                  <div>
-                    <Label className="text-[#FDFBF7]">Title *</Label>
-                    <Input
-                      value={notificationForm.title}
-                      onChange={(e) => setNotificationForm({ ...notificationForm, title: e.target.value })}
-                      placeholder="e.g., New Books Added!"
-                      className="bg-surface border-gold/30 text-[#FDFBF7]"
-                      maxLength={50}
-                      required
-                      data-testid="notification-title"
-                    />
-                    <p className="text-xs text-[#B0C4BF] mt-1">{notificationForm.title.length}/50 characters</p>
-                  </div>
-
-                  <div>
-                    <Label className="text-[#FDFBF7]">Message *</Label>
-                    <Textarea
-                      value={notificationForm.message}
-                      onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
-                      placeholder="Write your message here..."
-                      className="bg-surface border-gold/30 text-[#FDFBF7] min-h-[100px]"
-                      maxLength={200}
-                      required
-                      data-testid="notification-message"
-                    />
-                    <p className="text-xs text-[#B0C4BF] mt-1">{notificationForm.message.length}/200 characters</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-[#FDFBF7]">Target Audience</Label>
-                      <Select
-                        value={notificationForm.target}
-                        onValueChange={(value) => setNotificationForm({ ...notificationForm, target: value })}
-                      >
-                        <SelectTrigger className="bg-surface border-gold/30 text-[#FDFBF7]" data-testid="notification-target">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#02120F] border-gold/30">
-                          <SelectItem value="all" className="text-[#FDFBF7]">Everyone (All Users)</SelectItem>
-                          <SelectItem value="unsubscribed" className="text-[#FDFBF7]">Unsubscribed Users Only</SelectItem>
-                          <SelectItem value="subscribed" className="text-[#FDFBF7]">Subscribed Users Only</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-[#B0C4BF] mt-1">
-                        {notificationForm.target === 'all' && 'Send to all users who have enabled notifications'}
-                        {notificationForm.target === 'unsubscribed' && 'Target users who haven\'t subscribed yet - great for promotions!'}
-                        {notificationForm.target === 'subscribed' && 'Only send to paying subscribers'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label className="text-[#FDFBF7]">Deep Link URL (Optional)</Label>
-                      <Input
-                        value={notificationForm.url}
-                        onChange={(e) => setNotificationForm({ ...notificationForm, url: e.target.value })}
-                        placeholder="e.g., /pricing or /book/book_abc123"
-                        className="bg-surface border-gold/30 text-[#FDFBF7]"
-                        data-testid="notification-url"
-                      />
-                      <p className="text-xs text-[#B0C4BF] mt-1">Where should users go when they tap the notification?</p>
-                    </div>
-                  </div>
-
-                  {/* Preview */}
-                  {(notificationForm.title || notificationForm.message) && (
-                    <div className="bg-[#082E26] rounded-lg p-4 border border-gold/20">
-                      <p className="text-xs text-gold mb-2">Preview:</p>
-                      <div className="bg-white rounded-lg p-3 shadow-lg max-w-xs">
-                        <div className="flex items-start gap-2">
-                          <div className="w-8 h-8 rounded bg-gold/20 flex items-center justify-center flex-shrink-0">
-                            <Bell className="w-4 h-4 text-gold" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900 text-sm">{notificationForm.title || 'Notification Title'}</p>
-                            <p className="text-gray-600 text-xs mt-0.5">{notificationForm.message || 'Your message will appear here'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
-                    disabled={notificationSending || !notificationForm.title.trim() || !notificationForm.message.trim()}
-                    className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                    data-testid="send-notification-btn"
-                  >
-                    {notificationSending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        Send Notification
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </div>
-
-              {/* Notification History */}
-              <div>
-                <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Notification History</h3>
-                
-                {notificationHistoryLoading ? (
-                  <div className="text-center py-8 text-[#B0C4BF]">Loading history...</div>
-                ) : notificationHistory.length === 0 ? (
-                  <div className="text-center py-12 border border-dashed border-gold/30 rounded-lg">
-                    <Bell className="w-12 h-12 mx-auto text-[#B0C4BF] mb-4" />
-                    <p className="text-[#B0C4BF]">No notifications sent yet</p>
-                    <p className="text-sm text-[#B0C4BF]/60">Your sent notifications will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {notificationHistory.map((notif) => (
-                      <div
-                        key={notif.notification_id || notif.onesignal_id}
-                        className="glass-card p-4 rounded-lg border border-gold/20"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-[#FDFBF7] font-medium truncate">{notif.title}</h4>
-                            <p className="text-sm text-[#B0C4BF] mt-1 line-clamp-2">{notif.message}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-[#B0C4BF]/70">
-                              <span>Target: {notif.target === 'all' ? 'Everyone' : notif.target === 'unsubscribed' ? 'Unsubscribed' : 'Subscribed'}</span>
-                              <span>Recipients: {notif.recipients || 0}</span>
-                              <span>{new Date(notif.sent_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <div className="max-w-4xl">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="font-serif text-2xl text-[#FDFBF7]">Subscription Tiers & Pricing</h2>
-                  <p className="text-[#B0C4BF] text-sm mt-1">Changes will update across the entire app and website</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={resetTierSettings}
-                    disabled={tierSaving}
-                    className="border-[rgba(212,175,55,0.3)] text-[#B0C4BF] hover:bg-surface"
-                    data-testid="reset-tiers-btn"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Reset to Defaults
-                  </Button>
-                  <Button
-                    onClick={saveTierSettings}
-                    disabled={tierSaving}
-                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                    data-testid="save-tiers-btn"
-                  >
-                    {tierSaving ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-[#02120F] border-t-transparent rounded-full animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {tierLoading ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              ) : Object.keys(tierSettings).length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-[#B0C4BF] mb-4">No tier settings loaded. Click below to load defaults.</p>
-                  <Button
-                    onClick={fetchTierSettings}
-                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Load Tier Settings
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {Object.entries(tierSettings).sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([tierId, tierInfo]) => (
-                    <div 
-                      key={tierId} 
-                      className={`glass-card rounded-sm p-6 border ${parseInt(tierId) === 4 ? 'border-gold' : 'border-[rgba(212,175,55,0.2)]'}`}
-                      data-testid={`tier-setting-${tierId}`}
-                    >
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className={`w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center`}>
-                          <DollarSign className="w-5 h-5 text-gold" />
-                        </div>
-                        <div>
-                          <span className={`tier-badge tier-${tierId} text-xs mb-1`}>Tier {tierId}</span>
-                          <p className="text-[#B0C4BF] text-xs">
-                            {parseInt(tierId) === 0 ? 'Pay per book option' : 
-                             parseInt(tierId) === 4 ? 'Premium unlimited plan' : 
-                             'Monthly subscription'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <Label className="text-[#FDFBF7] text-sm">Tier Name</Label>
-                          <Input
-                            value={tierInfo.name || ''}
-                            onChange={(e) => handleTierChange(tierId, 'name', e.target.value)}
-                            className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                            placeholder="e.g. Basic, Premium"
-                            data-testid={`tier-${tierId}-name`}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[#FDFBF7] text-sm">Price (USD/month)</Label>
-                          <div className="relative mt-1">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0C4BF]">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={tierInfo.price || 0}
-                              onChange={(e) => handleTierChange(tierId, 'price', e.target.value)}
-                              className="pl-7 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
-                              placeholder="0.00"
-                              data-testid={`tier-${tierId}-price`}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-[#FDFBF7] text-sm">Monthly Book Limit</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={tierInfo.book_limit ?? ''}
-                            onChange={(e) => handleTierChange(tierId, 'book_limit', e.target.value)}
-                            className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
-                            placeholder="Empty = Unlimited"
-                            data-testid={`tier-${tierId}-limit`}
-                          />
-                          <p className="text-xs text-[#B0C4BF] mt-1">Leave empty for unlimited</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-8 glass-card rounded-sm p-6 border border-[rgba(212,175,55,0.2)]">
-                <h3 className="font-serif text-lg text-[#FDFBF7] mb-3">How Tier Changes Work</h3>
-                <ul className="space-y-2 text-sm text-[#B0C4BF]">
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 flex-shrink-0"></span>
-                    Price changes apply to new subscriptions only. Existing subscribers keep their current rate until renewal.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 flex-shrink-0"></span>
-                    Book limit changes apply immediately to all users of that tier.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5 flex-shrink-0"></span>
-                    Tier 0 (Pay Per Book) price is always $0 as users buy individual books.
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </TabsContent>
-=======
->>>>>>> origin/main
         </Tabs>
       </main>
     </div>
