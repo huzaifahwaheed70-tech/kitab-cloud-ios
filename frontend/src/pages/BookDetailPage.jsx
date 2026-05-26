@@ -490,7 +490,7 @@ const BookDetailPage = () => {
 
         <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
           <div className="md:col-span-1">
-            <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border border-[rgba(212,175,55,0.2)]">
+            <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)]">
               {book.cover_url ? (
                 <img
                   src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
@@ -681,7 +681,7 @@ const BookDetailPage = () => {
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* iOS Payment Modal - Shows checkout confirmation link */}
       {paymentModal.show && (
@@ -733,7 +733,7 @@ const BookDetailPage = () => {
               <p className="text-xs text-[#B0C4BF] mt-4">
                 {user?.is_guest 
                   ? 'After purchasing, log in to the app to access your book'
-                  : 'You\'ll be redirected to Stripe\'s secure payment page'
+                  : "You'll be redirected to Stripe's secure payment page"
                 }
               </p>
               <Link to="/privacy" className="text-xs text-gold hover:underline mt-2 inline-block">
