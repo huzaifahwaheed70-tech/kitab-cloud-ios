@@ -5,16 +5,14 @@ import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
   BookOpen, ArrowLeft, BookMarked, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library
+  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library, 
+  Download, ExternalLink
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
-<<<<<<< HEAD
 import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
-=======
->>>>>>> origin/main
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -46,13 +44,12 @@ const BookDetailPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [pageSaved, setPageSaved] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
-<<<<<<< HEAD
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
-  const [isIOSApp, setIsIOSApp] = useState(false);
   const [showWebsitePopup, setShowWebsitePopup] = useState(false);
-=======
->>>>>>> origin/main
+
+  // Dynamically set based on the imported platform utilities
+  const isIOSApp = shouldHidePrices() || shouldDisablePurchases();
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;
@@ -132,6 +129,19 @@ const BookDetailPage = () => {
     } else {
       loadPdf();
     }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!pdfUrl) {
+      toast.error('Please view the PDF first to initialize downoad.');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.setAttribute('download', `${book?.title || 'book'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
   };
 
   const checkBookshelf = async () => {
@@ -236,20 +246,33 @@ const BookDetailPage = () => {
     }
 
     if (user?.is_guest) {
+      // For iOS guests, show the descriptive popup modal
+      if (isIOSApp) {
+        setPaymentModal({ show: true, url: getWebsiteUrl() });
+        return;
+      }
       toast.error('Please create an account to purchase');
       navigate('/register');
       return;
     }
     
+    setPurchaseLoading(true);
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
         headers, 
         withCredentials: true 
       });
-      await openPaymentUrl(response.data.url);
+      
+      if (isIOSApp) {
+        setPaymentModal({ show: true, url: response.data.url });
+      } else {
+        await openPaymentUrl(response.data.url);
+      }
     } catch (error) {
       toast.error('Failed to initiate purchase');
+    } finally {
+      setPurchaseLoading(false);
     }
   };
 
@@ -504,30 +527,26 @@ const BookDetailPage = () => {
                 <p className="text-[#B0C4BF] leading-relaxed text-lg">{book.description}</p>
               )}
 
-<<<<<<< HEAD
-              {/* Pricing Info - Hide on iOS */}
+              {/* Pricing Info - Fully Hide on iOS to stay clear of Apple guidelines */}
               {!isIOSApp && (
-=======
->>>>>>> origin/main
-              <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
-                {book.original_price && (
-                  <div>
-                    <p className="text-[#B0C4BF] text-sm">Physical Book</p>
-                    <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
-                  </div>
-                )}
-                {book.pdf_price && (
-                  <div>
-                    <p className="text-[#B0C4BF] text-sm">PDF</p>
-                    <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
-                  </div>
-                )}
-              </div>
+                <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
+                  {book.original_price && (
+                    <div>
+                      <p className="text-[#B0C4BF] text-sm">Physical Book</p>
+                      <p className="text-[#FDFBF7] text-xl font-bold">${book.original_price}</p>
+                    </div>
+                  )}
+                  {book.pdf_price && (
+                    <div>
+                      <p className="text-[#B0C4BF] text-sm">PDF</p>
+                      <p className="text-gold text-xl font-bold">${book.pdf_price}</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="flex flex-wrap gap-4 pt-4">
                 {isLocked ? (
-<<<<<<< HEAD
                   isIOSApp ? (
                     <Button 
                       size="lg" 
@@ -544,13 +563,6 @@ const BookDetailPage = () => {
                       </Button>
                     </Link>
                   )
-=======
-                  <Link to="/pricing">
-                    <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
-                      Upgrade to Access
-                    </Button>
-                  </Link>
->>>>>>> origin/main
                 ) : book.pdf_url ? (
                   canRead || hasPurchased ? (
                     <Button
@@ -572,7 +584,6 @@ const BookDetailPage = () => {
                         </>
                       )}
                     </Button>
-<<<<<<< HEAD
                   ) : isIOSApp ? (
                     <Button 
                       size="lg" 
@@ -582,8 +593,6 @@ const BookDetailPage = () => {
                     >
                       Subscribe to Read
                     </Button>
-=======
->>>>>>> origin/main
                   ) : (
                     <Link to="/pricing">
                       <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-btn">
@@ -597,15 +606,15 @@ const BookDetailPage = () => {
                   </Button>
                 )}
 
-                {book.pdf_price && !hasPurchased && (
+                {/* Web Purchase Flow */}
+                {!isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button size="lg" variant="outline" onClick={handleBuyPdf} className="border-gold text-gold hover:bg-gold/10" data-testid="buy-pdf-btn">
                     <ShoppingCart className="w-5 h-5 mr-2" />
-<<<<<<< HEAD
                     {purchaseLoading ? 'Processing...' : (user?.is_guest ? `Buy on Website ($${book.pdf_price})` : `Buy PDF ($${book.pdf_price})`)}
                   </Button>
                 )}
                 
-                {/* iOS - Simple button that shows popup (no prices, no external links) */}
+                {/* iOS Purchase Flow (Hides prices, directs safely) */}
                 {isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button
                     size="lg"
@@ -628,9 +637,6 @@ const BookDetailPage = () => {
                   >
                     <Download className="w-5 h-5 mr-2" />
                     Download PDF
-=======
-                    Buy PDF (${book.pdf_price})
->>>>>>> origin/main
                   </Button>
                 )}
 
@@ -676,10 +682,9 @@ const BookDetailPage = () => {
             </div>
           </div>
         </div>
-      </div>
-<<<<<<< HEAD
+      )}
 
-      {/* iOS Payment Modal - Shows tappable link to open in external browser */}
+      {/* iOS Payment Modal - Shows checkout confirmation link */}
       {paymentModal.show && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
@@ -704,7 +709,6 @@ const BookDetailPage = () => {
                 }
               </p>
               
-              {/* This is an actual anchor tag - iOS allows user taps on real links to open externally */}
               <a 
                 href={paymentModal.url}
                 target="_blank"
@@ -716,7 +720,6 @@ const BookDetailPage = () => {
                 {user?.is_guest ? 'Open Kitab Cloud Website' : 'Open Secure Checkout'}
               </a>
               
-              {/* For guests, show instructions */}
               {user?.is_guest && (
                 <div className="mt-4 p-3 bg-[#082E26] rounded-md text-left">
                   <p className="text-sm text-[#FDFBF7] font-medium mb-2">How to purchase:</p>
@@ -758,32 +761,24 @@ const BookDetailPage = () => {
                 <ExternalLink className="w-8 h-8 text-gold" />
               </div>
               <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
-                Purchase on Our Website
+                Access Content via Website
               </h3>
               <p className="text-[#B0C4BF] mb-6">
-                To subscribe or purchase books, please visit our website at:
+                To manage subscriptions, upgrade tiers, or buy book content, please visit our online web portal.
               </p>
-              
-              <div className="bg-[#082E26] p-4 rounded-lg mb-6">
-                <p className="text-gold font-mono text-lg">kitab-cloud.emergent.host</p>
-              </div>
-              
-              <p className="text-[#B0C4BF] text-sm mb-4">
-                After purchasing, return to this app and log in to access your content.
-              </p>
-              
-              <Button 
-                onClick={() => setShowWebsitePopup(false)}
-                className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+              <a 
+                href={getWebsiteUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
               >
-                Got it
-              </Button>
+                <ExternalLink className="w-5 h-5" />
+                Go to Kitab Cloud Web
+              </a>
             </div>
           </div>
         </div>
       )}
-=======
->>>>>>> origin/main
     </div>
   );
 };
