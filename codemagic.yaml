@@ -37,7 +37,7 @@ workflows:
       - name: Build iOS & Process Icons
         script: |
           cd frontend/ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 46" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 47" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
