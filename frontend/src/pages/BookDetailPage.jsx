@@ -133,7 +133,7 @@ const BookDetailPage = () => {
 
   const handleDownloadPdf = async () => {
     if (!pdfUrl) {
-      toast.error('Please view the PDF first to initialize downoad.');
+      toast.error('Please view the PDF first to initialize download.');
       return;
     }
     const link = document.createElement('a');
@@ -246,7 +246,6 @@ const BookDetailPage = () => {
     }
 
     if (user?.is_guest) {
-      // For iOS guests, show the descriptive popup modal
       if (isIOSApp) {
         setPaymentModal({ show: true, url: getWebsiteUrl() });
         return;
@@ -491,7 +490,7 @@ const BookDetailPage = () => {
 
         <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
           <div className="md:col-span-1">
-            <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border-[rgba(212,175,55,0.2)]">
+            <div className="relative aspect-[2/3] rounded-sm overflow-hidden bg-surface border border border-[rgba(212,175,55,0.2)]">
               {book.cover_url ? (
                 <img
                   src={`${process.env.REACT_APP_BACKEND_URL}/api/covers/${book.cover_url.replace('darussalam-kitab/covers/', '')}`}
@@ -761,16 +760,18 @@ const BookDetailPage = () => {
                 <ExternalLink className="w-8 h-8 text-gold" />
               </div>
               <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
-                Access Content via Website
+                Manage Purchases on Web
               </h3>
               <p className="text-[#B0C4BF] mb-6">
-                To manage subscriptions, upgrade tiers, or buy book content, please visit our online web portal.
+                To upgrade your tier or buy premium content, please head over to our web portal.
               </p>
+              
               <a 
                 href={getWebsiteUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold py-4 px-8 rounded-md w-full transition-colors"
+                data-testid="external-payment-link"
               >
                 <ExternalLink className="w-5 h-5" />
                 Go to Kitab Cloud Web
