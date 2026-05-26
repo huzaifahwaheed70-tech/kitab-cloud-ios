@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
+import { Capacitor } from '@capacitor/core';
+import { initStore } from './purchase';
 
 // OneSignal Push Notifications
 import { 
@@ -39,22 +41,10 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 
-// HARDCODED production URL for iOS Capacitor builds
-// Codemagic env vars may not be injected properly during React build
-const PRODUCTION_URL = 'https://kitab-cloud.emergent.host';
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || PRODUCTION_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://kitab-cloud.emergent.host";
 const API = `${BACKEND_URL}/api`;
 
-// Debug: Log which URL is being used (visible in Safari Web Inspector)
-console.log('[App] Initializing Kitab Cloud');
-console.log('[App] BACKEND_URL:', BACKEND_URL);
-console.log('[App] API:', API);
-console.log('[App] Platform:', navigator.platform);
-console.log('[App] UserAgent:', navigator.userAgent);
-
-// Auth Context
 const AuthContext = createContext(null);
-
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -63,7 +53,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Auth Provider Component
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,6 +64,10 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = useCallback(async () => {
+    if (window.location.hash?.includes('session_id=')) {
+      setLoading(false);
+      return;
+    }
     try {
       const storedToken = localStorage.getItem('auth_token');
       if (storedToken) {
@@ -90,6 +83,9 @@ const AuthProvider = ({ children }) => {
           response.data.email, 
           response.data.subscription_tier
         ).catch(console.error);
+      } else if (Capacitor.getPlatform() !== 'ios') {
+        const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
+        setUser(response.data);
       }
     } catch (error) {
       setUser(null);
@@ -130,18 +126,14 @@ const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const guestLogin = async () => {
-    const response = await axios.post(`${API}/auth/guest`);
-    const { token: newToken, user: userData } = response.data;
-    localStorage.setItem('auth_token', newToken);
-    setToken(newToken);
-    setUser(userData);
-    return userData;
+  const loginWithGoogle = () => {
+    const redirectUrl = 'https://kitab-cloud.emergent.host/library';
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   const logout = async () => {
     try {
-      await axios.post(`${API}/auth/logout`, {});
+      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -156,13 +148,14 @@ const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     try {
       const storedToken = localStorage.getItem('auth_token');
-      if (storedToken) {
-        const response = await axios.get(`${API}/auth/me`, {
-          headers: { Authorization: `Bearer ${storedToken}` }
-        });
-        setUser(response.data);
-        
-        // Update OneSignal tags if subscription changed
+      const response = await axios.get(`${API}/auth/me`, {
+        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+        withCredentials: true
+      });
+      setUser(response.data);
+      
+      // Update OneSignal tags if subscription changed
+      if (response.data) {
         updateUserTags({
           subscription_tier: String(response.data.subscription_tier || 0),
           is_subscribed: response.data.subscription_tier > 0 ? 'true' : 'false',
@@ -174,13 +167,61 @@ const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, guestLogin, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Protected Route Component
+const AuthCallback = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasProcessed = useRef(false);
+  const { refreshUser } = useAuth();
+
+  useEffect(() => {
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
+    const processAuth = async () => {
+      const hash = location.hash;
+      const sessionIdMatch = hash.match(/session_id=([^&]+)/);
+      if (sessionIdMatch) {
+        const sessionId = sessionIdMatch[1];
+        try {
+          const response = await axios.get(`${API}/auth/session`, {
+            params: { session_id: sessionId },
+            withCredentials: true
+          });
+          if (response.data.user) {
+            if (response.data.token) {
+              localStorage.setItem('auth_token', response.data.token);
+            }
+            await refreshUser();
+            navigate('/library', { replace: true, state: { user: response.data.user } });
+          }
+        } catch (error) {
+          console.error('Auth callback error:', error);
+          navigate('/login', { replace: true });
+        }
+      } else {
+        navigate('/library', { replace: true });
+      }
+    };
+
+    processAuth();
+  }, [location, navigate, refreshUser]);
+
+  return (
+    <div className="min-h-screen bg-dark flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-secondary">Authenticating...</p>
+      </div>
+    </div>
+  );
+};
+
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -204,8 +245,23 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
   return children;
 };
 
-// App Router Component
+const IOSCheckoutBlock = () => (
+  <div className="min-h-screen bg-dark flex items-center justify-center">
+    <div className="text-center p-8">
+      <h2 className="font-serif text-2xl font-bold text-[#FDFBF7] mb-4">Subscribe on iOS</h2>
+      <p className="text-[#B0C4BF]">Please use the in-app subscription on the pricing page.</p>
+    </div>
+  </div>
+);
+
 const AppRouter = () => {
+  const location = useLocation();
+  const isIOS = Capacitor.getPlatform() === 'ios';
+
+  if (location.hash?.includes('session_id=')) {
+    return <AuthCallback />;
+  }
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -214,121 +270,47 @@ const AppRouter = () => {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/pricing" element={<PricingPage />} />
-      <Route path="/payment-success" element={<PaymentSuccessPage />} />
-      
+      <Route path="/payment-success" element={isIOS ? <IOSCheckoutBlock /> : <PaymentSuccessPage />} />
+      <Route path="/checkout" element={isIOS ? <IOSCheckoutBlock /> : <Navigate to="/pricing" replace />} />
+
       <Route path="/library" element={
-        <ProtectedRoute>
-          <LibraryPage />
-        </ProtectedRoute>
+        <ProtectedRoute><LibraryPage /></ProtectedRoute>
       } />
-      
       <Route path="/book/:bookId" element={
-        <ProtectedRoute>
-          <BookDetailPage />
-        </ProtectedRoute>
+        <ProtectedRoute><BookDetailPage /></ProtectedRoute>
       } />
-      
       <Route path="/bookshelf" element={
-        <ProtectedRoute>
-          <BookshelfPage />
-        </ProtectedRoute>
+        <ProtectedRoute><BookshelfPage /></ProtectedRoute>
       } />
-      
       <Route path="/favorites" element={
-        <ProtectedRoute>
-          <FavoritesPage />
-        </ProtectedRoute>
+        <ProtectedRoute><FavoritesPage /></ProtectedRoute>
       } />
-      
       <Route path="/settings" element={
-        <ProtectedRoute>
-          <SettingsPage />
-        </ProtectedRoute>
+        <ProtectedRoute><SettingsPage /></ProtectedRoute>
       } />
-      
       <Route path="/admin" element={
-        <ProtectedRoute requireAdmin>
-          <AdminDashboard />
-        </ProtectedRoute>
+        <ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>
       } />
-      
-      <Route path="/privacy" element={<PrivacyPolicyPage />} />
-      
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
 function App() {
-  return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRouter />
-          <Toaster position="bottom-right" richColors />
-        </AuthProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
-  );
-}
-
-// Error Boundary to catch React errors and prevent blank screen
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ 
-          minHeight: '100vh', 
-          display: 'flex', 
-          flexDirection: 'column',
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          backgroundColor: '#02120F',
-          color: '#FDFBF7',
-          padding: '20px',
-          textAlign: 'center'
-        }}>
-          <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>Something went wrong</h1>
-          <p style={{ color: '#B0C4BF', marginBottom: '24px' }}>
-            Please try refreshing the app or restarting it.
-          </p>
-          <button 
-            onClick={() => window.location.reload()}
-            style={{
-              backgroundColor: '#D4AF37',
-              color: '#02120F',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              border: 'none',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            Refresh App
-          </button>
-          <p style={{ color: '#B0C4BF', fontSize: '12px', marginTop: '24px' }}>
-            Error: {this.state.error?.message || 'Unknown error'}
-          </p>
-        </div>
-      );
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'ios') {
+      initStore();
     }
+  }, []);
 
-    return this.props.children;
-  }
+  return (
+    <HashRouter>
+      <AuthProvider>
+        <AppRouter />
+        <Toaster position="bottom-right" richColors />
+      </AuthProvider>
+    </HashRouter>
+  );
 }
 
 export default App;
