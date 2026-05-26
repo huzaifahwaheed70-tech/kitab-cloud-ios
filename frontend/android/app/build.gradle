@@ -17,7 +17,7 @@ android {
         applicationId "host.emergent.kitabcloud"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
+        versionCode 11
         versionName "1.2"
 >>>>>>> origin/main
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
