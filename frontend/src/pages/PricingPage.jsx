@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
+import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
 import {
   Dialog,
   DialogContent,
@@ -320,30 +320,29 @@ const PricingPage = () => {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Plans</p>
           <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] tracking-tight mb-6">
-            {isIOSApp ? 'View Our Plans' : 'Choose Your Access Level'}
+            {isIOSApp ? 'Access Your Books' : 'Choose Your Access Level'}
           </h1>
           <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">
             {isIOSApp 
-              ? 'To subscribe or purchase books, please visit our website. Then log in here to access your content.'
+              ? 'Log in to access books from your subscription. To subscribe, visit kitab-cloud.emergent.host'
               : 'Subscribe monthly to read books, or buy individual PDFs without a subscription.'
             }
           </p>
           
-          {/* iOS App - Website Link (tappable) */}
+          {/* iOS App - Simple message (no external links or buttons) */}
           {isIOSApp && (
             <div className="mt-8">
-              <a 
-                href={`${getWebsiteUrl()}/pricing`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-6 py-3 rounded-lg transition-colors"
-              >
-                <ExternalLink className="w-5 h-5" />
-                Visit Website to Subscribe
-              </a>
-              <p className="text-sm text-[#B0C4BF] mt-4">
-                Already have a subscription? <Link to="/login" className="text-gold hover:underline">Log in</Link> to access your books.
-              </p>
+              <div className="inline-block bg-surface border border-gold/30 rounded-lg p-6 max-w-md">
+                <p className="text-[#FDFBF7] mb-4">
+                  To subscribe or purchase books, visit our website:
+                </p>
+                <p className="text-gold font-mono text-lg mb-4">
+                  kitab-cloud.emergent.host
+                </p>
+                <p className="text-sm text-[#B0C4BF]">
+                  Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to access your books.
+                </p>
+              </div>
             </div>
           )}
           
@@ -424,10 +423,10 @@ const PricingPage = () => {
               <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : isIOSApp ? (
-            /* iOS App - Feature comparison only, no purchase buttons */
+            /* iOS App - Feature comparison only, no prices, no purchase buttons */
             <div className="space-y-8">
               <p className="text-center text-[#B0C4BF] mb-8">
-                Browse our subscription tiers below. Visit our website to subscribe.
+                Browse our subscription tiers below. Visit kitab-cloud.emergent.host to subscribe.
               </p>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {tiers.filter(t => t.tier > 0).map((tier) => (
@@ -460,17 +459,6 @@ const PricingPage = () => {
                     )}
                   </div>
                 ))}
-              </div>
-              <div className="text-center mt-8">
-                <a 
-                  href={`${getWebsiteUrl()}/pricing`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold px-8 py-4 rounded-lg transition-colors text-lg"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                  Subscribe on Website
-                </a>
               </div>
             </div>
           ) : (

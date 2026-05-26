@@ -11,7 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
+import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -43,6 +43,7 @@ const BookDetailPage = () => {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [isIOSApp, setIsIOSApp] = useState(false);
+  const [showWebsitePopup, setShowWebsitePopup] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   
@@ -744,7 +745,8 @@ const BookDetailPage = () => {
                 </p>
               )}
 
-              {/* Info */}
+              {/* Pricing Info - Hide on iOS */}
+              {!isIOSApp && (
               <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
                 {book.original_price && (
                   <div>
@@ -759,21 +761,20 @@ const BookDetailPage = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4 pt-4">
                 {isLocked ? (
                   isIOSApp ? (
-                    <a 
-                      href={`${getWebsiteUrl()}/pricing`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Button 
+                      size="lg" 
+                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
+                      data-testid="upgrade-btn"
+                      onClick={() => setShowWebsitePopup(true)}
                     >
-                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
-                        <ExternalLink className="w-5 h-5 mr-2" />
-                        Subscribe on Website
-                      </Button>
-                    </a>
+                      Upgrade to Access
+                    </Button>
                   ) : (
                     <Link to="/pricing">
                       <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
@@ -803,16 +804,14 @@ const BookDetailPage = () => {
                       )}
                     </Button>
                   ) : isIOSApp ? (
-                    <a 
-                      href={`${getWebsiteUrl()}/pricing`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Button 
+                      size="lg" 
+                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
+                      data-testid="subscribe-btn"
+                      onClick={() => setShowWebsitePopup(true)}
                     >
-                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-btn">
-                        <ExternalLink className="w-5 h-5 mr-2" />
-                        Subscribe on Website
-                      </Button>
-                    </a>
+                      Subscribe to Read
+                    </Button>
                   ) : (
                     <Link to="/pricing">
                       <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-btn">
@@ -841,23 +840,17 @@ const BookDetailPage = () => {
                   </Button>
                 )}
                 
-                {/* iOS - Tappable link for purchases */}
+                {/* iOS - Simple button that shows popup (no prices, no external links) */}
                 {isIOSApp && book.pdf_price && !hasPurchased && (
-                  <a 
-                    href={`${getWebsiteUrl()}/book/${bookId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-gold text-gold hover:bg-gold/10"
+                    data-testid="buy-on-website-btn"
+                    onClick={() => setShowWebsitePopup(true)}
                   >
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="border-gold text-gold hover:bg-gold/10"
-                      data-testid="buy-on-website-btn"
-                    >
-                      <ExternalLink className="w-5 h-5 mr-2" />
-                      Purchase on Website
-                    </Button>
-                  </a>
+                    Buy This Book
+                  </Button>
                 )}
 
                 {/* Download PDF button - shown after purchase */}
@@ -988,6 +981,47 @@ const BookDetailPage = () => {
               <Link to="/privacy" className="text-xs text-gold hover:underline mt-2 inline-block">
                 Privacy Policy
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Website Redirect Popup - Simple message directing users to website */}
+      {showWebsitePopup && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
+            <button 
+              onClick={() => setShowWebsitePopup(false)}
+              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
+                <ExternalLink className="w-8 h-8 text-gold" />
+              </div>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
+                Purchase on Our Website
+              </h3>
+              <p className="text-[#B0C4BF] mb-6">
+                To subscribe or purchase books, please visit our website at:
+              </p>
+              
+              <div className="bg-[#082E26] p-4 rounded-lg mb-6">
+                <p className="text-gold font-mono text-lg">kitab-cloud.emergent.host</p>
+              </div>
+              
+              <p className="text-[#B0C4BF] text-sm mb-4">
+                After purchasing, return to this app and log in to access your content.
+              </p>
+              
+              <Button 
+                onClick={() => setShowWebsitePopup(false)}
+                className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+              >
+                Got it
+              </Button>
             </div>
           </div>
         </div>
