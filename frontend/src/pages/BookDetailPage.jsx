@@ -47,8 +47,8 @@ const BookDetailPage = () => {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [showWebsitePopup, setShowWebsitePopup] = useState(false);
+  const [popupType, setPopupType] = useState('pdf');
 
-  // Dynamically set based on the imported platform utilities
   const isIOSApp = shouldHidePrices() || shouldDisablePurchases();
 
   const userTier = user?.subscription_tier || 0;
@@ -526,7 +526,6 @@ const BookDetailPage = () => {
                 <p className="text-[#B0C4BF] leading-relaxed text-lg">{book.description}</p>
               )}
 
-              {/* Pricing Info - Fully Hide on iOS to stay clear of Apple guidelines */}
               {!isIOSApp && (
                 <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
                   {book.original_price && (
@@ -551,7 +550,7 @@ const BookDetailPage = () => {
                       size="lg" 
                       className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
                       data-testid="upgrade-btn"
-                      onClick={() => setShowWebsitePopup(true)}
+                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
                     >
                       Upgrade to Access
                     </Button>
@@ -588,7 +587,7 @@ const BookDetailPage = () => {
                       size="lg" 
                       className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
                       data-testid="subscribe-btn"
-                      onClick={() => setShowWebsitePopup(true)}
+                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
                     >
                       Subscribe to Read
                     </Button>
@@ -605,7 +604,6 @@ const BookDetailPage = () => {
                   </Button>
                 )}
 
-                {/* Web Purchase Flow */}
                 {!isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button size="lg" variant="outline" onClick={handleBuyPdf} className="border-gold text-gold hover:bg-gold/10" data-testid="buy-pdf-btn">
                     <ShoppingCart className="w-5 h-5 mr-2" />
@@ -613,20 +611,30 @@ const BookDetailPage = () => {
                   </Button>
                 )}
                 
-                {/* iOS Purchase Flow (Hides prices, directs safely) */}
                 {isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button
                     size="lg"
                     variant="outline"
                     className="border-gold text-gold hover:bg-gold/10"
-                    data-testid="buy-on-website-btn"
-                    onClick={() => setShowWebsitePopup(true)}
+                    data-testid="buy-pdf-btn-ios"
+                    onClick={() => { setPopupType('pdf'); setShowWebsitePopup(true); }}
                   >
-                    Buy This Book
+                    Buy PDF
+                  </Button>
+                )}
+                
+                {isIOSApp && book.purchase_link && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-[#B0C4BF] text-[#B0C4BF] hover:bg-[#B0C4BF]/10"
+                    data-testid="buy-physical-btn-ios"
+                    onClick={() => { setPopupType('physical'); setShowWebsitePopup(true); }}
+                  >
+                    Buy Physical Book
                   </Button>
                 )}
 
-                {/* Download PDF button - shown after purchase */}
                 {hasPurchased && book.pdf_url && (
                   <Button
                     size="lg"
@@ -683,7 +691,6 @@ const BookDetailPage = () => {
         </div>
       </div>
 
-      {/* iOS Payment Modal - Shows checkout confirmation link */}
       {paymentModal.show && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
@@ -744,7 +751,6 @@ const BookDetailPage = () => {
         </div>
       )}
 
-      {/* iOS Website Redirect Popup - Simple message directing users to website */}
       {showWebsitePopup && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">

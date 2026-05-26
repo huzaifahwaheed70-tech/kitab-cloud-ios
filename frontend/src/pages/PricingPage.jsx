@@ -4,7 +4,7 @@ import { useAuth, API } from '../App.js';
 import axios from 'axios';
 import { BookOpen, Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input'; // Added to prevent runtime errors with the discount text field
+import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { buySubscription } from '../purchase';
@@ -23,26 +23,25 @@ const PricingPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(null);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
-  const [tiersLoading, setTiersLoading] = useState(false); // Set to false if tiers array is static below
+  const [tiersLoading, setTiersLoading] = useState(false);
   
-  // Discount code state
   const [discountCode, setDiscountCode] = useState('');
   const [discountInfo, setDiscountInfo] = useState(null);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [visibleDiscounts, setVisibleDiscounts] = useState([]);
   const [selectedTierForDiscount, setSelectedTierForDiscount] = useState(null);
   
-  // Discount popup state
   const [showDiscountPopup, setShowDiscountPopup] = useState(false);
   const [pendingTier, setPendingTier] = useState(null);
   const [popupDiscountCode, setPopupDiscountCode] = useState('');
   const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
   const [popupLoading, setPopupLoading] = useState(false);
+  
+  const [showCopyLinkPopup, setShowCopyLinkPopup] = useState(false);
 
   const platform = Capacitor.getPlatform();
   const isIOS = platform === 'ios';
-  // Use platform checks to flag native apps if you have custom logic, or rely on isIOS
-  const isIOSApp = isIOS; 
+  const isIOSApp = isIOS;
 
   const tiers = [
     {
@@ -84,7 +83,6 @@ const PricingPage = () => {
     }
   ];
 
-  // Show discount popup or direct layout route before checkout
   const initiateSubscribe = (tier) => {
     if (tier === 0) {
       navigate(user ? '/library' : '/register');
@@ -107,15 +105,13 @@ const PricingPage = () => {
       return;
     }
 
-    // iOS Native App route directly uses App Store In-App Purchases (Discounts bypass Apple guidelines if web-linked)
     if (isIOS) {
       handleNativeApplePurchase(tier);
       return;
     }
 
-    // Show discount popup before proceeding to web checkout
     setPendingTier(tier);
-    setPopupDiscountCode(discountCode || ''); 
+    setPopupDiscountCode(discountCode || '');
     setPopupDiscountInfo(discountInfo);
     setShowDiscountPopup(true);
   };
@@ -131,7 +127,6 @@ const PricingPage = () => {
     }
   };
 
-  // Validate discount code in popup
   const validatePopupDiscount = async () => {
     if (!popupDiscountCode.trim()) {
       toast.error('Please enter a discount code');
@@ -158,7 +153,6 @@ const PricingPage = () => {
     }
   };
 
-  // Proceed to checkout from popup (Web / Android / Capacitor Non-iOS)
   const proceedToCheckout = async (withDiscount = false) => {
     if (!pendingTier) return;
     
@@ -195,7 +189,6 @@ const PricingPage = () => {
     }
   };
 
-  // Legacy handler for backward compatibility
   const handleSubscribe = (tier) => {
     initiateSubscribe(tier);
   };
@@ -316,7 +309,6 @@ const PricingPage = () => {
         </div>
       </section>
 
-      {/* FAQ Section */}
       <section className="pb-24">
         <div className="max-w-3xl mx-auto px-6">
           <h2 className="font-serif text-3xl text-[#FDFBF7] text-center mb-12">
@@ -359,7 +351,6 @@ const PricingPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-surface border-t border-[rgba(212,175,55,0.2)] py-12">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -379,7 +370,6 @@ const PricingPage = () => {
         </div>
       </footer>
 
-      {/* Pre-Checkout Discount Popup */}
       <Dialog open={showDiscountPopup} onOpenChange={(open) => {
         if (!open) {
           setShowDiscountPopup(false);
@@ -477,7 +467,6 @@ const PricingPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* iOS Payment Modal */}
       {paymentModal.show && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
