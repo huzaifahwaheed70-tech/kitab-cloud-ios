@@ -4,14 +4,6 @@
   "private": true,
   "homepage": ".",
   "dependencies": {
-<<<<<<< HEAD
-    "@capacitor/android": "7",
-    "@capacitor/app": "7",
-    "@capacitor/browser": "7",
-    "@capacitor/cli": "7",
-    "@capacitor/core": "7",
-    "@capacitor/ios": "7",
-=======
     "@capacitor/android": "^8.3.1",
     "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.3.0",
@@ -20,7 +12,6 @@
     "@capacitor/ios": "^8.3.0",
     "@capacitor/keyboard": "^8.0.3",
     "@capacitor/status-bar": "^8.0.2",
->>>>>>> origin/main
     "@hookform/resolvers": "^5.0.1",
     "@onesignal/capacitor-plugin": "^1.0.5",
     "@phosphor-icons/react": "^2.1.10",
