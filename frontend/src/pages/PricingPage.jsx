@@ -152,7 +152,8 @@ const PricingPage = () => {
     }
   };
 
-  const handleSubscribe = async (tier) => {
+  // Show discount popup before checkout
+  const initiateSubscribe = (tier) => {
     if (tier === 0) {
       // Tier 0 is pay-per-book, redirect to library
       navigate(user ? '/library' : '/register');
@@ -175,20 +176,58 @@ const PricingPage = () => {
       return;
     }
 
-    setLoading(tier);
+    // Show discount popup before proceeding to checkout
+    setPendingTier(tier);
+    setPopupDiscountCode(discountCode || ''); // Pre-fill if already entered
+    setPopupDiscountInfo(discountInfo);
+    setShowDiscountPopup(true);
+  };
+
+  // Validate discount code in popup
+  const validatePopupDiscount = async () => {
+    if (!popupDiscountCode.trim()) {
+      toast.error('Please enter a discount code');
+      return;
+    }
+    
+    setPopupLoading(true);
     
     try {
-      // Use Stripe for all platforms
+      const response = await axios.post(
+        `${API}/discount/validate`,
+        { code: popupDiscountCode.trim(), tier: pendingTier },
+        { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
+      );
+      
+      setPopupDiscountInfo(response.data);
+      toast.success(`Discount applied: ${response.data.description}`);
+    } catch (error) {
+      console.error('Error validating discount:', error);
+      toast.error(error.response?.data?.detail || 'Invalid discount code');
+      setPopupDiscountInfo(null);
+    } finally {
+      setPopupLoading(false);
+    }
+  };
+
+  // Proceed to checkout from popup
+  const proceedToCheckout = async (withDiscount = false) => {
+    if (!pendingTier) return;
+    
+    setShowDiscountPopup(false);
+    setLoading(pendingTier);
+    
+    try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      // Include discount code if applied and matches this tier
       const requestData = {
-        tier,
+        tier: pendingTier,
         origin_url: window.location.origin
       };
       
-      if (discountInfo && selectedTierForDiscount === tier) {
-        requestData.discount_code = discountCode;
+      // Include discount code if applied
+      if (withDiscount && popupDiscountInfo) {
+        requestData.discount_code = popupDiscountCode;
       }
       
       const response = await axios.post(`${API}/payments/create-checkout`, requestData, { headers, withCredentials: true });
@@ -205,6 +244,16 @@ const PricingPage = () => {
       toast.error(error.message || 'Failed to process payment');
       setLoading(null);
     }
+    
+    // Reset popup state
+    setPendingTier(null);
+    setPopupDiscountCode('');
+    setPopupDiscountInfo(null);
+  };
+
+  // Legacy handler for backward compatibility
+  const handleSubscribe = (tier) => {
+    initiateSubscribe(tier);
   };
 
   const userTier = user?.subscription_tier || 0;
@@ -573,6 +622,105 @@ const PricingPage = () => {
           </div>
         </div>
       </footer>
+
+      {/* Pre-Checkout Discount Popup */}
+      <Dialog open={showDiscountPopup} onOpenChange={(open) => {
+        if (!open) {
+          setShowDiscountPopup(false);
+          setPendingTier(null);
+          setPopupDiscountCode('');
+          setPopupDiscountInfo(null);
+        }
+      }}>
+        <DialogContent className="bg-surface border-gold/30 text-[#FDFBF7] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2">
+              <Ticket className="w-5 h-5 text-gold" />
+              Before You Subscribe
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <p className="text-[#B0C4BF] text-sm">
+              Have a discount code? Enter it below before proceeding to checkout.
+            </p>
+            
+            {popupDiscountInfo ? (
+              <div className="bg-gold/10 border border-gold/30 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-gold font-mono font-bold">{popupDiscountInfo.code}</span>
+                  <button 
+                    onClick={() => setPopupDiscountInfo(null)} 
+                    className="text-[#B0C4BF] hover:text-red-400 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <p className="text-sm text-[#FDFBF7]">{popupDiscountInfo.name}</p>
+                <p className="text-xs text-[#B0C4BF] mt-1">{popupDiscountInfo.description}</p>
+                {popupDiscountInfo.savings > 0 && (
+                  <p className="text-sm text-green-400 mt-2">
+                    You save ${popupDiscountInfo.savings.toFixed(2)} on your first month!
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Enter discount code"
+                  value={popupDiscountCode}
+                  onChange={(e) => setPopupDiscountCode(e.target.value.toUpperCase())}
+                  className="bg-[#082E26] border-gold/30 text-[#FDFBF7] uppercase"
+                  data-testid="popup-discount-input"
+                  onKeyDown={(e) => e.key === 'Enter' && validatePopupDiscount()}
+                />
+                <Button
+                  onClick={validatePopupDiscount}
+                  disabled={popupLoading || !popupDiscountCode.trim()}
+                  className="bg-gold/20 text-gold hover:bg-gold/30 border border-gold/30"
+                  data-testid="popup-apply-discount-btn"
+                >
+                  {popupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                </Button>
+              </div>
+            )}
+            
+            {/* Available discounts hint */}
+            {visibleDiscounts.length > 0 && !popupDiscountInfo && (
+              <div className="text-xs text-[#B0C4BF] bg-[#082E26] rounded p-2">
+                <span className="text-gold">Tip:</span> Try code{' '}
+                <button 
+                  onClick={() => setPopupDiscountCode(visibleDiscounts[0].code)}
+                  className="text-gold hover:underline font-mono"
+                >
+                  {visibleDiscounts[0].code}
+                </button>
+                {' '}for a special discount!
+              </div>
+            )}
+            
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={() => proceedToCheckout(false)}
+                variant="outline"
+                className="flex-1 border-gold/30 text-[#B0C4BF] hover:text-[#FDFBF7]"
+                data-testid="popup-skip-btn"
+              >
+                Skip & Checkout
+              </Button>
+              <Button
+                onClick={() => proceedToCheckout(true)}
+                disabled={!popupDiscountInfo}
+                className="flex-1 bg-gold text-[#02120F] hover:bg-[#E9C85C] disabled:opacity-50"
+                data-testid="popup-checkout-btn"
+              >
+                {popupDiscountInfo ? 'Checkout with Discount' : 'Apply Code First'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* iOS Payment Modal - Shows tappable link to open in external browser */}
       {paymentModal.show && (

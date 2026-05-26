@@ -2758,6 +2758,149 @@ async def delete_account(user: dict = Depends(get_current_user)):
     return {"message": "Account deleted successfully"}
 
 
+# ==================== OneSignal Push Notifications ====================
+
+ONESIGNAL_APP_ID = os.environ.get('ONESIGNAL_APP_ID')
+ONESIGNAL_REST_API_KEY = os.environ.get('ONESIGNAL_REST_API_KEY')
+
+
+class SendNotificationRequest(BaseModel):
+    title: str
+    message: str
+    target: str = "all"  # "all", "unsubscribed", "subscribed"
+    url: Optional[str] = None  # Optional deep link URL
+
+
+class NotificationResponse(BaseModel):
+    success: bool
+    notification_id: Optional[str] = None
+    recipients: Optional[int] = None
+    message: str
+
+
+@api_router.post("/admin/notifications/send", response_model=NotificationResponse)
+async def send_push_notification(request: SendNotificationRequest, user: dict = Depends(get_admin_user)):
+    """Send push notification to users via OneSignal"""
+    if not ONESIGNAL_APP_ID or not ONESIGNAL_REST_API_KEY:
+        raise HTTPException(status_code=500, detail="OneSignal not configured")
+    
+    try:
+        # Build OneSignal API request
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Basic {ONESIGNAL_REST_API_KEY}"
+        }
+        
+        # Build payload based on targeting
+        payload = {
+            "app_id": ONESIGNAL_APP_ID,
+            "headings": {"en": request.title},
+            "contents": {"en": request.message},
+        }
+        
+        # Add URL if provided
+        if request.url:
+            payload["url"] = request.url
+        
+        # Set targeting based on request
+        if request.target == "all":
+            # Send to all subscribers
+            payload["included_segments"] = ["Subscribed Users"]
+        elif request.target == "unsubscribed":
+            # Send to users with subscription_tier = 0
+            payload["filters"] = [
+                {"field": "tag", "key": "is_subscribed", "relation": "=", "value": "false"}
+            ]
+        elif request.target == "subscribed":
+            # Send to users with active subscriptions
+            payload["filters"] = [
+                {"field": "tag", "key": "is_subscribed", "relation": "=", "value": "true"}
+            ]
+        else:
+            # Default to all
+            payload["included_segments"] = ["Subscribed Users"]
+        
+        # Send notification via OneSignal REST API
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://onesignal.com/api/v1/notifications",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Log the notification in database
+            notification_id = f"notif_{uuid.uuid4().hex[:12]}"
+            await db.notification_history.insert_one({
+                "notification_id": notification_id,
+                "onesignal_id": data.get("id"),
+                "title": request.title,
+                "message": request.message,
+                "target": request.target,
+                "url": request.url,
+                "recipients": data.get("recipients", 0),
+                "sent_by": user["user_id"],
+                "sent_at": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return NotificationResponse(
+                success=True,
+                notification_id=data.get("id"),
+                recipients=data.get("recipients", 0),
+                message=f"Notification sent to {data.get('recipients', 0)} devices"
+            )
+        else:
+            error_data = response.json()
+            logger.error(f"OneSignal error: {error_data}")
+            return NotificationResponse(
+                success=False,
+                message=f"OneSignal error: {error_data.get('errors', ['Unknown error'])}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error sending notification: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send notification: {str(e)}")
+
+
+@api_router.get("/admin/notifications/history")
+async def get_notification_history(user: dict = Depends(get_admin_user), limit: int = 20):
+    """Get history of sent notifications"""
+    notifications = await db.notification_history.find(
+        {}, {"_id": 0}
+    ).sort("sent_at", -1).limit(limit).to_list(limit)
+    
+    return {"notifications": notifications}
+
+
+@api_router.post("/notifications/register-device")
+async def register_device(
+    player_id: str = Query(..., description="OneSignal Player ID"),
+    user: dict = Depends(get_current_user)
+):
+    """Register a device's OneSignal Player ID with a user"""
+    user_id = user["user_id"]
+    
+    # Store device registration
+    await db.device_registrations.update_one(
+        {"player_id": player_id},
+        {
+            "$set": {
+                "user_id": user_id,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$setOnInsert": {
+                "registered_at": datetime.now(timezone.utc).isoformat()
+            }
+        },
+        upsert=True
+    )
+    
+    return {"message": "Device registered"}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 

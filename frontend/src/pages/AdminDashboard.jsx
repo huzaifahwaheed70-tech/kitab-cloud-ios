@@ -4,7 +4,8 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
-  Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff
+  Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff,
+  Bell, Send, Loader2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -68,6 +69,17 @@ const AdminDashboard = () => {
     banner_text: '',
     badge_text: ''
   });
+
+  // Push Notifications State
+  const [notificationForm, setNotificationForm] = useState({
+    title: '',
+    message: '',
+    target: 'all',
+    url: ''
+  });
+  const [notificationSending, setNotificationSending] = useState(false);
+  const [notificationHistory, setNotificationHistory] = useState([]);
+  const [notificationHistoryLoading, setNotificationHistoryLoading] = useState(false);
 
   // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -200,6 +212,60 @@ const AdminDashboard = () => {
       fetchDiscountCodes();
     }
   }, [activeTab, token]);
+
+  // Fetch notification history when notifications tab is active
+  useEffect(() => {
+    if (activeTab === 'notifications' && token) {
+      fetchNotificationHistory();
+    }
+  }, [activeTab, token]);
+
+  const fetchNotificationHistory = async () => {
+    setNotificationHistoryLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/notifications/history`, { headers, withCredentials: true });
+      setNotificationHistory(response.data.notifications || []);
+    } catch (error) {
+      console.error('Error fetching notification history:', error);
+    } finally {
+      setNotificationHistoryLoading(false);
+    }
+  };
+
+  const handleSendNotification = async (e) => {
+    e.preventDefault();
+    if (!notificationForm.title.trim() || !notificationForm.message.trim()) {
+      toast.error('Please enter both title and message');
+      return;
+    }
+    
+    setNotificationSending(true);
+    try {
+      const response = await axios.post(
+        `${API}/admin/notifications/send`,
+        {
+          title: notificationForm.title,
+          message: notificationForm.message,
+          target: notificationForm.target,
+          url: notificationForm.url || null
+        },
+        { headers, withCredentials: true }
+      );
+      
+      if (response.data.success) {
+        toast.success(`Notification sent to ${response.data.recipients} devices!`);
+        setNotificationForm({ title: '', message: '', target: 'all', url: '' });
+        fetchNotificationHistory();
+      } else {
+        toast.error(response.data.message || 'Failed to send notification');
+      }
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      toast.error(error.response?.data?.detail || 'Failed to send notification');
+    } finally {
+      setNotificationSending(false);
+    }
+  };
 
   const resetDiscountForm = () => {
     setDiscountForm({
@@ -524,14 +590,18 @@ const AdminDashboard = () => {
               <Tag className="w-4 h-4 mr-1" />
               Discounts
             </TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-notifications">
+              <Bell className="w-4 h-4 mr-1" />
+              Notifications
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
               <Settings className="w-4 h-4 mr-1" />
               Settings
             </TabsTrigger>
           </TabsList>
 
-          {/* Search (hidden on settings and discounts tab) */}
-          {activeTab !== 'settings' && activeTab !== 'discounts' && (
+          {/* Search (hidden on settings, discounts, and notifications tab) */}
+          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'notifications' && (
           <div className="relative mb-6 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
             <Input
@@ -1221,6 +1291,163 @@ const AdminDashboard = () => {
                 </form>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications">
+            <div className="max-w-4xl space-y-8">
+              {/* Send Notification Form */}
+              <div className="glass-card rounded-lg p-6 border border-gold/30">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                    <Send className="w-5 h-5 text-gold" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-xl text-[#FDFBF7]">Send Push Notification</h2>
+                    <p className="text-[#B0C4BF] text-sm">Send notifications to your users' devices</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSendNotification} className="space-y-4">
+                  <div>
+                    <Label className="text-[#FDFBF7]">Title *</Label>
+                    <Input
+                      value={notificationForm.title}
+                      onChange={(e) => setNotificationForm({ ...notificationForm, title: e.target.value })}
+                      placeholder="e.g., New Books Added!"
+                      className="bg-surface border-gold/30 text-[#FDFBF7]"
+                      maxLength={50}
+                      required
+                      data-testid="notification-title"
+                    />
+                    <p className="text-xs text-[#B0C4BF] mt-1">{notificationForm.title.length}/50 characters</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-[#FDFBF7]">Message *</Label>
+                    <Textarea
+                      value={notificationForm.message}
+                      onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
+                      placeholder="Write your message here..."
+                      className="bg-surface border-gold/30 text-[#FDFBF7] min-h-[100px]"
+                      maxLength={200}
+                      required
+                      data-testid="notification-message"
+                    />
+                    <p className="text-xs text-[#B0C4BF] mt-1">{notificationForm.message.length}/200 characters</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-[#FDFBF7]">Target Audience</Label>
+                      <Select
+                        value={notificationForm.target}
+                        onValueChange={(value) => setNotificationForm({ ...notificationForm, target: value })}
+                      >
+                        <SelectTrigger className="bg-surface border-gold/30 text-[#FDFBF7]" data-testid="notification-target">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#02120F] border-gold/30">
+                          <SelectItem value="all" className="text-[#FDFBF7]">Everyone (All Users)</SelectItem>
+                          <SelectItem value="unsubscribed" className="text-[#FDFBF7]">Unsubscribed Users Only</SelectItem>
+                          <SelectItem value="subscribed" className="text-[#FDFBF7]">Subscribed Users Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-[#B0C4BF] mt-1">
+                        {notificationForm.target === 'all' && 'Send to all users who have enabled notifications'}
+                        {notificationForm.target === 'unsubscribed' && 'Target users who haven\'t subscribed yet - great for promotions!'}
+                        {notificationForm.target === 'subscribed' && 'Only send to paying subscribers'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-[#FDFBF7]">Deep Link URL (Optional)</Label>
+                      <Input
+                        value={notificationForm.url}
+                        onChange={(e) => setNotificationForm({ ...notificationForm, url: e.target.value })}
+                        placeholder="e.g., /pricing or /book/book_abc123"
+                        className="bg-surface border-gold/30 text-[#FDFBF7]"
+                        data-testid="notification-url"
+                      />
+                      <p className="text-xs text-[#B0C4BF] mt-1">Where should users go when they tap the notification?</p>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  {(notificationForm.title || notificationForm.message) && (
+                    <div className="bg-[#082E26] rounded-lg p-4 border border-gold/20">
+                      <p className="text-xs text-gold mb-2">Preview:</p>
+                      <div className="bg-white rounded-lg p-3 shadow-lg max-w-xs">
+                        <div className="flex items-start gap-2">
+                          <div className="w-8 h-8 rounded bg-gold/20 flex items-center justify-center flex-shrink-0">
+                            <Bell className="w-4 h-4 text-gold" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">{notificationForm.title || 'Notification Title'}</p>
+                            <p className="text-gray-600 text-xs mt-0.5">{notificationForm.message || 'Your message will appear here'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={notificationSending || !notificationForm.title.trim() || !notificationForm.message.trim()}
+                    className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                    data-testid="send-notification-btn"
+                  >
+                    {notificationSending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Notification
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </div>
+
+              {/* Notification History */}
+              <div>
+                <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Notification History</h3>
+                
+                {notificationHistoryLoading ? (
+                  <div className="text-center py-8 text-[#B0C4BF]">Loading history...</div>
+                ) : notificationHistory.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-gold/30 rounded-lg">
+                    <Bell className="w-12 h-12 mx-auto text-[#B0C4BF] mb-4" />
+                    <p className="text-[#B0C4BF]">No notifications sent yet</p>
+                    <p className="text-sm text-[#B0C4BF]/60">Your sent notifications will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notificationHistory.map((notif) => (
+                      <div
+                        key={notif.notification_id || notif.onesignal_id}
+                        className="glass-card p-4 rounded-lg border border-gold/20"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[#FDFBF7] font-medium truncate">{notif.title}</h4>
+                            <p className="text-sm text-[#B0C4BF] mt-1 line-clamp-2">{notif.message}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-[#B0C4BF]/70">
+                              <span>Target: {notif.target === 'all' ? 'Everyone' : notif.target === 'unsubscribed' ? 'Unsubscribed' : 'Subscribed'}</span>
+                              <span>Recipients: {notif.recipients || 0}</span>
+                              <span>{new Date(notif.sent_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
 
           {/* Settings Tab */}
