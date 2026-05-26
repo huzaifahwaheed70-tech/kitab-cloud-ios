@@ -4,6 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { toast } from 'sonner';
 import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
 
 const LandingPage = () => {
@@ -314,7 +315,7 @@ const LandingPage = () => {
           </p>
           
           {isIOSApp ? (
-            /* iOS - Simple feature list without external links */
+            /* iOS - Simple feature list with copy link */
             <div className="max-w-lg mx-auto text-center">
               <div className="glass-card rounded-lg p-8 mb-6">
                 <h3 className="font-serif text-xl text-[#FDFBF7] mb-4">Our Plans Include:</h3>
@@ -336,10 +337,19 @@ const LandingPage = () => {
                     Premium - Unlimited access to all books
                   </li>
                 </ul>
-                <div className="bg-surface border border-gold/30 rounded-lg p-4">
-                  <p className="text-[#FDFBF7] mb-2">To subscribe, visit:</p>
-                  <p className="text-gold font-mono">kitab-cloud.emergent.host</p>
+                <div className="bg-surface border border-gold/30 rounded-lg p-4 mb-4">
+                  <p className="text-[#FDFBF7] text-sm mb-2">To subscribe, copy this link:</p>
+                  <p className="text-gold font-mono text-sm break-all">{getWebsiteUrl()}/pricing</p>
                 </div>
+                <Button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${getWebsiteUrl()}/pricing`);
+                    toast.success('Link copied to clipboard!');
+                  }}
+                  className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                >
+                  Copy Link
+                </Button>
               </div>
               <p className="text-sm text-[#B0C4BF]">
                 Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to start reading

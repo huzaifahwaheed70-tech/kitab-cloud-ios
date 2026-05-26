@@ -38,6 +38,9 @@ const PricingPage = () => {
   const [popupDiscountCode, setPopupDiscountCode] = useState('');
   const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
   const [popupLoading, setPopupLoading] = useState(false);
+  
+  // iOS copy link popup state
+  const [showCopyLinkPopup, setShowCopyLinkPopup] = useState(false);
 
   // Check if iOS app (disable purchases)
   useEffect(() => {
@@ -329,17 +332,28 @@ const PricingPage = () => {
             }
           </p>
           
-          {/* iOS App - Simple message (no external links or buttons) */}
+          {/* iOS App - Simple message with copy link */}
           {isIOSApp && (
             <div className="mt-8">
               <div className="inline-block bg-surface border border-gold/30 rounded-lg p-6 max-w-md">
                 <p className="text-[#FDFBF7] mb-4">
-                  To subscribe or purchase books, visit our website:
+                  To subscribe or purchase books, copy this link and open in your browser:
                 </p>
-                <p className="text-gold font-mono text-lg mb-4">
-                  kitab-cloud.emergent.host
-                </p>
-                <p className="text-sm text-[#B0C4BF]">
+                <div className="bg-[#082E26] p-3 rounded-lg mb-4">
+                  <p className="text-gold font-mono text-sm break-all">
+                    {getWebsiteUrl()}/pricing
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${getWebsiteUrl()}/pricing`);
+                    toast.success('Link copied to clipboard!');
+                  }}
+                  className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                >
+                  Copy Link
+                </Button>
+                <p className="text-sm text-[#B0C4BF] mt-4">
                   Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to access your books.
                 </p>
               </div>

@@ -44,6 +44,7 @@ const BookDetailPage = () => {
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [isIOSApp, setIsIOSApp] = useState(false);
   const [showWebsitePopup, setShowWebsitePopup] = useState(false);
+  const [popupType, setPopupType] = useState('pdf'); // 'pdf', 'physical', 'subscribe'
 
   const userTier = user?.subscription_tier || 0;
   
@@ -771,7 +772,7 @@ const BookDetailPage = () => {
                       size="lg" 
                       className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
                       data-testid="upgrade-btn"
-                      onClick={() => setShowWebsitePopup(true)}
+                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
                     >
                       Upgrade to Access
                     </Button>
@@ -808,7 +809,7 @@ const BookDetailPage = () => {
                       size="lg" 
                       className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
                       data-testid="subscribe-btn"
-                      onClick={() => setShowWebsitePopup(true)}
+                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
                     >
                       Subscribe to Read
                     </Button>
@@ -840,16 +841,29 @@ const BookDetailPage = () => {
                   </Button>
                 )}
                 
-                {/* iOS - Simple button that shows popup (no prices, no external links) */}
+                {/* iOS - Buy PDF button that shows popup */}
                 {isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button
                     size="lg"
                     variant="outline"
                     className="border-gold text-gold hover:bg-gold/10"
-                    data-testid="buy-on-website-btn"
-                    onClick={() => setShowWebsitePopup(true)}
+                    data-testid="buy-pdf-btn-ios"
+                    onClick={() => { setPopupType('pdf'); setShowWebsitePopup(true); }}
                   >
-                    Buy This Book
+                    Buy PDF
+                  </Button>
+                )}
+                
+                {/* iOS - Buy Physical Book button (if purchase_link exists) */}
+                {isIOSApp && book.purchase_link && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-[#B0C4BF] text-[#B0C4BF] hover:bg-[#B0C4BF]/10"
+                    data-testid="buy-physical-btn-ios"
+                    onClick={() => { setPopupType('physical'); setShowWebsitePopup(true); }}
+                  >
+                    Buy Physical Book
                   </Button>
                 )}
 
@@ -986,7 +1000,7 @@ const BookDetailPage = () => {
         </div>
       )}
 
-      {/* iOS Website Redirect Popup - Simple message directing users to website */}
+      {/* iOS Website Redirect Popup - Dynamic based on purchase type */}
       {showWebsitePopup && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
@@ -1002,25 +1016,55 @@ const BookDetailPage = () => {
                 <ExternalLink className="w-8 h-8 text-gold" />
               </div>
               <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
-                Purchase on Our Website
+                {popupType === 'pdf' && 'Buy PDF'}
+                {popupType === 'physical' && 'Buy Physical Book'}
+                {popupType === 'subscribe' && 'Subscribe'}
               </h3>
               <p className="text-[#B0C4BF] mb-6">
-                To subscribe or purchase books, please visit our website at:
+                {popupType === 'pdf' && 'To buy the PDF version, copy the link below and open it in your browser:'}
+                {popupType === 'physical' && 'To buy the physical book, copy the link below and open it in your browser:'}
+                {popupType === 'subscribe' && 'To subscribe and access this book, copy the link below and open it in your browser:'}
               </p>
               
-              <div className="bg-[#082E26] p-4 rounded-lg mb-6">
-                <p className="text-gold font-mono text-lg">kitab-cloud.emergent.host</p>
+              <div className="bg-[#082E26] p-4 rounded-lg mb-4">
+                <p className="text-gold font-mono text-sm break-all">
+                  {popupType === 'physical' && book?.purchase_link 
+                    ? book.purchase_link 
+                    : popupType === 'subscribe' 
+                      ? `${getWebsiteUrl()}/pricing`
+                      : `${getWebsiteUrl()}/book/${bookId}`
+                  }
+                </p>
               </div>
               
+              <Button 
+                onClick={() => {
+                  const linkToCopy = popupType === 'physical' && book?.purchase_link 
+                    ? book.purchase_link 
+                    : popupType === 'subscribe' 
+                      ? `${getWebsiteUrl()}/pricing`
+                      : `${getWebsiteUrl()}/book/${bookId}`;
+                  navigator.clipboard.writeText(linkToCopy);
+                  toast.success('Link copied to clipboard!');
+                }}
+                className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C] mb-3"
+              >
+                Copy Link
+              </Button>
+              
               <p className="text-[#B0C4BF] text-sm mb-4">
-                After purchasing, return to this app and log in to access your content.
+                {popupType === 'physical' 
+                  ? 'This will take you to the Dar-us-Salam store.'
+                  : 'After purchasing, return to this app and log in to access your content.'
+                }
               </p>
               
               <Button 
                 onClick={() => setShowWebsitePopup(false)}
-                className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                variant="outline"
+                className="w-full border-gold/30 text-[#B0C4BF]"
               >
-                Got it
+                Close
               </Button>
             </div>
           </div>
