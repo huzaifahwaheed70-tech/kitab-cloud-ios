@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2 } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
 import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 
 const PricingPage = () => {
   const { user, token } = useAuth();
@@ -25,6 +31,13 @@ const PricingPage = () => {
   const [discountLoading, setDiscountLoading] = useState(false);
   const [visibleDiscounts, setVisibleDiscounts] = useState([]);
   const [selectedTierForDiscount, setSelectedTierForDiscount] = useState(null);
+  
+  // Discount popup state
+  const [showDiscountPopup, setShowDiscountPopup] = useState(false);
+  const [pendingTier, setPendingTier] = useState(null);
+  const [popupDiscountCode, setPopupDiscountCode] = useState('');
+  const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
+  const [popupLoading, setPopupLoading] = useState(false);
 
   // Check if iOS app (disable purchases)
   useEffect(() => {
