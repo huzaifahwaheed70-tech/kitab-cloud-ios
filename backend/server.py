@@ -1287,8 +1287,8 @@ async def send_push_notification(request: SendNotificationRequest, user: dict = 
         
         # Set targeting based on request
         if request.target == "all":
-            # Send to all subscribers
-            payload["included_segments"] = ["Subscribed Users"]
+            # Send to ALL subscribed devices (not just "Subscribed Users" segment)
+            payload["included_segments"] = ["All"]
         elif request.target == "unsubscribed":
             # Send to users with subscription_tier = 0
             payload["filters"] = [
@@ -1301,7 +1301,9 @@ async def send_push_notification(request: SendNotificationRequest, user: dict = 
             ]
         else:
             # Default to all
-            payload["included_segments"] = ["Subscribed Users"]
+            payload["included_segments"] = ["All"]
+        
+        logger.info(f"Sending OneSignal notification: {payload}")
         
         # Send notification via OneSignal REST API
         async with httpx.AsyncClient() as client:
@@ -1312,35 +1314,36 @@ async def send_push_notification(request: SendNotificationRequest, user: dict = 
                 timeout=30
             )
         
+        response_data = response.json()
+        logger.info(f"OneSignal response: {response.status_code} - {response_data}")
+        
         if response.status_code == 200:
-            data = response.json()
-            
             # Log the notification in database
             notification_id = f"notif_{uuid.uuid4().hex[:12]}"
             await db.notification_history.insert_one({
                 "notification_id": notification_id,
-                "onesignal_id": data.get("id"),
+                "onesignal_id": response_data.get("id"),
                 "title": request.title,
                 "message": request.message,
                 "target": request.target,
                 "url": request.url,
-                "recipients": data.get("recipients", 0),
+                "recipients": response_data.get("recipients", 0),
                 "sent_by": user["user_id"],
-                "sent_at": datetime.now(timezone.utc).isoformat()
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "onesignal_response": response_data
             })
             
             return NotificationResponse(
                 success=True,
-                notification_id=data.get("id"),
-                recipients=data.get("recipients", 0),
-                message=f"Notification sent to {data.get('recipients', 0)} devices"
+                notification_id=response_data.get("id"),
+                recipients=response_data.get("recipients", 0),
+                message=f"Notification sent to {response_data.get('recipients', 0)} devices"
             )
         else:
-            error_data = response.json()
-            logger.error(f"OneSignal error: {error_data}")
+            logger.error(f"OneSignal error: {response_data}")
             return NotificationResponse(
                 success=False,
-                message=f"OneSignal error: {error_data.get('errors', ['Unknown error'])}"
+                message=f"OneSignal error: {response_data.get('errors', ['Unknown error'])}"
             )
             
     except Exception as e:

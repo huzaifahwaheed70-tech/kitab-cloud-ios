@@ -6,32 +6,55 @@ let isInitialized = false;
 let OneSignalWeb = null;
 let OneSignalNative = null;
 
-// Detect if running in native app or web
-const isNative = Capacitor.isNativePlatform();
+/**
+ * Check if running in native app
+ */
+const checkIsNative = () => {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch (e) {
+    return false;
+  }
+};
 
 /**
  * Initialize OneSignal for push notifications
  * Uses Capacitor plugin for native apps, react-onesignal for web
  */
 export const initializeOneSignal = async () => {
-  if (isInitialized || !ONESIGNAL_APP_ID) {
-    console.log('[OneSignal] Skipping init - already initialized or no app ID');
-    return;
+  if (isInitialized) {
+    console.log('[OneSignal] Already initialized');
+    return true;
   }
+  
+  if (!ONESIGNAL_APP_ID) {
+    console.log('[OneSignal] No app ID configured');
+    return false;
+  }
+
+  const isNative = checkIsNative();
+  console.log('[OneSignal] Platform detection - isNative:', isNative, 'platform:', Capacitor.getPlatform());
 
   try {
     if (isNative) {
       // Native app - use Capacitor plugin
+      console.log('[OneSignal] Initializing native plugin...');
       const { OneSignal } = await import('@onesignal/capacitor-plugin');
       OneSignalNative = OneSignal;
       
-      // Initialize OneSignal
+      // Initialize OneSignal with app ID
+      console.log('[OneSignal] Calling initialize with app ID:', ONESIGNAL_APP_ID);
       OneSignal.initialize(ONESIGNAL_APP_ID);
       
       // Request permission (iOS will show prompt, Android auto-grants)
+      console.log('[OneSignal] Checking notification permission...');
       const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+      console.log('[OneSignal] Current permission:', hasPermission);
+      
       if (!hasPermission) {
-        await OneSignal.Notifications.requestPermission(true);
+        console.log('[OneSignal] Requesting permission...');
+        const permissionResult = await OneSignal.Notifications.requestPermission(true);
+        console.log('[OneSignal] Permission request result:', permissionResult);
       }
       
       console.log('[OneSignal Native] Initialized successfully');
@@ -39,6 +62,7 @@ export const initializeOneSignal = async () => {
       return true;
     } else {
       // Web - use react-onesignal
+      console.log('[OneSignal] Initializing web SDK...');
       const ReactOneSignal = await import('react-onesignal');
       OneSignalWeb = ReactOneSignal.default;
       
@@ -68,6 +92,7 @@ export const initializeOneSignal = async () => {
  * Request notification permission from the user
  */
 export const requestNotificationPermission = async () => {
+  const isNative = checkIsNative();
   try {
     if (isNative && OneSignalNative) {
       const result = await OneSignalNative.Notifications.requestPermission(true);
@@ -89,6 +114,7 @@ export const requestNotificationPermission = async () => {
  * Check if notifications are enabled
  */
 export const areNotificationsEnabled = async () => {
+  const isNative = checkIsNative();
   try {
     if (isNative && OneSignalNative) {
       return await OneSignalNative.Notifications.getPermissionAsync();
@@ -107,6 +133,7 @@ export const areNotificationsEnabled = async () => {
  * This allows targeting specific users for notifications
  */
 export const setUserForNotifications = async (userId, email, subscriptionTier) => {
+  const isNative = checkIsNative();
   if (!isInitialized || !ONESIGNAL_APP_ID) {
     console.log('[OneSignal] Not initialized, skipping user setup');
     return;
@@ -153,6 +180,7 @@ export const setUserForNotifications = async (userId, email, subscriptionTier) =
  * Update user tags (e.g., when subscription tier changes)
  */
 export const updateUserTags = async (tags) => {
+  const isNative = checkIsNative();
   if (!isInitialized) return;
   
   try {
@@ -173,6 +201,7 @@ export const updateUserTags = async (tags) => {
  * Clear user association (on logout)
  */
 export const clearUserForNotifications = async () => {
+  const isNative = checkIsNative();
   if (!isInitialized) return;
   
   try {
@@ -193,6 +222,7 @@ export const clearUserForNotifications = async () => {
  * Get the OneSignal ID for the current device
  */
 export const getOneSignalId = async () => {
+  const isNative = checkIsNative();
   if (!isInitialized) return null;
   
   try {
