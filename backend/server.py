@@ -574,7 +574,8 @@ class DiscountCodeResponse(BaseModel):
 
 class DiscountValidateRequest(BaseModel):
     code: str
-    tier: int
+    tier: Optional[int] = None
+    book_id: Optional[str] = None
 
 
 # Apple StoreKit Models
@@ -1325,14 +1326,61 @@ async def get_favorites(user: dict = Depends(get_current_user)):
 
 
 # PDF Purchase for Tier 0 users
+class PdfPurchaseRequest(BaseModel):
+    discount_code: Optional[str] = None
+
+
 @api_router.post("/purchase-pdf/{book_id}")
-async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_current_user)):
+async def purchase_pdf(book_id: str, request: Request, body: PdfPurchaseRequest = None, user: dict = Depends(get_current_user)):
     book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
     if not book.get("pdf_price"):
         raise HTTPException(status_code=400, detail="This book is not available for individual purchase")
+    
+    original_price = float(book["pdf_price"])
+    final_price = original_price
+    stripe_coupon_id = None
+    discount_description = None
+    
+    # Handle discount code if provided
+    if body and body.discount_code:
+        code = body.discount_code.upper()
+        discount = await db.discount_codes.find_one({"code": code, "is_active": True})
+        
+        if discount:
+            now = datetime.now(timezone.utc)
+            is_valid = True
+            
+            # Check date range
+            if discount.get("valid_from"):
+                valid_from = datetime.fromisoformat(discount["valid_from"].replace('Z', '+00:00'))
+                if now < valid_from:
+                    is_valid = False
+            
+            if discount.get("valid_until"):
+                valid_until = datetime.fromisoformat(discount["valid_until"].replace('Z', '+00:00'))
+                if now > valid_until:
+                    is_valid = False
+            
+            if is_valid:
+                discount_type = discount.get("discount_type", "percentage")
+                
+                if discount_type == "percentage":
+                    discount_percent = discount.get("discount_percent", discount.get("value", 0))
+                    final_price = original_price * (1 - discount_percent / 100)
+                    discount_description = f"{discount_percent}% off"
+                elif discount_type == "fixed":
+                    discount_amount = discount.get("discount_amount", discount.get("value", 0))
+                    final_price = max(0, original_price - discount_amount)
+                    discount_description = f"${discount_amount} off"
+                
+                # Get or create Stripe coupon
+                if discount.get("stripe_coupon_id"):
+                    stripe_coupon_id = discount["stripe_coupon_id"]
+                
+                logger.info(f"Applied discount {code} to PDF purchase: ${original_price} -> ${final_price}")
     
     # Create Stripe checkout for single PDF
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
@@ -1351,16 +1399,23 @@ async def purchase_pdf(book_id: str, request: Request, user: dict = Depends(get_
     cancel_url = f"{origin_url}/book/{book_id}"
     
     checkout_request = CheckoutSessionRequest(
-        amount=float(book["pdf_price"]),
+        amount=float(final_price),
         currency="usd",
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={
             "user_id": user["user_id"],
             "book_id": book_id,
-            "type": "pdf_purchase"
+            "type": "pdf_purchase",
+            "discount_code": body.discount_code if body and body.discount_code else None,
+            "original_price": str(original_price),
+            "final_price": str(final_price)
         }
     )
+    
+    # Apply Stripe coupon if available
+    if stripe_coupon_id:
+        checkout_request.coupon_id = stripe_coupon_id
     
     session = await stripe_checkout.create_checkout_session(checkout_request)
     
@@ -2436,6 +2491,7 @@ async def validate_discount_code(request: DiscountValidateRequest, user: dict = 
     """Validate a discount code and return discount details"""
     code = request.code.upper()
     tier = request.tier
+    book_id = request.book_id
     
     discount = await db.discount_codes.find_one({"code": code, "is_active": True}, {"_id": 0})
     
@@ -2466,16 +2522,29 @@ async def validate_discount_code(request: DiscountValidateRequest, user: dict = 
     if user_usage >= discount.get("per_user_limit", 1):
         raise HTTPException(status_code=400, detail="You have already used this discount code")
     
-    # Check if applicable to selected tier
-    if discount.get("applicable_tiers") and tier not in discount["applicable_tiers"]:
-        raise HTTPException(status_code=400, detail="This discount code is not valid for the selected plan")
+    # Determine original price based on tier or book
+    original_price = 0
     
-    # Calculate discount amount
-    custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
-    tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
-    tier_key = str(tier) if str(tier) in tiers else tier
-    tier_info = tiers.get(tier_key) or tiers.get(str(tier_key))
-    original_price = tier_info["price"]
+    if book_id:
+        # PDF purchase - get book price
+        book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
+        if book and book.get("pdf_price"):
+            original_price = float(book["pdf_price"])
+        else:
+            raise HTTPException(status_code=400, detail="Book not found or not available for purchase")
+    elif tier:
+        # Subscription - check if applicable to selected tier
+        if discount.get("applicable_tiers") and tier not in discount["applicable_tiers"]:
+            raise HTTPException(status_code=400, detail="This discount code is not valid for the selected plan")
+        
+        # Get tier price
+        custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
+        tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
+        tier_key = str(tier) if str(tier) in tiers else tier
+        tier_info = tiers.get(tier_key) or tiers.get(str(tier_key))
+        original_price = tier_info["price"]
+    else:
+        raise HTTPException(status_code=400, detail="Please specify a tier or book_id")
     
     discount_info = {
         "code": discount["code"],

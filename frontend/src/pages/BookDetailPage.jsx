@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { 
   ArrowLeft, BookMarked, ChevronLeft, ChevronRight, 
-  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library, ExternalLink, Download
+  ZoomIn, ZoomOut, X, ShoppingCart, Heart, Bookmark, Search, Library, ExternalLink, Download, Tag, Loader2, Check
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -45,6 +45,13 @@ const BookDetailPage = () => {
   const [isIOSApp, setIsIOSApp] = useState(false);
   const [showWebsitePopup, setShowWebsitePopup] = useState(false);
   const [popupType, setPopupType] = useState('pdf'); // 'pdf', 'physical', 'subscribe'
+  
+  // Discount popup state for PDF purchases
+  const [showDiscountPopup, setShowDiscountPopup] = useState(false);
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountInfo, setDiscountInfo] = useState(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [visibleDiscounts, setVisibleDiscounts] = useState([]);
 
   const userTier = user?.subscription_tier || 0;
   
@@ -52,6 +59,20 @@ const BookDetailPage = () => {
   useEffect(() => {
     setIsIOSApp(shouldDisablePurchases());
   }, []);
+  
+  // Fetch visible discount codes
+  useEffect(() => {
+    const fetchVisibleDiscounts = async () => {
+      try {
+        const response = await axios.get(`${API}/discount/visible`);
+        setVisibleDiscounts(response.data.discounts || []);
+      } catch (error) {
+        console.error('Error fetching discounts:', error);
+      }
+    };
+    fetchVisibleDiscounts();
+  }, []);
+  
   const canSearch = userTier >= 3;
 
   useEffect(() => {
@@ -277,31 +298,68 @@ const BookDetailPage = () => {
     }
   };
 
-  const handleBuyPdf = async () => {
+  // Show discount popup before buying PDF
+  const initiateBuyPdf = () => {
     if (!book?.pdf_price) {
       toast.error('This book is not available for purchase');
       return;
     }
 
-    // For guest users, redirect to the same book on the Kitab Cloud website
-    // They'll create an account there, purchase, then log in to the app
+    // For guest users, redirect to the website
     if (user?.is_guest) {
       const websiteUrl = `https://kitab-cloud.emergent.host/book/${bookId}`;
-      const result = await openPaymentUrl(websiteUrl);
-      if (result.showModal) {
-        setPaymentModal({ show: true, url: result.url });
-      } else {
-        window.open(websiteUrl, '_blank');
-      }
+      window.open(websiteUrl, '_blank');
+      return;
+    }
+
+    // Show discount popup first
+    setDiscountCode('');
+    setDiscountInfo(null);
+    setShowDiscountPopup(true);
+  };
+
+  // Validate discount code for PDF purchase
+  const validateDiscount = async () => {
+    if (!discountCode.trim()) {
+      toast.error('Please enter a discount code');
       return;
     }
     
+    setDiscountLoading(true);
+    
+    try {
+      const response = await axios.post(
+        `${API}/discount/validate`,
+        { code: discountCode.trim(), book_id: bookId },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true }
+      );
+      
+      setDiscountInfo(response.data);
+      toast.success(`Discount applied: ${response.data.description || response.data.name}`);
+    } catch (error) {
+      console.error('Error validating discount:', error);
+      toast.error(error.response?.data?.detail || 'Invalid discount code');
+      setDiscountInfo(null);
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
+  // Proceed to checkout with or without discount
+  const proceedToPdfCheckout = async (withDiscount = false) => {
+    setShowDiscountPopup(false);
     setPurchaseLoading(true);
     
     try {
-      // Use Stripe for all platforms
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await axios.post(`${API}/purchase-pdf/${bookId}`, {}, { 
+      const requestData = {};
+      
+      // Include discount code if applied
+      if (withDiscount && discountInfo) {
+        requestData.discount_code = discountCode;
+      }
+      
+      const response = await axios.post(`${API}/purchase-pdf/${bookId}`, requestData, { 
         headers, 
         withCredentials: true 
       });
@@ -317,7 +375,14 @@ const BookDetailPage = () => {
       toast.error(error.response?.data?.detail || 'Failed to initiate purchase');
     } finally {
       setPurchaseLoading(false);
+      setDiscountCode('');
+      setDiscountInfo(null);
     }
+  };
+
+  // Legacy function for backward compatibility
+  const handleBuyPdf = async () => {
+    initiateBuyPdf();
   };
 
   // Download PDF to device files
@@ -1066,6 +1131,116 @@ const BookDetailPage = () => {
               >
                 Close
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discount Code Popup for PDF Purchase */}
+      {showDiscountPopup && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
+            <button 
+              onClick={() => {
+                setShowDiscountPopup(false);
+                setDiscountCode('');
+                setDiscountInfo(null);
+              }}
+              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
+                <Tag className="w-8 h-8 text-gold" />
+              </div>
+              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
+                Buy PDF - ${book?.pdf_price}
+              </h3>
+              <p className="text-[#B0C4BF] mb-6">
+                Have a discount code? Enter it below before checkout.
+              </p>
+              
+              {/* Discount Applied Success State */}
+              {discountInfo ? (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-center gap-2 text-green-400 mb-2">
+                    <Check className="w-5 h-5" />
+                    <span className="font-semibold">Discount Applied!</span>
+                  </div>
+                  <p className="text-[#FDFBF7] font-mono">{discountInfo.code}</p>
+                  <p className="text-sm text-[#B0C4BF] mt-1">{discountInfo.description || discountInfo.name}</p>
+                  {discountInfo.savings > 0 && (
+                    <p className="text-green-400 text-sm mt-2">
+                      You save ${discountInfo.savings.toFixed(2)}!
+                    </p>
+                  )}
+                  <button 
+                    onClick={() => {
+                      setDiscountInfo(null);
+                      setDiscountCode('');
+                    }}
+                    className="text-xs text-[#B0C4BF] hover:text-red-400 mt-2"
+                  >
+                    Remove discount
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3 mb-4">
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Enter discount code"
+                      value={discountCode}
+                      onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                      className="bg-[#082E26] border-gold/30 text-[#FDFBF7] uppercase"
+                      data-testid="pdf-discount-input"
+                      onKeyDown={(e) => e.key === 'Enter' && validateDiscount()}
+                    />
+                    <Button
+                      onClick={validateDiscount}
+                      disabled={discountLoading || !discountCode.trim()}
+                      className="bg-gold/20 text-gold hover:bg-gold/30 border border-gold/30 px-4"
+                      data-testid="pdf-apply-discount-btn"
+                    >
+                      {discountLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                    </Button>
+                  </div>
+                  
+                  {/* Available discounts hint */}
+                  {visibleDiscounts.length > 0 && (
+                    <div className="text-xs text-[#B0C4BF] bg-[#082E26] rounded p-2 text-left">
+                      <span className="text-gold">Tip:</span> Try code{' '}
+                      <button 
+                        onClick={() => setDiscountCode(visibleDiscounts[0].code)}
+                        className="text-gold hover:underline font-mono"
+                      >
+                        {visibleDiscounts[0].code}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => proceedToPdfCheckout(false)}
+                  variant="outline"
+                  className="flex-1 border-gold/30 text-[#B0C4BF] hover:text-[#FDFBF7]"
+                  data-testid="pdf-skip-discount-btn"
+                >
+                  {discountInfo ? 'Skip Discount' : 'Continue Without'}
+                </Button>
+                <Button
+                  onClick={() => proceedToPdfCheckout(true)}
+                  disabled={!discountInfo}
+                  className="flex-1 bg-gold text-[#02120F] hover:bg-[#E9C85C] disabled:opacity-50"
+                  data-testid="pdf-checkout-btn"
+                >
+                  {discountInfo ? 'Checkout with Discount' : 'Enter Code First'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
