@@ -931,6 +931,25 @@ const BookDetailPage = () => {
                     Buy Physical Book
                   </Button>
                 )}
+                
+                {/* Web/Android - Buy Physical Book button (if purchase_link exists) */}
+                {!isIOSApp && book.purchase_link && (
+                  <a 
+                    href={book.purchase_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-[#B0C4BF] text-[#B0C4BF] hover:bg-[#B0C4BF]/10"
+                      data-testid="buy-physical-btn"
+                    >
+                      <ExternalLink className="w-5 h-5 mr-2" />
+                      Buy Physical Book
+                    </Button>
+                  </a>
+                )}
 
                 {/* Download PDF button - shown after purchase */}
                 {hasPurchased && book.pdf_url && (
