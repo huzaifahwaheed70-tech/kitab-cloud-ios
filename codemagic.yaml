@@ -62,8 +62,16 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
-          sed -i.bak 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
-          sed -i.bak2 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
+          # Fix RevenueCat provisioning profile issue
+          sed -i.bak 's/PROVISIONING_PROFILE_SPECIFIER = "Dar-Us-Salam Kitab Cloud";/PROVISIONING_PROFILE_SPECIFIER = "";/g' App.xcodeproj/project.pbxproj
+          sed -i.bak2 's/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' ../Pods/Target\ Support\ Files/Pods-App/Pods-App.debug.xcconfig || true
+          
+          # Remove RevenueCat SPM if present (not needed for main branch)
+          sed -i.bak3 '/XCLocalSwiftPackageReference.*RevenueCat/,/};/d' App.xcodeproj/project.pbxproj || true
+          sed -i.bak4 '/XCSwiftPackageProductDependency.*RevenueCat/,/};/d' App.xcodeproj/project.pbxproj || true
+
+          sed -i.bak5 's/ProvisioningStyle = Manual;/ProvisioningStyle = Automatic;/g' App.xcodeproj/project.pbxproj
+          sed -i.bak6 "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
           PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
           security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
@@ -74,9 +82,8 @@ workflows:
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            PROVISIONING_PROFILE="$PROV_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution"
 
       - name: Export IPA
