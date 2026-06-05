@@ -1,5 +1,3 @@
-Here's the updated codemagic.yaml with the hybrid approach:
-
 workflows:
   ios-release:
     name: Kitab Cloud iOS Build
@@ -71,12 +69,9 @@ workflows:
           PROV_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /tmp/profile.plist)
           echo "Using provisioning profile: $PROV_UUID ($PROV_NAME)"
 
-          # Configure main project for manual signing
-          echo "Configuring Xcode project for manual signing..."
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' App.xcodeproj/project.pbxproj
-          sed -i '' 's/ProvisioningStyle = Automatic/ProvisioningStyle = Manual/g' App.xcodeproj/project.pbxproj
-          sed -i '' "s/DEVELOPMENT_TEAM = \"\"/DEVELOPMENT_TEAM = $APPLE_TEAM_ID/g" App.xcodeproj/project.pbxproj
-          sed -i '' "s/DEVELOPMENT_TEAM = ;/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
+          # Use Codemagic's xcode-project tool to set signing for main target only
+          echo "Setting up code signing using xcode-project..."
+          xcode-project use-profiles --project App.xcodeproj
 
           # Use xcworkspace if it exists (SPM creates it), otherwise use xcodeproj
           if [ -d "App.xcworkspace" ]; then
@@ -85,72 +80,18 @@ workflows:
             PROJECT_ARG="-project App.xcodeproj"
           fi
 
-          # First resolve package dependencies
-          echo "Resolving Swift Package dependencies..."
-          xcodebuild -resolvePackageDependencies $PROJECT_ARG -scheme App
-
-          # Fix all SPM package projects to NOT require signing (they are static libraries)
-          echo "Disabling code signing for SPM packages..."
-          find ~/Library/Developer/Xcode/DerivedData -name "project.pbxproj" -path "*SourcePackages*" 2>/dev/null | while read pbxproj; do
-            echo "  Fixing: $pbxproj"
-            # Set SPM packages to not require code signing
-            sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' "$pbxproj"
-            sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "$pbxproj"
-            # Clear any provisioning profile settings
-            sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = "[^"]*"/PROVISIONING_PROFILE_SPECIFIER = ""/g' "$pbxproj"
-            sed -i '' 's/PROVISIONING_PROFILE = "[^"]*"/PROVISIONING_PROFILE = ""/g' "$pbxproj"
-            # Set to no signing identity
-            sed -i '' 's/CODE_SIGN_IDENTITY = "[^"]*"/CODE_SIGN_IDENTITY = ""/g' "$pbxproj"
-          done
-
-          # Archive with manual signing for main app only
+          # Archive - let xcode-project handle signing configuration
           xcodebuild archive \
             $PROJECT_ARG \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
-            -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_NAME"
+            -destination "generic/platform=iOS"
 
       - name: Export IPA
         script: |
-          # Get provisioning profile info for export
-          PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
-          security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
-          PROV_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /tmp/profile.plist)
-          echo "Using provisioning profile for export: $PROV_NAME"
-
-          # Create export options plist with manual signing for App Store
-          cat > /tmp/ExportOptions.plist << PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store-connect</string>
-              <key>teamID</key>
-              <string>$APPLE_TEAM_ID</string>
-              <key>uploadSymbols</key>
-              <true/>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>signingCertificate</key>
-              <string>Apple Distribution</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>host.emergent.kitabcloud</key>
-                  <string>$PROV_NAME</string>
-              </dict>
-          </dict>
-          </plist>
-          PLIST
-
-          xcodebuild -exportArchive \
-            -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /tmp/ExportOptions.plist \
-            -exportPath /Users/builder/export
+          xcode-project build-ipa \
+            --archive-path /Users/builder/archive.xcarchive \
+            --ipa-path /Users/builder/export/App.ipa
 
     artifacts:
       - /Users/builder/export/*.ipa
