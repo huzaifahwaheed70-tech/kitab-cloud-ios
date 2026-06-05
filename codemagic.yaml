@@ -37,7 +37,7 @@ workflows:
       - name: Set signing for dependencies
         script: |
           cd frontend/ios/App
-          xcodebuild -project App.xcodeproj -target App -showBuildSettings | grep PROVISIONING
+          xcodebuild -project App.xcodeproj -target App -showBuildSettings | grep PROVISIONING || true
 
       - name: Build iOS & Process Icons
         script: |
@@ -67,22 +67,41 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
-          # Set main App target to automatic signing
-          sed -i '' 's/ProvisioningStyle = Manual;/ProvisioningStyle = Automatic;/g' App.xcodeproj/project.pbxproj
+          # Set to manual signing
+          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
           sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
-          # Clear any manual provisioning profile references
-          sed -i '' 's/PROVISIONING_PROFILE = "[^"]*";/PROVISIONING_PROFILE = "";/g' App.xcodeproj/project.pbxproj
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' App.xcodeproj/project.pbxproj
+          # Get provisioning profile UUID
+          PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
+          PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
 
+          echo "Using provisioning profile: $PROV_UUID"
+
+          # Set provisioning profile for App target only
+          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROV_UUID\";/g" App.xcodeproj/project.pbxproj
+
+          # Remove RevenueCat from SPM to avoid provisioning conflict
+          # RevenueCat's Package.swift doesn't support manual provisioning
+          rm -rf ~/Library/Developer/Xcode/DerivedData/App-*/SourcePackages/checkouts/purchases-ios-spm 2>/dev/null || true
+
+          # Alternative: remove RevenueCat SPM reference from project
+          sed -i '' '/XCLocalSwiftPackageReference.*purchases-ios-spm/,/};/d' App.xcodeproj/project.pbxproj
+          sed -i '' '/XCSwiftPackageProductDependency.*RevenueCat/,/};/d' App.xcodeproj/project.pbxproj
+          sed -i '' '/RevenueCat_RevenueCat in Frameworks/d' App.xcodeproj/project.pbxproj
+          sed -i '' '/RevenueCat_RevenueCat/d' App.xcodeproj/project.pbxproj
+
+          # Now archive
           xcodebuild archive \
             -project App.xcodeproj \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            -allowProvisioningUpdates
+            PROVISIONING_PROFILE="$PROV_UUID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
 
       - name: Export IPA
         script: |
