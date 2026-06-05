@@ -78,20 +78,12 @@ workflows:
 
           echo "Using provisioning profile: $PROV_UUID"
 
-          # Set provisioning profile for App target only
+          # Set provisioning profile specifier
           sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROV_UUID\";/g" App.xcodeproj/project.pbxproj
 
-          # Remove RevenueCat from SPM to avoid provisioning conflict
-          # RevenueCat's Package.swift doesn't support manual provisioning
-          rm -rf ~/Library/Developer/Xcode/DerivedData/App-*/SourcePackages/checkouts/purchases-ios-spm 2>/dev/null || true
+          # Fix RevenueCat signing - it doesn't support manual provisioning
+          sed -i '' '/RevenueCat/,/};/{s/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;}' App.xcodeproj/project.pbxproj
 
-          # Alternative: remove RevenueCat SPM reference from project
-          sed -i '' '/XCLocalSwiftPackageReference.*purchases-ios-spm/,/};/d' App.xcodeproj/project.pbxproj
-          sed -i '' '/XCSwiftPackageProductDependency.*RevenueCat/,/};/d' App.xcodeproj/project.pbxproj
-          sed -i '' '/RevenueCat_RevenueCat in Frameworks/d' App.xcodeproj/project.pbxproj
-          sed -i '' '/RevenueCat_RevenueCat/d' App.xcodeproj/project.pbxproj
-
-          # Now archive
           xcodebuild archive \
             -project App.xcodeproj \
             -scheme App \
@@ -101,7 +93,7 @@ workflows:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             PROVISIONING_PROFILE="$PROV_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
+            OTHER_CODE_SIGN_FLAGS="--timestamp"
 
       - name: Export IPA
         script: |
