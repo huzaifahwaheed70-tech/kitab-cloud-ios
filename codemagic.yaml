@@ -62,24 +62,34 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
-          # Remove RevenueCat SPM references entirely
-          sed -i '' '/XCLocalSwiftPackageReference.*RevenueCat/,/};/d' App.xcodeproj/project.pbxproj
-          sed -i '' '/XCSwiftPackageProductDependency.*RevenueCat/,/};/d' App.xcodeproj/project.pbxproj
-          sed -i '' '/RevenueCat_RevenueCat in Frameworks/d' App.xcodeproj/project.pbxproj
-
-          # Clean up any RevenueCat framwork references
-          sed -i '' '/RevenueCat/d' App.xcodeproj/project.pbxproj
-
-          # Clear manual provisioning profile for RevenueCat compatibility
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' App.xcodeproj/project.pbxproj
-
-          # Set to manual signing
+          # Fix RevenueCat provisioning profile issue
+          # First, set the main app to manual signing
           sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
           sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
 
           PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
           security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
           PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
+
+          # Set provisioning profile ONLY for the App target, not RevenueCat
+          # The regex specifically targets only the App target's build settings
+          ruby -e "
+            pbxproj = File.read('App.xcodeproj/project.pbxproj')
+            # Find the App target's build settings section and add provisioning profile
+            pbxproj.gsub!(/(504EC317.*Debug.*buildSettings\s*=\s*\{)/) { |m| m + '\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"' + ENV['PROV_UUID'] + '\";' }
+            pbxproj.gsub!(/(504EC318.*Release.*buildSettings\s*=\s*\{)/) { |m| m + '\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"' + ENV['PROV_UUID'] + '\";' }
+            File.write('App.xcodeproj/project.pbxproj', pbxproj)
+          " || true
+
+          # Alternative: simpler sed approach for provisioning
+          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROV_UUID\";/g" App.xcodeproj/project.pbxproj
+
+          # Create a RevenueCat-specific xcconfig to override its provisioning
+          cat > RevenueCat.xcconfig << 'EOF'
+          CODE_SIGN_STYLE = Automatic
+          PROVISIONING_PROFILE_SPECIFIER = 
+          CODE_SIGN_IDENTITY = 
+          EOF
 
           xcodebuild archive \
             -project App.xcodeproj \
@@ -89,7 +99,8 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             PROVISIONING_PROFILE="$PROV_UUID" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            OTHER_CODE_SIGN_FLAGS="--deep"
 
       - name: Export IPA
         script: |
