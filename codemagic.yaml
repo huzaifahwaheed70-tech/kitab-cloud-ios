@@ -34,15 +34,10 @@ workflows:
           npm install cordova-plugin-purchase
           npx cap sync ios
 
-      - name: Set signing for dependencies
-        script: |
-          cd frontend/ios/App
-          xcodebuild -project App.xcodeproj -target App -showBuildSettings | grep PROVISIONING || true
-
       - name: Build iOS & Process Icons
         script: |
           cd frontend/ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 51" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 52" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" App/Info.plist
 
           ICON_SRC="/Users/builder/clone/assets/IMG_3931.png"
@@ -67,40 +62,57 @@ workflows:
             cp /Users/builder/clone/Contents.json "$ICONSET/Contents.json"
           fi
 
-          # Set to manual signing
-          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
-          sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $APPLE_TEAM_ID;/g" App.xcodeproj/project.pbxproj
-
-          # Get provisioning profile UUID
+          # Get provisioning profile info
           PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
           security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
           PROV_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/profile.plist)
+          PROV_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /tmp/profile.plist)
+          echo "Using provisioning profile: $PROV_UUID ($PROV_NAME)"
 
-          echo "Using provisioning profile: $PROV_UUID"
+          # Use xcworkspace if it exists (SPM creates it), otherwise use xcodeproj
+          if [ -d "App.xcworkspace" ]; then
+            PROJECT_ARG="-workspace App.xcworkspace"
+          else
+            PROJECT_ARG="-project App.xcodeproj"
+          fi
 
-          # Set provisioning profile specifier
-          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROV_UUID\";/g" App.xcodeproj/project.pbxproj
-
-          # Fix RevenueCat signing - it doesn't support manual provisioning
-          sed -i '' '/RevenueCat/,/};/{s/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = "";/g;}' App.xcodeproj/project.pbxproj
-
+          # Archive with AUTOMATIC signing - Codemagic handles code signing at export time
+          # This avoids SPM provisioning profile conflicts entirely
           xcodebuild archive \
-            -project App.xcodeproj \
+            $PROJECT_ARG \
             -scheme App \
             -archivePath /Users/builder/archive.xcarchive \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            PROVISIONING_PROFILE="$PROV_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            OTHER_CODE_SIGN_FLAGS="--timestamp"
+            -allowProvisioningUpdates
 
       - name: Export IPA
         script: |
+          # Create export options plist with manual signing for App Store
+          cat > /tmp/ExportOptions.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>6HUND32X2N</string>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          PLIST
+
           xcodebuild -exportArchive \
             -archivePath /Users/builder/archive.xcarchive \
-            -exportOptionsPlist /Users/builder/clone/export_options.plist \
-            -exportPath /Users/builder/export
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath /Users/builder/export \
+            -allowProvisioningUpdates
 
     artifacts:
       - /Users/builder/export/*.ipa
