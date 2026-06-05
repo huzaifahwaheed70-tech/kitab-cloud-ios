@@ -1,5 +1,5 @@
 {
-  "appId": "com.darussalam.kitabcloud",
+  "appId": "host.emergent.kitabcloud",
   "appName": "Kitab Cloud",
   "webDir": "build",
   "server": {
