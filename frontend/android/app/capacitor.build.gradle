@@ -13,6 +13,7 @@ dependencies {
 <<<<<<< HEAD
     implementation project(':capacitor-browser')
     implementation project(':onesignal-capacitor-plugin')
+    implementation project(':revenuecat-purchases-capacitor')
 
 =======
     implementation project(':capacitor-haptics')
