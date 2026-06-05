@@ -2731,6 +2731,45 @@ async def change_password(passwords: ChangePasswordRequest, user: dict = Depends
     return {"message": "Password changed successfully"}
 
 
+class SyncSubscriptionRequest(BaseModel):
+    tier: int
+
+
+@api_router.post("/user/sync-subscription")
+async def sync_subscription(request: SyncSubscriptionRequest, user: dict = Depends(get_current_user)):
+    """Sync subscription tier from iOS In-App Purchase (RevenueCat)"""
+    user_id = user["user_id"]
+    new_tier = request.tier
+    
+    if new_tier < 0 or new_tier > 4:
+        raise HTTPException(status_code=400, detail="Invalid tier")
+    
+    # Update user's subscription tier
+    await db.users.update_one(
+        {"user_id": user_id},
+        {
+            "$set": {
+                "subscription_tier": new_tier,
+                "subscription_source": "ios_iap",
+                "subscription_updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Log the subscription change
+    await db.subscription_history.insert_one({
+        "history_id": f"hist_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "tier": new_tier,
+        "source": "ios_iap",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    logger.info(f"Synced iOS subscription for user {user_id}: Tier {new_tier}")
+    
+    return {"message": "Subscription synced", "tier": new_tier}
+
+
 @api_router.post("/user/cancel-subscription")
 async def cancel_subscription(user: dict = Depends(get_current_user)):
     """Cancel subscription at end of billing period"""

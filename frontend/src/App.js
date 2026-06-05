@@ -12,6 +12,13 @@ import {
   updateUserTags 
 } from './utils/onesignal';
 
+// RevenueCat In-App Purchases (iOS)
+import {
+  initializeRevenueCat,
+  setRevenueCatUser,
+  clearRevenueCatUser
+} from './utils/revenuecat';
+
 // Global error handler for uncaught errors
 window.onerror = function(message, source, lineno, colno, error) {
   console.error('[App] Global error:', { message, source, lineno, colno, error });
@@ -69,9 +76,10 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
 
-  // Initialize OneSignal on mount
+  // Initialize OneSignal and RevenueCat on mount
   useEffect(() => {
     initializeOneSignal().catch(console.error);
+    initializeRevenueCat().catch(console.error);
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -90,6 +98,9 @@ const AuthProvider = ({ children }) => {
           response.data.email, 
           response.data.subscription_tier
         ).catch(console.error);
+        
+        // Set user for RevenueCat
+        setRevenueCatUser(response.data.user_id).catch(console.error);
       }
     } catch (error) {
       setUser(null);
@@ -114,6 +125,9 @@ const AuthProvider = ({ children }) => {
     // Set user for OneSignal
     setUserForNotifications(userData.user_id, userData.email, userData.subscription_tier).catch(console.error);
     
+    // Set user for RevenueCat
+    setRevenueCatUser(userData.user_id).catch(console.error);
+    
     return userData;
   };
 
@@ -126,6 +140,9 @@ const AuthProvider = ({ children }) => {
     
     // Set user for OneSignal
     setUserForNotifications(userData.user_id, userData.email, userData.subscription_tier).catch(console.error);
+    
+    // Set user for RevenueCat
+    setRevenueCatUser(userData.user_id).catch(console.error);
     
     return userData;
   };
@@ -151,6 +168,9 @@ const AuthProvider = ({ children }) => {
     
     // Clear OneSignal user association
     clearUserForNotifications().catch(console.error);
+    
+    // Clear RevenueCat user
+    clearRevenueCatUser().catch(console.error);
   };
 
   const refreshUser = async () => {
