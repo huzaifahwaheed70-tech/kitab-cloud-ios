@@ -906,31 +906,8 @@ const BookDetailPage = () => {
                   </Button>
                 )}
                 
-                {/* iOS - Buy PDF button that shows popup */}
-                {isIOSApp && book.pdf_price && !hasPurchased && (
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-gold text-gold hover:bg-gold/10"
-                    data-testid="buy-pdf-btn-ios"
-                    onClick={() => { setPopupType('pdf'); setShowWebsitePopup(true); }}
-                  >
-                    Buy PDF
-                  </Button>
-                )}
-                
-                {/* iOS - Buy Physical Book button (if purchase_link exists) */}
-                {isIOSApp && book.purchase_link && (
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-[#B0C4BF] text-[#B0C4BF] hover:bg-[#B0C4BF]/10"
-                    data-testid="buy-physical-btn-ios"
-                    onClick={() => { setPopupType('physical'); setShowWebsitePopup(true); }}
-                  >
-                    Buy Physical Book
-                  </Button>
-                )}
+                {/* iOS - PDF and Physical Book purchases are HIDDEN for App Store compliance */}
+                {/* PDF purchases via IAP may be added in a future update */}
                 
                 {/* Web/Android - Buy Physical Book button (if purchase_link exists) */}
                 {!isIOSApp && book.purchase_link && (
