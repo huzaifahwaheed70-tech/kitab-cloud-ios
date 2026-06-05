@@ -1,3 +1,5 @@
+Here's the updated codemagic.yaml:
+
 workflows:
   ios-release:
     name: Kitab Cloud iOS Build
@@ -76,8 +78,8 @@ workflows:
             PROJECT_ARG="-project App.xcodeproj"
           fi
 
-          # Archive with AUTOMATIC signing - Codemagic handles code signing at export time
-          # This avoids SPM provisioning profile conflicts entirely
+          # Archive with AUTOMATIC signing - let Xcode handle identity selection
+          # Distribution signing happens at export time, not archive time
           xcodebuild archive \
             $PROJECT_ARG \
             -scheme App \
@@ -85,7 +87,6 @@ workflows:
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             -allowProvisioningUpdates
 
       - name: Export IPA
