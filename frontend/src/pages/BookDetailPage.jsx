@@ -12,7 +12,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
+import { shouldHideExternalPurchases, getWebsiteUrl } from '../utils/platform';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -545,22 +545,11 @@ const BookDetailPage = () => {
 
               <div className="flex flex-wrap gap-4 pt-4">
                 {isLocked ? (
-                  isIOSApp ? (
-                    <Button 
-                      size="lg" 
-                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
-                      data-testid="upgrade-btn"
-                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
-                    >
+                  <Link to="/pricing">
+                    <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
                       Upgrade to Access
                     </Button>
-                  ) : (
-                    <Link to="/pricing">
-                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
-                        Upgrade to Access
-                      </Button>
-                    </Link>
-                  )
+                  </Link>
                 ) : book.pdf_url ? (
                   canRead || hasPurchased ? (
                     <Button
@@ -581,15 +570,6 @@ const BookDetailPage = () => {
                           Read Now
                         </>
                       )}
-                    </Button>
-                  ) : isIOSApp ? (
-                    <Button 
-                      size="lg" 
-                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
-                      data-testid="subscribe-btn"
-                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
-                    >
-                      Subscribe to Read
                     </Button>
                   ) : (
                     <Link to="/pricing">

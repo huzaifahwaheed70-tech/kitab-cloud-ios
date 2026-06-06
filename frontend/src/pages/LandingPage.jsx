@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
-import { shouldDisablePurchases, getWebsiteUrl } from '../utils/platform';
+import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl } from '../utils/platform';
 
 const LandingPage = () => {
   const { user, loading } = useAuth();
@@ -15,9 +15,9 @@ const LandingPage = () => {
   const [visibleDiscounts, setVisibleDiscounts] = useState([]);
   const [isIOSApp, setIsIOSApp] = useState(false);
 
-  // Check if iOS app
+  // Check if iOS app (for hiding external purchases)
   useEffect(() => {
-    setIsIOSApp(shouldDisablePurchases());
+    setIsIOSApp(shouldHideExternalPurchases());
   }, []);
 
   // Auto-redirect to library if already logged in
@@ -42,9 +42,9 @@ const LandingPage = () => {
     fetchBooks();
   }, []);
 
-  // Fetch visible discounts - only on web, not iOS
+  // Fetch visible discounts - only on web, not iOS (Apple has their own discounts)
   useEffect(() => {
-    if (!shouldDisablePurchases()) {
+    if (!shouldHideDiscounts()) {
       const fetchDiscounts = async () => {
         try {
           const response = await axios.get(`${API}/discount/visible`);

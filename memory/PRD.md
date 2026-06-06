@@ -9,11 +9,13 @@
 - **Frontend:** React + Tailwind CSS + Shadcn UI
 - **Backend:** FastAPI (Python)
 - **Database:** MongoDB
-- **Native Wrapper:** Capacitor (iOS & Android)
-- **Payments:** Stripe (external browser checkout for iOS compliance)
+- **Native Wrapper:** Capacitor v7 (iOS & Android)
+- **Payments:** 
+  - **Web/Android:** Stripe Checkout
+  - **iOS:** RevenueCat Apple In-App Purchase (IAP)
 - **Emails:** Resend
 - **Storage:** Emergent Object Storage
-- **Push Notifications:** OneSignal (NEW - May 2026)
+- **Push Notifications:** OneSignal (react-onesignal + @onesignal/capacitor-plugin)
 
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
@@ -21,19 +23,38 @@
 - [x] 5-tier subscription system (0=Pay-per-book, 1-4=Monthly plans)
 - [x] Admin dashboard for book/user management
 - [x] PDF reading in-app
-- [x] Individual PDF purchases
+- [x] Individual PDF purchases (Web/Android only)
 - [x] Monthly reading limits (configurable by admin)
 - [x] Email verification via Resend
 - [x] Account deletion (Apple compliance)
 - [x] Privacy Policy page
-- [x] External browser payment modal (iOS WebView bypass)
 - [x] ErrorBoundary for crash handling
 - [x] App Transport Security (ATS) configuration
-- [x] **Discount Code System** (May 2026)
-- [x] **Pre-checkout Discount Popup** (May 2026)
-- [x] **Admin Push Notifications via OneSignal** (May 2026)
+- [x] **Discount Code System** (Web/Android only - Apple has their own)
+- [x] **Pre-checkout Discount Popup** (Web/Android only)
+- [x] **Admin Push Notifications via OneSignal**
+- [x] **RevenueCat Apple IAP for iOS Subscriptions** (Dec 2025)
 
-## Discount Code System
+## iOS App Store Compliance (CRITICAL)
+### What's HIDDEN on iOS:
+- PDF purchases (completely hidden - Apple Guideline 3.1.1)
+- Physical book purchases (completely hidden)
+- Discount codes (Apple handles their own via App Store Connect)
+- External payment links
+
+### What's SHOWN on iOS:
+- Subscription prices (via RevenueCat IAP)
+- Subscribe buttons (use RevenueCat, not Stripe)
+- Restore Purchases button
+- All book content and reading features
+
+### RevenueCat Integration:
+- **iOS API Key:** appl_ektcemLtYrefFQBihwgtwStQpKB
+- **Products:** kitab_tier_1_monthly, kitab_tier_2_monthly, kitab_tier_3_monthly, kitab_tier_4_monthly
+- **Entitlements:** tier_1, tier_2, tier_3, tier_4
+- **Backend Sync:** POST /api/user/sync-subscription
+
+## Discount Code System (Web/Android Only)
 ### Features:
 - Create/manage discount codes from Admin Dashboard
 - 4 discount types: percentage, fixed amount, free trial, buy X get Y
@@ -52,7 +73,7 @@
 - `POST /api/discount/validate` - Validate a code for checkout
 - `GET /api/discount/visible` - Get visible codes for homepage
 
-## Push Notifications System (NEW)
+## Push Notifications System
 ### Features:
 - Admin can send push notifications from Admin Dashboard > Notifications tab
 - Target audiences: Everyone, Unsubscribed users only, Subscribed users only
@@ -67,13 +88,8 @@
 
 ### OneSignal Configuration:
 - **App ID:** 31bf8b91-fdf9-427b-8908-9e52914d6d11
-- **Frontend:** react-onesignal package, initialized in App.js
+- **Frontend:** react-onesignal (web) + @onesignal/capacitor-plugin (native)
 - **User tagging:** subscription_tier, is_subscribed tags for targeting
-- **Note:** Web push requires OneSignal dashboard configuration. Native apps (iOS/Android) will use Capacitor plugin.
-
-### Database Collections:
-- `notification_history` - Stores sent notification records
-- `device_registrations` - Links OneSignal Player IDs to users
 
 ## Database Schema
 - **users:** email, hashed_password, is_admin, is_guest, subscription_tier, bookshelf
@@ -88,6 +104,7 @@
 - `/api/auth/login`, `/api/auth/register`
 - `/api/books/all`, `/api/books/{id}`
 - `/api/user/cancel-subscription`
+- `/api/user/sync-subscription` (RevenueCat iOS sync)
 - `/api/payments/create-checkout` (supports discount_code parameter)
 - `/api/admin/*` (admin routes including discount and notification management)
 
@@ -98,22 +115,19 @@
 
 ## Store Compliance Status
 ### Google Play
-- [x] Removed promotional language ("premier", "sophisticated", "Best")
-- [x] Removed user count claims ("thousands of readers")
-- [x] Changed "exclusive" to neutral language
-- [ ] **ACTION REQUIRED:** Update Google Play Console metadata with compliant description
+- [x] Compliant description
+- [x] Stripe payments working
 
 ### Apple App Store
 - [x] Privacy Policy accessible in-app
 - [x] Account Deletion feature implemented
-- [x] External browser payment (avoids IAP for digital goods)
+- [x] RevenueCat IAP for subscriptions (Guideline 3.1.1 compliant)
+- [x] PDF/Physical book purchases HIDDEN on iOS
+- [x] No external payment links on iOS
+- [x] No discount codes on iOS (Apple handles their own)
 - [x] ATS configured for HTTPS
 - [x] ErrorBoundary for crash handling
-- [x] All StoreKit/IAP code removed
-- [x] Prices shown (Apple confirmed external payment OK for US storefront)
-- [ ] **PENDING:** iPad blank screen verification from TestFlight
-- [ ] **ACTION REQUIRED:** Fix Support URL in App Store Connect
-- [ ] **ACTION REQUIRED:** Remove China mainland from distribution OR provide publishing license
+- [ ] **PENDING:** Codemagic build fixing (RevenueCat SPM signing issue)
 
 ## Environment Variables
 ### Backend (.env)
@@ -137,8 +151,7 @@
 
 ## Backlog (Future Features)
 - [ ] (P2) Reading statistics dashboard
-- [ ] Configure OneSignal dashboard for web push (currently only backend API ready)
-- [ ] Add Capacitor OneSignal plugin for native iOS/Android push (requires Capacitor v7+ upgrade)
+- [ ] Configure OneSignal dashboard for web push
 
 ---
-*Last updated: May 2026*
+*Last updated: December 2025*
