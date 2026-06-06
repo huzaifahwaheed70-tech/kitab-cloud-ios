@@ -36,8 +36,6 @@ const PricingPage = () => {
   const [popupDiscountCode, setPopupDiscountCode] = useState('');
   const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
   const [popupLoading, setPopupLoading] = useState(false);
-  
-  const [showCopyLinkPopup, setShowCopyLinkPopup] = useState(false);
 
   const platform = Capacitor.getPlatform();
   const isIOS = platform === 'ios';
