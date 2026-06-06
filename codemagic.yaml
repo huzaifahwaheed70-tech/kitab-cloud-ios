@@ -89,12 +89,46 @@ workflows:
 
       - name: Export IPA
         script: |
-          xcode-project build-ipa \
-            --archive-path /Users/builder/archive.xcarchive \
-            --ipa-path /Users/builder/export/App.ipa
+          mkdir -p /Users/builder/export
+
+          PROFILE_FILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+
+          security cms -D -i "$PROFILE_FILE" > /tmp/profile.plist
+
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /tmp/profile.plist)
+
+          cat > /tmp/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+
+            <key>signingStyle</key>
+            <string>manual</string>
+
+            <key>teamID</key>
+            <string>6HUND32X2N</string>
+
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>host.emergent.kitabcloud</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          cat /tmp/ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/archive.xcarchive \
+            -exportPath /Users/builder/export \
+            -exportOptionsPlist /tmp/ExportOptions.plist
 
     artifacts:
-      - /Users/builder/export/*.ipa
+      - /Users/builder/export/**/*.ipa
     publishing:
       app_store_connect:
         auth: integration
