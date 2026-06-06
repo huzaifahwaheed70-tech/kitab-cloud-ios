@@ -41,9 +41,6 @@ const PricingPage = () => {
   const [popupDiscountCode, setPopupDiscountCode] = useState('');
   const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
   const [popupLoading, setPopupLoading] = useState(false);
-  
-  // iOS copy link popup state
-  const [showCopyLinkPopup, setShowCopyLinkPopup] = useState(false);
 
   // Check if iOS app
   useEffect(() => {

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Library, Shield, Sparkles, ArrowRight, ShoppingCart, Lock, ExternalLink, Tag } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
-import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl } from '../utils/platform';
+import { shouldHideExternalPurchases, shouldHideDiscounts } from '../utils/platform';
 
 const LandingPage = () => {
   const { user, loading } = useAuth();
@@ -302,102 +302,56 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Pricing Section - Hide prices on iOS, show website link */}
+      {/* Pricing Section */}
       <section className="py-16 px-6 bg-[#082E26]/30">
         <div className="max-w-7xl mx-auto">
           <h2 className="font-serif text-3xl font-bold text-[#FDFBF7] text-center mb-4">
-            {isIOSApp ? 'Subscription Plans' : 'Simple Pricing'}
+            Simple Pricing
           </h2>
           <p className="text-[#B0C4BF] text-center mb-12">
-            {isIOSApp 
-              ? 'Visit our website to subscribe, then log in here to access your books'
-              : 'Choose the plan that fits your reading goals'
-            }
+            Choose the plan that fits your reading goals
           </p>
           
-          {isIOSApp ? (
-            /* iOS - Simple feature list with copy link */
-            <div className="max-w-lg mx-auto text-center">
-              <div className="glass-card rounded-lg p-8 mb-6">
-                <h3 className="font-serif text-xl text-[#FDFBF7] mb-4">Our Plans Include:</h3>
-                <ul className="space-y-3 text-left mb-6">
-                  <li className="text-[#B0C4BF] flex items-center gap-2">
-                    <span className="w-2 h-2 bg-gold rounded-full"></span>
-                    Basic - Monthly book allowance
-                  </li>
-                  <li className="text-[#B0C4BF] flex items-center gap-2">
-                    <span className="w-2 h-2 bg-gold rounded-full"></span>
-                    Standard - Expanded reading access
-                  </li>
-                  <li className="text-[#B0C4BF] flex items-center gap-2">
-                    <span className="w-2 h-2 bg-gold rounded-full"></span>
-                    Advanced - Volume books & in-book search
-                  </li>
-                  <li className="text-[#B0C4BF] flex items-center gap-2">
-                    <span className="w-2 h-2 bg-gold rounded-full"></span>
-                    Premium - Unlimited access to all books
-                  </li>
-                </ul>
-                <div className="bg-surface border border-gold/30 rounded-lg p-4 mb-4">
-                  <p className="text-[#FDFBF7] text-sm mb-2">To subscribe, copy this link:</p>
-                  <p className="text-gold font-mono text-sm break-all">{getWebsiteUrl()}/pricing</p>
-                </div>
-                <Button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${getWebsiteUrl()}/pricing`);
-                    toast.success('Link copied to clipboard!');
-                  }}
-                  className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                >
-                  Copy Link
-                </Button>
-              </div>
-              <p className="text-sm text-[#B0C4BF]">
-                Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to start reading
-              </p>
-            </div>
-          ) : (
-            /* Web/Android - Full pricing grid */
-            <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {tiers.map((tier) => (
-                <div 
-                  key={tier.tier}
-                  className={`glass-card rounded-sm p-6 ${tier.featured ? 'border-gold ring-2 ring-gold/20' : ''}`}
-                >
-                  {tier.featured && (
-                    <span className="text-xs font-semibold text-gold mb-2 block">RECOMMENDED</span>
+          {/* Pricing grid - works for all platforms (iOS uses RevenueCat IAP on pricing page) */}
+          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {tiers.map((tier) => (
+              <div 
+                key={tier.tier}
+                className={`glass-card rounded-sm p-6 ${tier.featured ? 'border-gold ring-2 ring-gold/20' : ''}`}
+              >
+                {tier.featured && (
+                  <span className="text-xs font-semibold text-gold mb-2 block">RECOMMENDED</span>
+                )}
+                <h3 className="font-serif text-lg text-[#FDFBF7] mb-1">{tier.name}</h3>
+                <div className="mb-4">
+                  {tier.perBook ? (
+                    <span className="text-[#B0C4BF] text-sm">Pay per book</span>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-gold">${tier.price}</span>
+                      <span className="text-[#B0C4BF]">/mo</span>
+                    </>
                   )}
-                  <h3 className="font-serif text-lg text-[#FDFBF7] mb-1">{tier.name}</h3>
-                  <div className="mb-4">
-                    {tier.perBook ? (
-                      <span className="text-[#B0C4BF] text-sm">Pay per book</span>
-                    ) : (
-                      <>
-                        <span className="text-3xl font-bold text-gold">${tier.price}</span>
-                        <span className="text-[#B0C4BF]">/mo</span>
-                      </>
-                    )}
-                  </div>
-                  <ul className="space-y-2 mb-6">
-                    {tier.features.map((feature, i) => (
-                      <li key={i} className="text-sm text-[#B0C4BF] flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-gold rounded-full"></span>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link to="/register">
-                    <Button 
-                      className={`w-full ${tier.featured ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' : 'bg-[#082E26] text-[#FDFBF7] hover:bg-[#0A3D33]'}`}
-                      size="sm"
-                    >
-                      Get Started
-                    </Button>
-                  </Link>
                 </div>
-              ))}
-            </div>
-          )}
+                <ul className="space-y-2 mb-6">
+                  {tier.features.map((feature, i) => (
+                    <li key={i} className="text-sm text-[#B0C4BF] flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-gold rounded-full"></span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/register">
+                  <Button 
+                    className={`w-full ${tier.featured ? 'bg-gold text-[#02120F] hover:bg-[#E9C85C]' : 'bg-[#082E26] text-[#FDFBF7] hover:bg-[#0A3D33]'}`}
+                    size="sm"
+                  >
+                    Get Started
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
