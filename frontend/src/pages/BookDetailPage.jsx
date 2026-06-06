@@ -11,7 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
+import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl, isIOSNativeApp } from '../utils/platform';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -43,10 +43,8 @@ const BookDetailPage = () => {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [isIOSApp, setIsIOSApp] = useState(false);
-  const [showWebsitePopup, setShowWebsitePopup] = useState(false);
-  const [popupType, setPopupType] = useState('pdf'); // 'pdf', 'physical', 'subscribe'
   
-  // Discount popup state for PDF purchases
+  // Discount popup state for PDF purchases (not used on iOS)
   const [showDiscountPopup, setShowDiscountPopup] = useState(false);
   const [discountCode, setDiscountCode] = useState('');
   const [discountInfo, setDiscountInfo] = useState(null);
@@ -55,13 +53,15 @@ const BookDetailPage = () => {
 
   const userTier = user?.subscription_tier || 0;
   
-  // Check if iOS app (disable purchases)
+  // Check if iOS app (hide external purchases - PDF and physical books)
   useEffect(() => {
-    setIsIOSApp(shouldDisablePurchases());
+    setIsIOSApp(shouldHideExternalPurchases());
   }, []);
   
-  // Fetch visible discount codes
+  // Fetch visible discount codes (not on iOS - Apple handles their own discounts)
   useEffect(() => {
+    if (shouldHideDiscounts()) return;
+    
     const fetchVisibleDiscounts = async () => {
       try {
         const response = await axios.get(`${API}/discount/visible`);
@@ -811,8 +811,9 @@ const BookDetailPage = () => {
                 </p>
               )}
 
-              {/* Pricing Info - Hide on iOS */}
-              {!isIOSApp && (
+              {/* Pricing Info - Always show prices (RevenueCat handles iOS subscriptions) */}
+              {/* Hide on iOS only for PDF/Physical since those purchases are disabled */}
+              {!isIOSApp && (book.original_price || book.pdf_price) && (
               <div className="flex flex-wrap items-center gap-6 p-4 bg-surface rounded-sm border border-[rgba(212,175,55,0.2)]">
                 {book.original_price && (
                   <div>
@@ -832,22 +833,12 @@ const BookDetailPage = () => {
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4 pt-4">
                 {isLocked ? (
-                  isIOSApp ? (
-                    <Button 
-                      size="lg" 
-                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
-                      data-testid="upgrade-btn"
-                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
-                    >
+                  // Locked book - redirect to pricing (works for both web and iOS with RevenueCat)
+                  <Link to="/pricing">
+                    <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
                       Upgrade to Access
                     </Button>
-                  ) : (
-                    <Link to="/pricing">
-                      <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="upgrade-btn">
-                        Upgrade to Access
-                      </Button>
-                    </Link>
-                  )
+                  </Link>
                 ) : book.pdf_url ? (
                   canRead || hasPurchased ? (
                     <Button
@@ -869,16 +860,8 @@ const BookDetailPage = () => {
                         </>
                       )}
                     </Button>
-                  ) : isIOSApp ? (
-                    <Button 
-                      size="lg" 
-                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" 
-                      data-testid="subscribe-btn"
-                      onClick={() => { setPopupType('subscribe'); setShowWebsitePopup(true); }}
-                    >
-                      Subscribe to Read
-                    </Button>
                   ) : (
+                    // Not subscribed - redirect to pricing (works for both web and iOS with RevenueCat)
                     <Link to="/pricing">
                       <Button size="lg" className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold" data-testid="subscribe-btn">
                         Subscribe to Read
@@ -891,7 +874,7 @@ const BookDetailPage = () => {
                   </Button>
                 )}
 
-                {/* Buy PDF button - Hide on iOS, for web/Android only */}
+                {/* Buy PDF button - COMPLETELY HIDDEN on iOS (not even copy link) */}
                 {!isIOSApp && book.pdf_price && !hasPurchased && (
                   <Button
                     size="lg"
@@ -906,10 +889,7 @@ const BookDetailPage = () => {
                   </Button>
                 )}
                 
-                {/* iOS - PDF and Physical Book purchases are HIDDEN for App Store compliance */}
-                {/* PDF purchases via IAP may be added in a future update */}
-                
-                {/* Web/Android - Buy Physical Book button (if purchase_link exists) */}
+                {/* Buy Physical Book button - COMPLETELY HIDDEN on iOS */}
                 {!isIOSApp && book.purchase_link && (
                   <a 
                     href={book.purchase_link}
@@ -1061,79 +1041,8 @@ const BookDetailPage = () => {
         </div>
       )}
 
-      {/* iOS Website Redirect Popup - Dynamic based on purchase type */}
-      {showWebsitePopup && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
-            <button 
-              onClick={() => setShowWebsitePopup(false)}
-              className="absolute top-4 right-4 text-[#B0C4BF] hover:text-white"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-4">
-                <ExternalLink className="w-8 h-8 text-gold" />
-              </div>
-              <h3 className="font-serif text-xl text-[#FDFBF7] mb-2">
-                {popupType === 'pdf' && 'Buy PDF'}
-                {popupType === 'physical' && 'Buy Physical Book'}
-                {popupType === 'subscribe' && 'Subscribe'}
-              </h3>
-              <p className="text-[#B0C4BF] mb-6">
-                {popupType === 'pdf' && 'To buy the PDF version, copy the link below and open it in your browser:'}
-                {popupType === 'physical' && 'To buy the physical book, copy the link below and open it in your browser:'}
-                {popupType === 'subscribe' && 'To subscribe and access this book, copy the link below and open it in your browser:'}
-              </p>
-              
-              <div className="bg-[#082E26] p-4 rounded-lg mb-4">
-                <p className="text-gold font-mono text-sm break-all">
-                  {popupType === 'physical' && book?.purchase_link 
-                    ? book.purchase_link 
-                    : popupType === 'subscribe' 
-                      ? `${getWebsiteUrl()}/pricing`
-                      : `${getWebsiteUrl()}/book/${bookId}`
-                  }
-                </p>
-              </div>
-              
-              <Button 
-                onClick={() => {
-                  const linkToCopy = popupType === 'physical' && book?.purchase_link 
-                    ? book.purchase_link 
-                    : popupType === 'subscribe' 
-                      ? `${getWebsiteUrl()}/pricing`
-                      : `${getWebsiteUrl()}/book/${bookId}`;
-                  navigator.clipboard.writeText(linkToCopy);
-                  toast.success('Link copied to clipboard!');
-                }}
-                className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C] mb-3"
-              >
-                Copy Link
-              </Button>
-              
-              <p className="text-[#B0C4BF] text-sm mb-4">
-                {popupType === 'physical' 
-                  ? 'This will take you to the Dar-us-Salam store.'
-                  : 'After purchasing, return to this app and log in to access your content.'
-                }
-              </p>
-              
-              <Button 
-                onClick={() => setShowWebsitePopup(false)}
-                variant="outline"
-                className="w-full border-gold/30 text-[#B0C4BF]"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Discount Code Popup for PDF Purchase */}
-      {showDiscountPopup && (
+      {/* Discount Code Popup for PDF Purchase - Not shown on iOS */}
+      {!shouldHideDiscounts() && showDiscountPopup && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-gold/30 rounded-lg max-w-md w-full p-6 relative">
             <button 

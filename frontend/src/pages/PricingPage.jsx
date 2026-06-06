@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldDisablePurchases, shouldHidePrices, getWebsiteUrl } from '../utils/platform';
+import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl, isIOSNativeApp } from '../utils/platform';
 import { isIOSNative, purchaseSubscription, restorePurchases } from '../utils/revenuecat';
 import {
   Dialog,
@@ -45,9 +45,11 @@ const PricingPage = () => {
   // iOS copy link popup state
   const [showCopyLinkPopup, setShowCopyLinkPopup] = useState(false);
 
-  // Check if iOS app (disable external purchases)
+  // Check if iOS app
   useEffect(() => {
-    setIsIOSApp(shouldDisablePurchases());
+    // isIOSApp is used for hiding external purchase options (PDF, physical books)
+    // isIOSNativeApp is used for RevenueCat IAP
+    setIsIOSApp(shouldHideExternalPurchases());
     setIsIOSNativeApp(isIOSNative());
   }, []);
 
@@ -62,8 +64,8 @@ const PricingPage = () => {
 
   useEffect(() => {
     fetchTiers();
-    // Only fetch discounts if not iOS (no purchases on iOS)
-    if (!shouldDisablePurchases()) {
+    // Only fetch discounts if not iOS (Apple handles their own discounts via App Store Connect)
+    if (!shouldHideDiscounts()) {
       fetchVisibleDiscounts();
     }
   }, []);
@@ -391,8 +393,8 @@ const PricingPage = () => {
         </div>
       </nav>
 
-      {/* Promotional Banner for Visible Discounts - Hide on iOS */}
-      {!isIOSApp && visibleDiscounts.length > 0 && (
+      {/* Promotional Banner for Visible Discounts - Hide on iOS (Apple has their own discounts) */}
+      {!shouldHideDiscounts() && visibleDiscounts.length > 0 && (
         <div className="bg-gradient-to-r from-gold/20 via-gold/10 to-gold/20 border-b border-gold/30">
           <div className="max-w-7xl mx-auto px-6 py-3">
             <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -425,39 +427,9 @@ const PricingPage = () => {
           <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">
             {isIOSNativeApp
               ? 'Subscribe to unlock unlimited access to our Islamic book collection.'
-              : isIOSApp 
-                ? 'Log in to access books from your subscription.'
-                : 'Subscribe monthly to read books, or buy individual PDFs without a subscription.'
+              : 'Subscribe monthly to read books, or buy individual PDFs without a subscription.'
             }
           </p>
-          
-          {/* iOS App (non-native) - Simple message with copy link */}
-          {isIOSApp && !isIOSNativeApp && (
-            <div className="mt-8">
-              <div className="inline-block bg-surface border border-gold/30 rounded-lg p-6 max-w-md">
-                <p className="text-[#FDFBF7] mb-4">
-                  To subscribe or purchase books, copy this link and open in your browser:
-                </p>
-                <div className="bg-[#082E26] p-3 rounded-lg mb-4">
-                  <p className="text-gold font-mono text-sm break-all">
-                    {getWebsiteUrl()}/pricing
-                  </p>
-                </div>
-                <Button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${getWebsiteUrl()}/pricing`);
-                    toast.success('Link copied to clipboard!');
-                  }}
-                  className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                >
-                  Copy Link
-                </Button>
-                <p className="text-sm text-[#B0C4BF] mt-4">
-                  Already subscribed? <Link to="/login" className="text-gold hover:underline">Log in</Link> to access your books.
-                </p>
-              </div>
-            </div>
-          )}
           
           {userTier > 0 && (
             <div className="mt-8 inline-flex items-center gap-2 bg-gold/10 border border-gold/30 rounded-full px-4 py-2">
@@ -470,8 +442,8 @@ const PricingPage = () => {
         </div>
       </section>
 
-      {/* Discount Code Section - Hide on iOS */}
-      {!isIOSApp && (
+      {/* Discount Code Section - Hide on iOS (Apple handles their own discounts) */}
+      {!shouldHideDiscounts() && (
       <section className="pb-8">
         <div className="max-w-md mx-auto px-6">
           <div className="glass-card p-4 rounded-lg border border-gold/30">
@@ -621,45 +593,6 @@ const PricingPage = () => {
                 Subscriptions auto-renew monthly. Cancel anytime in Settings.
               </p>
             </div>
-          ) : isIOSApp ? (
-            /* iOS App (non-native/web view) - Feature comparison only */
-            <div className="space-y-8">
-              <p className="text-center text-[#B0C4BF] mb-8">
-                Browse our subscription tiers below. Visit kitab-cloud.emergent.host to subscribe.
-              </p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {tiers.filter(t => t.tier > 0).map((tier) => (
-                  <div 
-                    key={tier.tier}
-                    className={`rounded-lg border p-6 ${
-                      tier.featured 
-                        ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold' 
-                        : 'bg-surface border-[rgba(212,175,55,0.2)]'
-                    } ${userTier === tier.tier ? 'ring-2 ring-gold' : ''}`}
-                  >
-                    <div className={`tier-badge ${tier.color} inline-block mb-3`}>
-                      Tier {tier.tier}
-                    </div>
-                    <h3 className="font-serif text-xl font-semibold text-[#FDFBF7] mb-4">
-                      {tier.name}
-                    </h3>
-                    <ul className="space-y-2">
-                      {tier.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
-                          <Check className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    {userTier === tier.tier && (
-                      <div className="mt-4 text-center text-gold text-sm font-medium">
-                        ✓ Your Current Plan
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
           ) : (
           /* Web/Android - Full pricing cards with purchase buttons */
           <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
@@ -680,8 +613,8 @@ const PricingPage = () => {
                     </div>
                   )}
                   
-                  {/* Discount Badge */}
-                  {tier.tier > 0 && visibleDiscounts.some(d => !d.applicable_tiers || d.applicable_tiers.includes(tier.tier)) && (
+                  {/* Discount Badge - Hide on iOS */}
+                  {!shouldHideDiscounts() && tier.tier > 0 && visibleDiscounts.some(d => !d.applicable_tiers || d.applicable_tiers.includes(tier.tier)) && (
                     <div className="absolute -top-3 right-4 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
                       {visibleDiscounts.find(d => !d.applicable_tiers || d.applicable_tiers.includes(tier.tier))?.badge_text || 'DEAL'}
                     </div>

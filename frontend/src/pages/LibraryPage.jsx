@@ -17,7 +17,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
-import { shouldDisablePurchases } from '../utils/platform';
+import { shouldHideExternalPurchases } from '../utils/platform';
 
 const LibraryPage = () => {
   const { user, token, logout } = useAuth();
@@ -31,9 +31,9 @@ const LibraryPage = () => {
   const [tierSettings, setTierSettings] = useState(null);
   const [isIOSApp, setIsIOSApp] = useState(false);
 
-  // Check if iOS app (disable purchases)
+  // Check if iOS app (hide external purchases like PDF and physical books)
   useEffect(() => {
-    setIsIOSApp(shouldDisablePurchases());
+    setIsIOSApp(shouldHideExternalPurchases());
   }, []);
 
   useEffect(() => {

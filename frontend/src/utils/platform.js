@@ -25,19 +25,28 @@ export const isNativeApp = () => {
 };
 
 /**
- * Check if purchases should be disabled (iOS App Store compliance)
- * Returns true for iOS native app - users must purchase on website
+ * Check if external purchases (PDF, physical books) should be hidden
+ * Returns true for iOS native app - these purchases are NOT allowed on iOS
+ * Subscriptions use RevenueCat IAP instead
  */
-export const shouldDisablePurchases = () => {
+export const shouldHideExternalPurchases = () => {
   return isIOSNativeApp();
 };
 
 /**
- * Check if prices should be hidden (iOS App Store compliance)
- * Apple doesn't want any prices shown in iOS apps that don't use IAP
+ * Check if discount codes should be hidden
+ * Returns true for iOS - Apple handles their own discounts via App Store Connect
+ */
+export const shouldHideDiscounts = () => {
+  return isIOSNativeApp();
+};
+
+/**
+ * Prices CAN be shown on iOS since we use RevenueCat IAP for subscriptions
+ * This returns false - prices are always visible
  */
 export const shouldHidePrices = () => {
-  return isIOSNativeApp();
+  return false;
 };
 
 /**
