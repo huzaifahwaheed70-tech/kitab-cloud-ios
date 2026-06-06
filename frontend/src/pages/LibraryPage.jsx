@@ -543,8 +543,8 @@ const BookCard = ({ book, userTier, isIOSApp }) => {
           </div>
         )}
 
-        {/* Price badge */}
-        {book.pdf_price && (
+        {/* Price badge - Hide on iOS (PDF purchases disabled) */}
+        {!isIOSApp && book.pdf_price && (
           <div className="absolute bottom-2 right-2 bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
             <ShoppingCart className="w-3 h-3 inline mr-1" />
             ${book.pdf_price}
@@ -561,7 +561,8 @@ const BookCard = ({ book, userTier, isIOSApp }) => {
         <h3 className="font-serif text-[#FDFBF7] text-sm md:text-base line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
         </h3>
-        {book.original_price && (
+        {/* Physical book price - Hide on iOS */}
+        {!isIOSApp && book.original_price && (
           <p className="text-xs text-[#B0C4BF] mt-1">Book: ${book.original_price}</p>
         )}
       </div>
@@ -613,7 +614,8 @@ const BookListItem = ({ book, userTier, isIOSApp }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {book.pdf_price && (
+            {/* PDF price in list view - Hide on iOS */}
+            {!isIOSApp && book.pdf_price && (
               <span className="bg-gold text-[#02120F] text-xs font-bold px-2 py-1 rounded">
                 ${book.pdf_price}
               </span>

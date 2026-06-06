@@ -254,7 +254,8 @@ const LandingPage = () => {
                   <div className="p-3">
                     <h3 className="font-serif text-sm text-[#FDFBF7] line-clamp-2 mb-1">{book.title}</h3>
                     <p className="text-xs text-gold font-mono">{book.darussalam_code}</p>
-                    {book.pdf_price && (
+                    {/* PDF price - Hide on iOS */}
+                    {!isIOSApp && book.pdf_price && (
                       <p className="text-xs text-[#B0C4BF] mt-1">PDF: ${book.pdf_price}</p>
                     )}
                   </div>
