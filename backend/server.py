@@ -1398,19 +1398,25 @@ async def purchase_pdf(book_id: str, request: Request, body: PdfPurchaseRequest 
     success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin_url}/book/{book_id}"
     
+    # Build metadata dict - only include discount_code if it has a value
+    metadata = {
+        "user_id": user["user_id"],
+        "book_id": book_id,
+        "type": "pdf_purchase",
+        "original_price": str(original_price),
+        "final_price": str(final_price)
+    }
+    
+    # Only add discount_code if it exists
+    if body and body.discount_code:
+        metadata["discount_code"] = body.discount_code
+    
     checkout_request = CheckoutSessionRequest(
         amount=float(final_price),
         currency="usd",
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={
-            "user_id": user["user_id"],
-            "book_id": book_id,
-            "type": "pdf_purchase",
-            "discount_code": body.discount_code if body and body.discount_code else None,
-            "original_price": str(original_price),
-            "final_price": str(final_price)
-        }
+        metadata=metadata
     )
     
     # Apply Stripe coupon if available
@@ -1553,11 +1559,15 @@ async def create_checkout(payment: PaymentCreate, request: Request, user: dict =
             "metadata": {
                 "user_id": user["user_id"],
                 "tier": str(tier),
-                "tier_name": tier_info["name"],
-                "discount_code": payment.discount_code.upper() if payment.discount_code else None,
-                "discount_id": discount_data["discount_id"] if discount_data else None
+                "tier_name": tier_info["name"]
             }
         }
+        
+        # Add optional metadata fields only if they have values
+        if payment.discount_code:
+            session_params["metadata"]["discount_code"] = payment.discount_code.upper()
+        if discount_data:
+            session_params["metadata"]["discount_id"] = discount_data["discount_id"]
         
         # Add coupon if available
         if stripe_coupon_id and not trial_days:
