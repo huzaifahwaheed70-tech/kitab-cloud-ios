@@ -1419,9 +1419,8 @@ async def purchase_pdf(book_id: str, request: Request, body: PdfPurchaseRequest 
         metadata=metadata
     )
     
-    # Apply Stripe coupon if available
-    if stripe_coupon_id:
-        checkout_request.coupon_id = stripe_coupon_id
+    # Note: Stripe coupon is not applied here since the emergent CheckoutSessionRequest
+    # doesn't support coupons. The discount is already calculated in final_price.
     
     session = await stripe_checkout.create_checkout_session(checkout_request)
     
