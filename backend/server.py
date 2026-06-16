@@ -89,7 +89,7 @@ APPLE_ENVIRONMENT = os.environ.get('APPLE_ENVIRONMENT', 'sandbox')  # 'sandbox' 
 
 # Email Helper Functions
 RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <kitabcloud@dar-us-salam.com>')
-LOGO_URL = "https://duskitab.com/logo.png"  # Logo for emails
+LOGO_URL = "https://kitab-cloud.emergent.host/logo.png"  # Logo for emails
 
 def get_email_header():
     """Returns HTML header with logo for all emails"""
@@ -139,7 +139,7 @@ async def send_welcome_email(email: str, name: str = None):
                         <li>Create your favorites list</li>
                     </ul>
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="https://duskitab.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                        <a href="https://kitab-cloud.emergent.host/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
                             Start Reading
                         </a>
                     </div>
@@ -204,7 +204,7 @@ async def send_verification_email(email: str, code: str):
 async def send_password_reset_email(email: str, reset_token: str):
     """Send password reset link"""
     try:
-        reset_link = f"https://duskitab.com/reset-password?token={reset_token}"
+        reset_link = f"https://kitab-cloud.emergent.host/reset-password?token={reset_token}"
         params = {
             "from": RESEND_FROM_EMAIL,
             "to": [email],
@@ -269,7 +269,7 @@ async def send_pdf_purchase_email(email: str, book_title: str, pdf_url: str, use
                     </p>
                     <div style="background-color: #082E26; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center;">
                         <p style="color: #FDFBF7; margin-bottom: 15px;">Access your book anytime:</p>
-                        <a href="https://kitab-cloud.preview.emergentagent.com/library" 
+                        <a href="https://kitab-cloud.emergent.host/library" 
                            style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
                             Go to My Library
                         </a>
@@ -330,7 +330,7 @@ async def send_subscription_confirmation_email(email: str, tier: int, user_name:
                         </ul>
                     </div>
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="https://kitab-cloud.preview.emergentagent.com/library" 
+                        <a href="https://kitab-cloud.emergent.host/library" 
                            style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
                             Start Reading Now
                         </a>
@@ -2236,7 +2236,7 @@ async def send_announcement_email(
                             {message}
                         </div>
                         <div style="text-align: center; margin: 30px 0;">
-                            <a href="https://duskitab.com/pricing" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                            <a href="https://kitab-cloud.emergent.host/pricing" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
                                 View New Pricing
                             </a>
                         </div>
@@ -2326,7 +2326,7 @@ async def send_price_drop_announcement(admin: dict = Depends(get_admin_user)):
                         </p>
                         
                         <div style="text-align: center; margin: 30px 0;">
-                            <a href="https://duskitab.com/pricing" style="background-color: #D4AF37; color: #02120F; padding: 15px 40px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px;">
+                            <a href="https://kitab-cloud.emergent.host/pricing" style="background-color: #D4AF37; color: #02120F; padding: 15px 40px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px;">
                                 Subscribe Now
                             </a>
                         </div>
