@@ -508,11 +508,14 @@ const BookDetailPage = () => {
 
   // Check if user can read this book
   // Admins can read all books for free
+  // Subscribed users must have book in their reading list
   const isAdmin = user?.is_admin === true;
-  const canRead = isAdmin || userTier > 0 || hasPurchased;
+  const isInReadingList = inBookshelf || hasPurchased || isAdmin;
+  const canRead = isAdmin || hasPurchased || (userTier > 0 && inBookshelf);
   const isVolumeLocked = book?.is_volume && userTier < 3 && !isAdmin;
   const isAdvancedLocked = book?.is_advanced && userTier < 4 && !isAdmin;
   const isLocked = isVolumeLocked || isAdvancedLocked;
+  const needsToAddToReadingList = userTier > 0 && !inBookshelf && !hasPurchased && !isAdmin;
 
   if (loading) {
     return (
@@ -842,6 +845,34 @@ const BookDetailPage = () => {
               </div>
               )}
 
+              {/* Reading List Notice for Subscribed Users */}
+              {needsToAddToReadingList && book.pdf_url && (
+                <div className={`p-4 rounded-sm border ${bookshelfStatus.is_locked ? 'bg-red-500/10 border-red-500/30' : 'bg-gold/10 border-gold/30'}`}>
+                  <div className="flex items-start gap-3">
+                    <BookMarked className={`w-5 h-5 mt-0.5 ${bookshelfStatus.is_locked ? 'text-red-400' : 'text-gold'}`} />
+                    <div>
+                      {bookshelfStatus.is_locked ? (
+                        <>
+                          <p className="text-[#FDFBF7] font-medium">Reading List Full</p>
+                          <p className="text-[#B0C4BF] text-sm">
+                            You've reached your monthly limit of {bookshelfStatus.limit} books. 
+                            Your reading list is locked until next month. Upgrade your tier for a higher limit.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[#FDFBF7] font-medium">Add to Your Reading List</p>
+                          <p className="text-[#B0C4BF] text-sm">
+                            To read this book, add it to your monthly reading list first. 
+                            You have {bookshelfStatus.limit === null ? 'unlimited' : (bookshelfStatus.limit - bookshelfStatus.count)} slots remaining this month.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4 pt-4">
                 {isLocked ? (
@@ -852,7 +883,7 @@ const BookDetailPage = () => {
                     </Button>
                   </Link>
                 ) : book.pdf_url ? (
-                  canRead || hasPurchased ? (
+                  canRead ? (
                     <Button
                       size="lg"
                       onClick={handleReadNow}
@@ -871,6 +902,24 @@ const BookDetailPage = () => {
                           Read Now
                         </>
                       )}
+                    </Button>
+                  ) : needsToAddToReadingList ? (
+                    // Subscribed but book not in reading list - show add to reading list button
+                    <Button
+                      size="lg"
+                      onClick={handleAddToBookshelf}
+                      disabled={bookshelfStatus.is_locked}
+                      className={bookshelfStatus.is_locked 
+                        ? "bg-surface text-[#B0C4BF] cursor-not-allowed" 
+                        : "bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold"
+                      }
+                      data-testid="add-to-read-btn"
+                    >
+                      <BookMarked className="w-5 h-5 mr-2" />
+                      {bookshelfStatus.is_locked 
+                        ? "Reading List Full" 
+                        : "Add to Reading List to Read"
+                      }
                     </Button>
                   ) : (
                     // Not subscribed - redirect to pricing (works for both web and iOS with RevenueCat)
@@ -937,21 +986,29 @@ const BookDetailPage = () => {
                   <span className="text-green-500 text-sm self-center">✓ PDF Purchased</span>
                 )}
 
-                {/* Add to reading list (subscribers only) */}
-                {userTier > 0 && !isLocked && (
+                {/* Add to reading list (subscribers only) - only show if not already shown as main action */}
+                {userTier > 0 && !isLocked && !needsToAddToReadingList && (
                   <Button
                     size="lg"
                     variant="outline"
                     onClick={inBookshelf ? handleRemoveFromBookshelf : handleAddToBookshelf}
+                    disabled={!inBookshelf && bookshelfStatus.is_locked}
                     className={`border-[rgba(212,175,55,0.3)] ${
                       inBookshelf 
                         ? 'bg-gold/10 text-gold border-gold' 
-                        : 'text-[#FDFBF7] hover:bg-[#082E26]'
+                        : bookshelfStatus.is_locked
+                          ? 'opacity-50 cursor-not-allowed text-[#B0C4BF]'
+                          : 'text-[#FDFBF7] hover:bg-[#082E26]'
                     }`}
                     data-testid="bookshelf-btn"
                   >
                     <BookMarked className="w-5 h-5 mr-2" />
-                    {inBookshelf ? 'In Reading List' : 'Add to Reading List'}
+                    {inBookshelf 
+                      ? 'In Reading List' 
+                      : bookshelfStatus.is_locked 
+                        ? 'Reading List Full'
+                        : 'Add to Reading List'
+                    }
                   </Button>
                 )}
 
