@@ -1062,26 +1062,10 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
     # Check if this is a PDF file access (reading a book)
     if path.endswith('.pdf'):
         # Extract book_id from path if possible
-        # Track monthly unique book reads for tier limits
+        book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
         current_month = datetime.now(timezone.utc).strftime("%Y-%m")
         
-        # Get or create monthly reading record
-        monthly_reads = await db.monthly_reads.find_one(
-            {"user_id": user_id, "month": current_month},
-            {"_id": 0}
-        )
-        
-        # Get tier limits from database or use defaults
-        custom_tiers = await db.settings.find_one({"setting_id": "subscription_tiers"}, {"_id": 0})
-        tiers = custom_tiers.get("tiers") if custom_tiers else SUBSCRIPTION_TIERS
-        
-        # Get read limit for user's tier
-        tier_key = str(user_tier) if str(user_tier) in tiers else user_tier
-        tier_info = tiers.get(tier_key) or tiers.get(str(tier_key)) or SUBSCRIPTION_TIERS.get(user_tier, {})
-        read_limit = tier_info.get("book_limit")
-        
-        # Check if user has purchased this specific PDF (Tier 0 users can read purchased PDFs)
-        book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
+        # Check if user has purchased this specific PDF
         has_purchased = await db.pdf_purchases.find_one({
             "user_id": user_id,
             "book_id": book_id_from_path
@@ -1093,28 +1077,18 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
         elif user_tier == 0:
             # Tier 0 without purchase
             raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
-        elif read_limit is not None and read_limit > 0:
-            # Check monthly read limit for Tier 1-3
-            read_book_ids = monthly_reads.get("book_ids", []) if monthly_reads else []
+        else:
+            # Subscribed users must have book in their bookshelf to read
+            bookshelf = await db.bookshelves.find_one({
+                "user_id": user_id, 
+                "month": current_month,
+                "book_ids": book_id_from_path
+            })
             
-            # If this book is already in their reads, allow (re-reading)
-            if book_id_from_path not in read_book_ids:
-                # New book this month
-                if len(read_book_ids) >= read_limit:
-                    raise HTTPException(
-                        status_code=403, 
-                        detail=f"Monthly reading limit reached ({read_limit} books). Wait until next billing cycle or upgrade your subscription."
-                    )
-                
-                # Add this book to monthly reads
-                await db.monthly_reads.update_one(
-                    {"user_id": user_id, "month": current_month},
-                    {
-                        "$addToSet": {"book_ids": book_id_from_path},
-                        "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
-                        "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
-                    },
-                    upsert=True
+            if not bookshelf:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Add this book to your reading list before reading. Go to the book page and click 'Add to Reading List'."
                 )
     
     try:
@@ -1143,13 +1117,31 @@ async def get_bookshelf(user: dict = Depends(get_current_user)):
     limit = tier_limits.get(user_tier, 0)
     
     if not bookshelf:
-        return {"books": [], "count": 0, "limit": limit, "month": current_month}
+        return {
+            "books": [], 
+            "count": 0, 
+            "limit": limit, 
+            "month": current_month,
+            "is_locked": False,
+            "can_modify": True
+        }
     
     # Get full book details
     book_ids = bookshelf.get("book_ids", [])
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
     
-    return {"books": books, "count": len(books), "limit": limit, "month": current_month}
+    # Check if bookshelf is locked (at limit)
+    count = len(books)
+    is_locked = limit is not None and count >= limit
+    
+    return {
+        "books": books, 
+        "count": count, 
+        "limit": limit, 
+        "month": current_month,
+        "is_locked": is_locked,
+        "can_modify": not is_locked  # Can only modify if not at limit
+    }
 
 
 @api_router.post("/bookshelf/{book_id}")
@@ -1193,8 +1185,12 @@ async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user))
         if book_id in book_ids:
             raise HTTPException(status_code=400, detail="Book already in this month's reading list")
         
+        # Check if at limit - if so, bookshelf is locked
         if limit and len(book_ids) >= limit:
-            raise HTTPException(status_code=400, detail=f"Monthly limit reached ({limit} books). Upgrade for more or wait until next month.")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"You've reached your monthly limit of {limit} books. Your reading list is locked until next month. Upgrade your tier for a higher limit."
+            )
         
         await db.bookshelves.update_one(
             {"user_id": user_id, "month": current_month},
@@ -1207,7 +1203,22 @@ async def add_to_bookshelf(book_id: str, user: dict = Depends(get_current_user))
 @api_router.delete("/bookshelf/{book_id}")
 async def remove_from_bookshelf(book_id: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
+    user_tier = user.get("subscription_tier", 0)
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    
+    # Check if bookshelf is at limit (locked)
+    bookshelf = await db.bookshelves.find_one({"user_id": user_id, "month": current_month})
+    if bookshelf:
+        book_ids = bookshelf.get("book_ids", [])
+        tier_limits = {1: 10, 2: 20, 3: 30, 4: None}
+        limit = tier_limits.get(user_tier)
+        
+        # If at limit, bookshelf is locked - can't remove books
+        if limit and len(book_ids) >= limit:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Your reading list is locked at {limit} books until next month. You cannot remove books until then."
+            )
     
     result = await db.bookshelves.update_one(
         {"user_id": user_id, "month": current_month},
@@ -1370,15 +1381,9 @@ async def purchase_pdf(book_id: str, request: Request, body: PdfPurchaseRequest 
                 if discount_type == "percentage":
                     discount_percent = discount.get("discount_percent", discount.get("value", 0))
                     final_price = original_price * (1 - discount_percent / 100)
-                    discount_description = f"{discount_percent}% off"
                 elif discount_type == "fixed":
                     discount_amount = discount.get("discount_amount", discount.get("value", 0))
                     final_price = max(0, original_price - discount_amount)
-                    discount_description = f"${discount_amount} off"
-                
-                # Get or create Stripe coupon
-                if discount.get("stripe_coupon_id"):
-                    stripe_coupon_id = discount["stripe_coupon_id"]
                 
                 logger.info(f"Applied discount {code} to PDF purchase: ${original_price} -> ${final_price}")
     
@@ -2146,6 +2151,66 @@ async def update_user_tier(user_id: str, tier: int, admin: dict = Depends(get_ad
         raise HTTPException(status_code=404, detail="User not found")
     
     return {"message": "Tier updated"}
+
+
+# Admin Test Purchase - allows admins to simulate purchases without payment
+@api_router.post("/admin/test-purchase")
+async def admin_test_purchase(tier: int, user: dict = Depends(get_admin_user)):
+    """Admin endpoint to test subscription without actual payment"""
+    if tier < 0 or tier > 4:
+        raise HTTPException(status_code=400, detail="Invalid tier (0-4)")
+    
+    user_id = user["user_id"]
+    
+    # Update user's tier directly
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"subscription_tier": tier}}
+    )
+    
+    # Log the test purchase
+    logger.info(f"Admin test purchase: {user['email']} set to tier {tier}")
+    
+    return {
+        "message": f"Test purchase successful. Your tier is now {tier}.",
+        "tier": tier
+    }
+
+
+# User self-service tier change (downgrade allowed, upgrade requires payment)
+@api_router.post("/user/change-tier")
+async def change_user_tier(new_tier: int, user: dict = Depends(get_current_user)):
+    """Allow users to downgrade their tier. Upgrades require payment."""
+    current_tier = user.get("subscription_tier", 0)
+    
+    if new_tier < 0 or new_tier > 4:
+        raise HTTPException(status_code=400, detail="Invalid tier (0-4)")
+    
+    if new_tier > current_tier:
+        raise HTTPException(
+            status_code=400, 
+            detail="To upgrade your tier, please use the subscription page to make a payment."
+        )
+    
+    if new_tier == current_tier:
+        raise HTTPException(status_code=400, detail="You are already on this tier.")
+    
+    # Allow downgrade
+    user_id = user["user_id"]
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"subscription_tier": new_tier}}
+    )
+    
+    tier_names = {0: "Free", 1: "Basic", 2: "Standard", 3: "Advanced", 4: "Premium"}
+    
+    logger.info(f"User {user['email']} downgraded from tier {current_tier} to {new_tier}")
+    
+    return {
+        "message": f"Successfully changed to {tier_names.get(new_tier, f'Tier {new_tier}')}.",
+        "old_tier": current_tier,
+        "new_tier": new_tier
+    }
 
 
 @api_router.put("/admin/users/{user_id}/admin")

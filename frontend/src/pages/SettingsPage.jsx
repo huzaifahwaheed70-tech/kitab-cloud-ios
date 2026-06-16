@@ -41,6 +41,11 @@ const SettingsPage = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   
+  // Tier change dialog
+  const [showTierChangeDialog, setShowTierChangeDialog] = useState(false);
+  const [selectedNewTier, setSelectedNewTier] = useState(null);
+  const [changingTier, setChangingTier] = useState(false);
+  
   // Delete account dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -198,6 +203,42 @@ const SettingsPage = () => {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const handleChangeTier = async () => {
+    if (selectedNewTier === null || selectedNewTier >= (profile?.subscription_tier || 0)) {
+      toast.error('You can only downgrade to a lower tier');
+      return;
+    }
+    
+    setChangingTier(true);
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API}/user/change-tier?new_tier=${selectedNewTier}`, {}, { 
+        headers, 
+        withCredentials: true 
+      });
+      toast.success(`Successfully changed to ${getTierName(selectedNewTier)}`);
+      setShowTierChangeDialog(false);
+      setSelectedNewTier(null);
+      fetchProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to change tier');
+    } finally {
+      setChangingTier(false);
+    }
+  };
+
+  const getTierName = (tier) => {
+    const names = {
+      0: 'Free',
+      1: 'Basic',
+      2: 'Standard',
+      3: 'Advanced',
+      4: 'Premium'
+    };
+    return names[tier] || `Tier ${tier}`;
   };
 
   const getTierBadgeClass = (tier) => {
@@ -512,6 +553,36 @@ const SettingsPage = () => {
                 </ul>
               </div>
             )}
+            
+            {/* Downgrade Tier Option */}
+            {profile?.subscription_tier > 1 && !profile?.cancellation_pending && (
+              <div className="glass-card rounded-sm p-6">
+                <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Change Your Plan</h3>
+                <p className="text-[#B0C4BF] text-sm mb-4">
+                  Need a smaller plan? You can downgrade to a lower tier at any time. 
+                  The change takes effect immediately.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(profile.subscription_tier)].map((_, i) => {
+                    const tier = i;
+                    if (tier === profile.subscription_tier) return null;
+                    return (
+                      <Button
+                        key={tier}
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedNewTier(tier);
+                          setShowTierChangeDialog(true);
+                        }}
+                        className="border-[rgba(212,175,55,0.3)] text-[#B0C4BF] hover:bg-[#082E26]"
+                      >
+                        Downgrade to {getTierName(tier)}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -639,6 +710,48 @@ const SettingsPage = () => {
               data-testid="confirm-delete-btn"
             >
               {deleting ? 'Deleting...' : 'Delete My Account'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tier Change Dialog */}
+      <Dialog open={showTierChangeDialog} onOpenChange={setShowTierChangeDialog}>
+        <DialogContent className="bg-surface border-gold/30 text-[#FDFBF7]">
+          <DialogHeader>
+            <DialogTitle className="text-[#FDFBF7] font-serif">Change Your Plan</DialogTitle>
+            <DialogDescription className="text-[#B0C4BF]">
+              You are about to downgrade from {getTierName(profile?.subscription_tier)} to {getTierName(selectedNewTier)}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="my-4 p-4 bg-[#082E26] rounded-sm">
+            <h4 className="text-[#FDFBF7] font-medium mb-2">What changes:</h4>
+            <ul className="text-sm text-[#B0C4BF] space-y-1">
+              <li>• Your monthly book limit will be reduced</li>
+              <li>• The change takes effect immediately</li>
+              <li>• You can upgrade again anytime from the pricing page</li>
+            </ul>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowTierChangeDialog(false);
+                setSelectedNewTier(null);
+              }}
+              className="border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleChangeTier}
+              disabled={changingTier}
+              className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+              data-testid="confirm-tier-change-btn"
+            >
+              {changingTier ? 'Changing...' : `Downgrade to ${getTierName(selectedNewTier)}`}
             </Button>
           </DialogFooter>
         </DialogContent>

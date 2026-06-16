@@ -43,6 +43,7 @@ const BookDetailPage = () => {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [isIOSApp, setIsIOSApp] = useState(false);
+  const [bookshelfStatus, setBookshelfStatus] = useState({ is_locked: false, count: 0, limit: null });
   
   // Discount popup state for PDF purchases (not used on iOS)
   const [showDiscountPopup, setShowDiscountPopup] = useState(false);
@@ -177,6 +178,11 @@ const BookDetailPage = () => {
       });
       const bookIds = response.data.books.map(b => b.book_id);
       setInBookshelf(bookIds.includes(bookId));
+      setBookshelfStatus({
+        is_locked: response.data.is_locked || false,
+        count: response.data.count || 0,
+        limit: response.data.limit
+      });
     } catch (error) {
       console.error('Error checking bookshelf:', error);
     }
@@ -262,6 +268,8 @@ const BookDetailPage = () => {
       });
       setInBookshelf(true);
       toast.success('Added to your monthly reading list!');
+      // Refresh bookshelf status
+      checkBookshelf();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to add to reading list');
     }
@@ -276,8 +284,10 @@ const BookDetailPage = () => {
       });
       setInBookshelf(false);
       toast.success('Removed from reading list');
+      // Refresh bookshelf status
+      checkBookshelf();
     } catch (error) {
-      toast.error('Failed to remove from reading list');
+      toast.error(error.response?.data?.detail || 'Failed to remove from reading list');
     }
   };
 
