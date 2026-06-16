@@ -507,9 +507,11 @@ const BookDetailPage = () => {
   };
 
   // Check if user can read this book
-  const canRead = userTier > 0 || hasPurchased;
-  const isVolumeLocked = book?.is_volume && userTier < 3;
-  const isAdvancedLocked = book?.is_advanced && userTier < 4;
+  // Admins can read all books for free
+  const isAdmin = user?.is_admin === true;
+  const canRead = isAdmin || userTier > 0 || hasPurchased;
+  const isVolumeLocked = book?.is_volume && userTier < 3 && !isAdmin;
+  const isAdvancedLocked = book?.is_advanced && userTier < 4 && !isAdmin;
   const isLocked = isVolumeLocked || isAdvancedLocked;
 
   if (loading) {

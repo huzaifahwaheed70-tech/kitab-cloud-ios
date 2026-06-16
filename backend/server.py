@@ -1058,38 +1058,43 @@ async def get_cover_image(path: str):
 async def get_file(path: str, user: dict = Depends(get_current_user)):
     user_id = user["user_id"]
     user_tier = user.get("subscription_tier", 0)
+    is_admin = user.get("is_admin", False)
     
     # Check if this is a PDF file access (reading a book)
     if path.endswith('.pdf'):
-        # Extract book_id from path if possible
-        book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
-        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
-        
-        # Check if user has purchased this specific PDF
-        has_purchased = await db.pdf_purchases.find_one({
-            "user_id": user_id,
-            "book_id": book_id_from_path
-        })
-        
-        if has_purchased:
-            # User purchased this PDF, allow access regardless of tier
-            pass
-        elif user_tier == 0:
-            # Tier 0 without purchase
-            raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
+        # Admins get free access to all PDFs
+        if is_admin:
+            logger.info(f"Admin {user['email']} accessing PDF: {path}")
         else:
-            # Subscribed users must have book in their bookshelf to read
-            bookshelf = await db.bookshelves.find_one({
-                "user_id": user_id, 
-                "month": current_month,
-                "book_ids": book_id_from_path
+            # Extract book_id from path if possible
+            book_id_from_path = path.replace('darussalam-kitab/pdfs/', '').replace('.pdf', '')
+            current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+            
+            # Check if user has purchased this specific PDF
+            has_purchased = await db.pdf_purchases.find_one({
+                "user_id": user_id,
+                "book_id": book_id_from_path
             })
             
-            if not bookshelf:
-                raise HTTPException(
-                    status_code=403, 
-                    detail="Add this book to your reading list before reading. Go to the book page and click 'Add to Reading List'."
-                )
+            if has_purchased:
+                # User purchased this PDF, allow access regardless of tier
+                pass
+            elif user_tier == 0:
+                # Tier 0 without purchase
+                raise HTTPException(status_code=403, detail="Purchase this PDF or subscribe to read")
+            else:
+                # Subscribed users must have book in their bookshelf to read
+                bookshelf = await db.bookshelves.find_one({
+                    "user_id": user_id, 
+                    "month": current_month,
+                    "book_ids": book_id_from_path
+                })
+                
+                if not bookshelf:
+                    raise HTTPException(
+                        status_code=403, 
+                        detail="Add this book to your reading list before reading. Go to the book page and click 'Add to Reading List'."
+                    )
     
     try:
         data, content_type = get_object(path)
