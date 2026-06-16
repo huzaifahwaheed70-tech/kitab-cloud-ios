@@ -47,10 +47,10 @@ storage_key = None
 # Subscription Tiers
 SUBSCRIPTION_TIERS = {
     0: {"name": "Pay Per Book", "price": 0, "book_limit": 0},
-    1: {"name": "Basic", "price": 20.00, "book_limit": 10},
-    2: {"name": "Standard", "price": 40.00, "book_limit": 20},
-    3: {"name": "Advanced", "price": 60.00, "book_limit": 30},
-    4: {"name": "Premium", "price": 80.00, "book_limit": None},
+    1: {"name": "Basic", "price": 8.95, "book_limit": 10},
+    2: {"name": "Standard", "price": 14.95, "book_limit": 20},
+    3: {"name": "Advanced", "price": 29.95, "book_limit": 30},
+    4: {"name": "Premium", "price": 44.95, "book_limit": None},
 }
 
 # Apple StoreKit Product IDs mapping to tiers
@@ -89,6 +89,28 @@ APPLE_ENVIRONMENT = os.environ.get('APPLE_ENVIRONMENT', 'sandbox')  # 'sandbox' 
 
 # Email Helper Functions
 RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Kitab Cloud <kitabcloud@dar-us-salam.com>')
+LOGO_URL = "https://duskitab.com/logo.png"  # Logo for emails
+
+def get_email_header():
+    """Returns HTML header with logo for all emails"""
+    return f'''
+    <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
+        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 12px;">
+            <img src="{LOGO_URL}" alt="Kitab Cloud" style="width: 40px; height: 40px; border-radius: 8px;" />
+            <h1 style="color: #D4AF37; margin: 0; font-size: 28px;">Kitab Cloud</h1>
+        </div>
+        <p style="color: #B0C4BF; margin: 5px 0;">Your Digital Islamic Library</p>
+    </div>
+    '''
+
+def get_email_footer():
+    """Returns HTML footer for all emails"""
+    return '''
+    <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
+        <p>Powered by Dar-Us-Salam Publications</p>
+        <p><a href="https://dar-us-salam.com" style="color: #D4AF37;">dar-us-salam.com</a></p>
+    </div>
+    '''
 
 async def send_welcome_email(email: str, name: str = None):
     """Send welcome email to new users"""
@@ -100,10 +122,7 @@ async def send_welcome_email(email: str, name: str = None):
             "subject": "Welcome to Kitab Cloud!",
             "html": f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                    <p style="color: #B0C4BF; margin: 5px 0;">Your Digital Islamic Library</p>
-                </div>
+                {get_email_header()}
                 <div style="padding: 30px 0;">
                     <h2 style="color: #FDFBF7;">Assalamu Alaikum {user_name}!</h2>
                     <p style="color: #B0C4BF; line-height: 1.6;">
@@ -120,7 +139,7 @@ async def send_welcome_email(email: str, name: str = None):
                         <li>Create your favorites list</li>
                     </ul>
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="https://kitab-cloud.preview.emergentagent.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                        <a href="https://duskitab.com/library" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
                             Start Reading
                         </a>
                     </div>
@@ -128,10 +147,7 @@ async def send_welcome_email(email: str, name: str = None):
                         JazakAllah Khair for choosing Kitab Cloud!
                     </p>
                 </div>
-                <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(212,175,55,0.2); color: #B0C4BF; font-size: 12px;">
-                    <p>Powered by Dar-Us-Salam Publications</p>
-                    <p><a href="https://dar-us-salam.com" style="color: #D4AF37;">dar-us-salam.com</a></p>
-                </div>
+                {get_email_footer()}
             </div>
             """
         }
@@ -157,9 +173,7 @@ async def send_verification_email(email: str, code: str):
             "subject": "Verify Your Email - Kitab Cloud",
             "html": f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                </div>
+                {get_email_header()}
                 <div style="padding: 30px 0; text-align: center;">
                     <h2 style="color: #FDFBF7;">Verify Your Email</h2>
                     <p style="color: #B0C4BF; line-height: 1.6;">
@@ -190,16 +204,14 @@ async def send_verification_email(email: str, code: str):
 async def send_password_reset_email(email: str, reset_token: str):
     """Send password reset link"""
     try:
-        reset_link = f"https://kitab-cloud.preview.emergentagent.com/reset-password?token={reset_token}"
+        reset_link = f"https://duskitab.com/reset-password?token={reset_token}"
         params = {
             "from": RESEND_FROM_EMAIL,
             "to": [email],
             "subject": "Reset Your Password - Kitab Cloud",
             "html": f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
-                <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <h1 style="color: #D4AF37; margin: 0;">Kitab Cloud</h1>
-                </div>
+                {get_email_header()}
                 <div style="padding: 30px 0; text-align: center;">
                     <h2 style="color: #FDFBF7;">Reset Your Password</h2>
                     <p style="color: #B0C4BF; line-height: 1.6;">
@@ -2180,6 +2192,168 @@ async def test_email_send(email: str, user: dict = Depends(get_admin_user)):
     except Exception as e:
         logger.error(f"Test email failed: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to send test email: {type(e).__name__}: {str(e)}")
+
+
+@api_router.post("/admin/send-announcement")
+async def send_announcement_email(
+    subject: str,
+    message: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Send an announcement email to all registered users (admin only)"""
+    if not resend.api_key:
+        raise HTTPException(status_code=500, detail="RESEND_API_KEY not configured")
+    
+    # Get all non-guest users with valid emails
+    users = await db.users.find(
+        {"$and": [
+            {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
+            {"email": {"$exists": True, "$ne": None, "$ne": ""}}
+        ]},
+        {"email": 1, "name": 1, "_id": 0}
+    ).to_list(10000)
+    
+    if not users:
+        raise HTTPException(status_code=404, detail="No users found to email")
+    
+    success_count = 0
+    fail_count = 0
+    failed_emails = []
+    
+    for user in users:
+        try:
+            user_name = user.get("name", user["email"].split("@")[0])
+            params = {
+                "from": RESEND_FROM_EMAIL,
+                "to": [user["email"]],
+                "subject": subject,
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                    {get_email_header()}
+                    <div style="padding: 30px 0;">
+                        <h2 style="color: #FDFBF7;">Assalamu Alaikum {user_name}!</h2>
+                        <div style="color: #B0C4BF; line-height: 1.8;">
+                            {message}
+                        </div>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://duskitab.com/pricing" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                                View New Pricing
+                            </a>
+                        </div>
+                    </div>
+                    {get_email_footer()}
+                </div>
+                """
+            }
+            resend.Emails.send(params)
+            success_count += 1
+            logger.info(f"Announcement email sent to {user['email']}")
+        except Exception as e:
+            fail_count += 1
+            failed_emails.append(user["email"])
+            logger.error(f"Failed to send announcement to {user['email']}: {e}")
+    
+    return {
+        "message": f"Announcement sent to {success_count} users",
+        "success_count": success_count,
+        "fail_count": fail_count,
+        "failed_emails": failed_emails[:10] if failed_emails else []  # Only show first 10 failures
+    }
+
+
+@api_router.post("/admin/send-price-drop-announcement")
+async def send_price_drop_announcement(admin: dict = Depends(get_admin_user)):
+    """Send the price drop announcement to all registered users (admin only)"""
+    if not resend.api_key:
+        raise HTTPException(status_code=500, detail="RESEND_API_KEY not configured")
+    
+    # Get all non-guest users with valid emails
+    users = await db.users.find(
+        {"$and": [
+            {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
+            {"email": {"$exists": True, "$ne": None, "$ne": ""}}
+        ]},
+        {"email": 1, "name": 1, "_id": 0}
+    ).to_list(10000)
+    
+    if not users:
+        raise HTTPException(status_code=404, detail="No users found to email")
+    
+    success_count = 0
+    fail_count = 0
+    failed_emails = []
+    
+    for user in users:
+        try:
+            user_name = user.get("name", user["email"].split("@")[0])
+            params = {
+                "from": RESEND_FROM_EMAIL,
+                "to": [user["email"]],
+                "subject": "🎉 Great News! We've Lowered Our Prices - Kitab Cloud",
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
+                    {get_email_header()}
+                    <div style="padding: 30px 0;">
+                        <h2 style="color: #FDFBF7;">Assalamu Alaikum {user_name}!</h2>
+                        <p style="color: #B0C4BF; line-height: 1.8; font-size: 16px;">
+                            We have exciting news! We've <strong style="color: #D4AF37;">significantly reduced our subscription prices</strong> to make Islamic knowledge more accessible to everyone.
+                        </p>
+                        
+                        <div style="background-color: #082E26; padding: 25px; margin: 25px 0; border-radius: 8px; border: 1px solid rgba(212,175,55,0.3);">
+                            <h3 style="color: #D4AF37; margin-top: 0; text-align: center;">New Lower Prices</h3>
+                            <table style="width: 100%; color: #B0C4BF; border-collapse: collapse;">
+                                <tr style="border-bottom: 1px solid rgba(212,175,55,0.2);">
+                                    <td style="padding: 12px 0;"><strong style="color: #FDFBF7;">Basic (10 books/mo)</strong></td>
+                                    <td style="padding: 12px 0; text-align: right;"><span style="color: #D4AF37; font-size: 20px; font-weight: bold;">$8.95</span></td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(212,175,55,0.2);">
+                                    <td style="padding: 12px 0;"><strong style="color: #FDFBF7;">Standard (20 books/mo)</strong></td>
+                                    <td style="padding: 12px 0; text-align: right;"><span style="color: #D4AF37; font-size: 20px; font-weight: bold;">$14.95</span></td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(212,175,55,0.2);">
+                                    <td style="padding: 12px 0;"><strong style="color: #FDFBF7;">Advanced (30 books/mo)</strong></td>
+                                    <td style="padding: 12px 0; text-align: right;"><span style="color: #D4AF37; font-size: 20px; font-weight: bold;">$29.95</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 0;"><strong style="color: #FDFBF7;">Premium (Unlimited)</strong></td>
+                                    <td style="padding: 12px 0; text-align: right;"><span style="color: #D4AF37; font-size: 20px; font-weight: bold;">$44.95</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <p style="color: #B0C4BF; line-height: 1.8;">
+                            Start or upgrade your subscription today and get unlimited access to our growing collection of authentic Islamic literature!
+                        </p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://duskitab.com/pricing" style="background-color: #D4AF37; color: #02120F; padding: 15px 40px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px;">
+                                Subscribe Now
+                            </a>
+                        </div>
+                        
+                        <p style="color: #B0C4BF; line-height: 1.6;">
+                            JazakAllah Khair for being part of the Kitab Cloud community!
+                        </p>
+                    </div>
+                    {get_email_footer()}
+                </div>
+                """
+            }
+            resend.Emails.send(params)
+            success_count += 1
+            logger.info(f"Price drop announcement sent to {user['email']}")
+        except Exception as e:
+            fail_count += 1
+            failed_emails.append(user["email"])
+            logger.error(f"Failed to send price drop announcement to {user['email']}: {e}")
+    
+    return {
+        "message": f"Price drop announcement sent to {success_count} users",
+        "success_count": success_count,
+        "fail_count": fail_count,
+        "total_users": len(users),
+        "failed_emails": failed_emails[:10] if failed_emails else []
+    }
 
 
 
