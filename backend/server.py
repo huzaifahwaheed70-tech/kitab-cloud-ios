@@ -2292,6 +2292,50 @@ async def get_admin_subscriptions(user: dict = Depends(get_admin_user)):
     return subscriptions
 
 
+# Admin Test PDF Purchase - grants PDF access without payment
+@api_router.post("/admin/test-pdf-purchase/{book_id}")
+async def admin_test_pdf_purchase(book_id: str, user: dict = Depends(get_admin_user)):
+    """Admin endpoint to grant free PDF access for testing"""
+    # Check book exists
+    book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    user_id = user["user_id"]
+    
+    # Check if already purchased
+    existing = await db.pdf_purchases.find_one({
+        "user_id": user_id,
+        "book_id": book_id
+    })
+    
+    if existing:
+        return {"message": "You already have access to this PDF", "already_owned": True}
+    
+    # Grant free access
+    purchase_record = {
+        "purchase_id": f"test_{secrets.token_hex(8)}",
+        "user_id": user_id,
+        "book_id": book_id,
+        "book_title": book.get("title", "Unknown"),
+        "amount": 0,
+        "currency": "usd",
+        "payment_status": "test_purchase",
+        "stripe_session_id": "admin_test",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.pdf_purchases.insert_one(purchase_record)
+    
+    logger.info(f"Admin test PDF purchase: {user['email']} granted access to {book.get('title')}")
+    
+    return {
+        "message": f"Test purchase successful. You now have access to '{book.get('title')}'",
+        "book_id": book_id,
+        "book_title": book.get("title")
+    }
+
+
 @api_router.get("/admin/users/{user_id}/details")
 async def get_user_details(user_id: str, admin: dict = Depends(get_admin_user)):
     """Get detailed user info including favorites, bookshelf, and purchases"""

@@ -51,6 +51,9 @@ const BookDetailPage = () => {
   const [discountInfo, setDiscountInfo] = useState(null);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [visibleDiscounts, setVisibleDiscounts] = useState([]);
+  
+  // Admin test purchase state
+  const [adminTestLoading, setAdminTestLoading] = useState(false);
 
   const userTier = user?.subscription_tier || 0;
   
@@ -393,6 +396,35 @@ const BookDetailPage = () => {
   // Legacy function for backward compatibility
   const handleBuyPdf = async () => {
     initiateBuyPdf();
+  };
+
+  // Admin test PDF purchase - grants free access
+  const handleAdminTestPdfPurchase = async () => {
+    if (!isAdmin) return;
+    
+    setAdminTestLoading(true);
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(
+        `${API}/admin/test-pdf-purchase/${bookId}`,
+        {},
+        { headers, withCredentials: true }
+      );
+      
+      if (response.data.already_owned) {
+        toast.info(response.data.message);
+      } else {
+        toast.success(response.data.message);
+        // Refresh purchase status
+        checkPurchased();
+      }
+    } catch (error) {
+      console.error('Admin test purchase error:', error);
+      toast.error(error.response?.data?.detail || 'Test purchase failed');
+    } finally {
+      setAdminTestLoading(false);
+    }
   };
 
   // Download PDF to device files
@@ -947,6 +979,24 @@ const BookDetailPage = () => {
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
                     {purchaseLoading ? 'Processing...' : (user?.is_guest ? `Buy on Website ($${book.pdf_price})` : `Buy PDF ($${book.pdf_price})`)}
+                  </Button>
+                )}
+                
+                {/* Admin Test PDF Purchase Button */}
+                {isAdmin && book.pdf_price && !hasPurchased && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handleAdminTestPdfPurchase}
+                    disabled={adminTestLoading}
+                    className="border-green-500 text-green-500 hover:bg-green-500/10"
+                    data-testid="admin-test-pdf-btn"
+                  >
+                    {adminTestLoading ? (
+                      'Processing...'
+                    ) : (
+                      <>🧪 Test Get PDF (Admin)</>
+                    )}
                   </Button>
                 )}
                 

@@ -41,6 +41,13 @@ const PricingPage = () => {
   const [popupDiscountCode, setPopupDiscountCode] = useState('');
   const [popupDiscountInfo, setPopupDiscountInfo] = useState(null);
   const [popupLoading, setPopupLoading] = useState(false);
+  
+  // Admin test purchase state
+  const [showAdminTestPopup, setShowAdminTestPopup] = useState(false);
+  const [adminTestTier, setAdminTestTier] = useState(null);
+  const [adminTestLoading, setAdminTestLoading] = useState(false);
+  
+  const isAdmin = user?.is_admin === true;
 
   // Check if iOS app
   useEffect(() => {
@@ -294,7 +301,7 @@ const PricingPage = () => {
     try {
       const response = await axios.post(
         `${API}/discount/validate`,
-        { code: popupDiscountCode.trim(), tier: pendingTier },
+        { code: popupDiscountCode.trim(), tier: pendingTier || adminTestTier },
         { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
       );
       
@@ -307,6 +314,49 @@ const PricingPage = () => {
     } finally {
       setPopupLoading(false);
     }
+  };
+
+  // Admin test purchase - instantly sets tier without payment
+  const handleAdminTestPurchase = async () => {
+    if (!adminTestTier) return;
+    
+    setAdminTestLoading(true);
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(
+        `${API}/admin/test-purchase?tier=${adminTestTier}`,
+        {},
+        { headers, withCredentials: true }
+      );
+      
+      toast.success(`Test purchase successful! You are now Tier ${adminTestTier}`);
+      setShowAdminTestPopup(false);
+      setAdminTestTier(null);
+      setPopupDiscountCode('');
+      setPopupDiscountInfo(null);
+      
+      // Refresh user data
+      if (refreshUser) {
+        await refreshUser();
+      }
+      
+      // Redirect to library
+      navigate('/library');
+    } catch (error) {
+      console.error('Error with test purchase:', error);
+      toast.error(error.response?.data?.detail || 'Test purchase failed');
+    } finally {
+      setAdminTestLoading(false);
+    }
+  };
+
+  // Open admin test popup instead of discount popup for admins
+  const initiateAdminTest = (tier) => {
+    setAdminTestTier(tier);
+    setPopupDiscountCode('');
+    setPopupDiscountInfo(null);
+    setShowAdminTestPopup(true);
   };
 
   // Proceed to checkout from popup
@@ -669,6 +719,18 @@ const PricingPage = () => {
                       </>
                     )}
                   </Button>
+                  
+                  {/* Admin Test Purchase Button */}
+                  {isAdmin && tier.tier > 0 && userTier < tier.tier && (
+                    <Button
+                      onClick={() => initiateAdminTest(tier.tier)}
+                      variant="outline"
+                      className="w-full mt-2 border-green-500 text-green-500 hover:bg-green-500/10"
+                      data-testid={`admin-test-tier-${tier.tier}`}
+                    >
+                      🧪 Test Purchase (Admin)
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -882,6 +944,83 @@ const PricingPage = () => {
           </div>
         </div>
       )}
+
+      {/* Admin Test Purchase Popup */}
+      <Dialog open={showAdminTestPopup} onOpenChange={setShowAdminTestPopup}>
+        <DialogContent className="bg-surface border-gold/30 text-[#FDFBF7] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#FDFBF7] font-serif flex items-center gap-2">
+              🧪 Admin Test Purchase
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <p className="text-green-400 text-sm">
+                This will instantly set your account to <strong>Tier {adminTestTier}</strong> without payment.
+                For testing purposes only.
+              </p>
+            </div>
+            
+            {/* Optional Discount Code */}
+            <div>
+              <label className="text-sm text-[#B0C4BF] mb-2 block">
+                Test Discount Code (optional)
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  value={popupDiscountCode}
+                  onChange={(e) => setPopupDiscountCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code to validate"
+                  className="bg-[#082E26] border-gold/20 text-[#FDFBF7]"
+                />
+                <Button
+                  onClick={validatePopupDiscount}
+                  disabled={popupLoading || !popupDiscountCode}
+                  variant="outline"
+                  className="border-gold/30 text-gold"
+                >
+                  {popupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Validate'}
+                </Button>
+              </div>
+              {popupDiscountInfo && (
+                <p className="text-green-400 text-sm mt-2">
+                  ✓ {popupDiscountInfo.description}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAdminTestPopup(false);
+                  setAdminTestTier(null);
+                  setPopupDiscountCode('');
+                  setPopupDiscountInfo(null);
+                }}
+                className="flex-1 border-gold/30 text-[#B0C4BF]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAdminTestPurchase}
+                disabled={adminTestLoading}
+                className="flex-1 bg-green-600 text-white hover:bg-green-500"
+              >
+                {adminTestLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>🧪 Activate Tier {adminTestTier}</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
