@@ -55,7 +55,7 @@ const RegisterPage = () => {
         password
       });
       
-      toast.success('Verification code sent to your email!');
+      toast.success('Verification code sent! Check your inbox (and spam folder)');
       setStep('verify');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to send verification code');
@@ -169,6 +169,9 @@ const RegisterPage = () => {
             <p className="text-[#B0C4BF]">
               We sent a 6-digit code to<br />
               <span className="text-gold font-medium">{email}</span>
+            </p>
+            <p className="text-[#B0C4BF]/70 text-sm mt-3 bg-surface/50 rounded-md px-3 py-2 inline-block">
+              💡 Don't see it? Check your <span className="text-gold">spam/junk folder</span>
             </p>
           </div>
           
