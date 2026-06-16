@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
   Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff,
-  Bell, Send, Loader2
+  Bell, Send, Loader2, Mail, Megaphone
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -80,6 +80,14 @@ const AdminDashboard = () => {
   const [notificationSending, setNotificationSending] = useState(false);
   const [notificationHistory, setNotificationHistory] = useState([]);
   const [notificationHistoryLoading, setNotificationHistoryLoading] = useState(false);
+
+  // Email Campaign State
+  const [emailForm, setEmailForm] = useState({
+    subject: '',
+    message: ''
+  });
+  const [emailSending, setEmailSending] = useState(false);
+  const [priceDropSending, setPriceDropSending] = useState(false);
 
   // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -264,6 +272,72 @@ const AdminDashboard = () => {
       toast.error(error.response?.data?.detail || 'Failed to send notification');
     } finally {
       setNotificationSending(false);
+    }
+  };
+
+  // Send Price Drop Announcement Email
+  const handleSendPriceDropEmail = async () => {
+    if (!window.confirm('This will send the price drop announcement to ALL registered users. Are you sure?')) {
+      return;
+    }
+    
+    setPriceDropSending(true);
+    try {
+      const response = await axios.post(
+        `${API}/admin/send-price-drop-announcement`,
+        {},
+        { headers, withCredentials: true }
+      );
+      
+      toast.success(`${response.data.message}`);
+      if (response.data.fail_count > 0) {
+        toast.warning(`${response.data.fail_count} emails failed to send`);
+      }
+    } catch (error) {
+      console.error('Error sending price drop email:', error);
+      toast.error(error.response?.data?.detail || 'Failed to send announcement');
+    } finally {
+      setPriceDropSending(false);
+    }
+  };
+
+  // Send Custom Email Campaign
+  const handleSendCustomEmail = async (e) => {
+    e.preventDefault();
+    if (!emailForm.subject.trim() || !emailForm.message.trim()) {
+      toast.error('Please enter both subject and message');
+      return;
+    }
+    
+    if (!window.confirm('This will send the email to ALL registered users. Are you sure?')) {
+      return;
+    }
+    
+    setEmailSending(true);
+    try {
+      const response = await axios.post(
+        `${API}/admin/send-announcement`,
+        null,
+        { 
+          headers, 
+          withCredentials: true,
+          params: {
+            subject: emailForm.subject,
+            message: emailForm.message
+          }
+        }
+      );
+      
+      toast.success(`${response.data.message}`);
+      if (response.data.fail_count > 0) {
+        toast.warning(`${response.data.fail_count} emails failed to send`);
+      }
+      setEmailForm({ subject: '', message: '' });
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error(error.response?.data?.detail || 'Failed to send email');
+    } finally {
+      setEmailSending(false);
     }
   };
 
@@ -594,14 +668,18 @@ const AdminDashboard = () => {
               <Bell className="w-4 h-4 mr-1" />
               Notifications
             </TabsTrigger>
+            <TabsTrigger value="emails" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-emails">
+              <Mail className="w-4 h-4 mr-1" />
+              Emails
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
               <Settings className="w-4 h-4 mr-1" />
               Settings
             </TabsTrigger>
           </TabsList>
 
-          {/* Search (hidden on settings, discounts, and notifications tab) */}
-          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'notifications' && (
+          {/* Search (hidden on settings, discounts, notifications, and emails tab) */}
+          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'notifications' && activeTab !== 'emails' && (
           <div className="relative mb-6 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
             <Input
@@ -1446,6 +1524,139 @@ const AdminDashboard = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Emails Tab */}
+          <TabsContent value="emails">
+            <div className="max-w-4xl space-y-8">
+              {/* Price Drop Announcement */}
+              <div className="glass-card rounded-lg p-6 border border-gold/30">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Megaphone className="w-5 h-5 text-green-400" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-xl text-[#FDFBF7]">Price Drop Announcement</h2>
+                    <p className="text-[#B0C4BF] text-sm">Send the pre-made price reduction announcement to all users</p>
+                  </div>
+                </div>
+
+                <div className="bg-[#082E26] rounded-lg p-4 border border-gold/20 mb-4">
+                  <p className="text-sm text-[#B0C4BF] mb-2">This will send an email announcing:</p>
+                  <ul className="text-sm text-[#FDFBF7] space-y-1">
+                    <li>• Basic: <span className="text-gold font-bold">$8.95/mo</span></li>
+                    <li>• Standard: <span className="text-gold font-bold">$14.95/mo</span></li>
+                    <li>• Advanced: <span className="text-gold font-bold">$29.95/mo</span></li>
+                    <li>• Premium: <span className="text-gold font-bold">$44.95/mo</span></li>
+                  </ul>
+                </div>
+
+                <Button
+                  onClick={handleSendPriceDropEmail}
+                  disabled={priceDropSending}
+                  className="w-full bg-green-600 hover:bg-green-500 text-white"
+                  data-testid="send-price-drop-btn"
+                >
+                  {priceDropSending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending to All Users...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Price Drop Announcement to All Users
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Custom Email Campaign */}
+              <div className="glass-card rounded-lg p-6 border border-gold/30">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-gold" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-xl text-[#FDFBF7]">Custom Email Campaign</h2>
+                    <p className="text-[#B0C4BF] text-sm">Create and send a custom email to all registered users</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSendCustomEmail} className="space-y-4">
+                  <div>
+                    <Label className="text-[#FDFBF7]">Email Subject *</Label>
+                    <Input
+                      value={emailForm.subject}
+                      onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+                      placeholder="e.g., New Books Added to Our Library!"
+                      className="bg-surface border-gold/30 text-[#FDFBF7]"
+                      required
+                      data-testid="email-subject"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-[#FDFBF7]">Email Message (HTML supported) *</Label>
+                    <Textarea
+                      value={emailForm.message}
+                      onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
+                      placeholder="Write your message here... You can use HTML tags like <strong>, <p>, <ul>, <li> for formatting."
+                      className="bg-surface border-gold/30 text-[#FDFBF7] min-h-[200px] font-mono text-sm"
+                      required
+                      data-testid="email-message"
+                    />
+                    <p className="text-xs text-[#B0C4BF] mt-1">
+                      Tip: Use &lt;strong&gt;text&lt;/strong&gt; for bold, &lt;p&gt;text&lt;/p&gt; for paragraphs
+                    </p>
+                  </div>
+
+                  {/* Preview */}
+                  {emailForm.message && (
+                    <div className="bg-[#082E26] rounded-lg p-4 border border-gold/20">
+                      <p className="text-xs text-gold mb-2">Preview:</p>
+                      <div className="bg-white rounded-lg p-4 text-gray-800">
+                        <h3 className="font-bold text-lg mb-2">{emailForm.subject || 'Email Subject'}</h3>
+                        <div 
+                          className="text-sm"
+                          dangerouslySetInnerHTML={{ __html: emailForm.message }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={emailSending || !emailForm.subject.trim() || !emailForm.message.trim()}
+                    className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                    data-testid="send-email-btn"
+                  >
+                    {emailSending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending to All Users...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Email to All Users
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </div>
+
+              {/* Email Tips */}
+              <div className="bg-[#082E26]/50 rounded-lg p-4 border border-gold/10">
+                <h3 className="text-[#FDFBF7] font-medium mb-2">📧 Email Best Practices</h3>
+                <ul className="text-sm text-[#B0C4BF] space-y-1">
+                  <li>• Emails include your logo and branded header automatically</li>
+                  <li>• Keep subject lines under 50 characters for best open rates</li>
+                  <li>• To set sender profile picture, configure it in Resend dashboard</li>
+                  <li>• Ensure domain SPF/DKIM/DMARC is configured to avoid spam folders</li>
+                </ul>
               </div>
             </div>
           </TabsContent>
