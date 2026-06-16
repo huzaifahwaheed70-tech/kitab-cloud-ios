@@ -8,6 +8,7 @@
     "@capacitor/browser": "7",
     "@capacitor/cli": "7",
     "@capacitor/core": "7",
+    "@capacitor/filesystem": "^8.1.2",
     "@capacitor/ios": "7",
     "@hookform/resolvers": "^5.0.1",
     "@onesignal/capacitor-plugin": "^1.0.5",

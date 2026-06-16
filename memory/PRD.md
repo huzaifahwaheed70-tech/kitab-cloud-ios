@@ -16,6 +16,7 @@
 - **Emails:** Resend
 - **Storage:** Emergent Object Storage
 - **Push Notifications:** OneSignal (react-onesignal + @onesignal/capacitor-plugin)
+- **File System (Native):** @capacitor/filesystem (PDF downloads)
 
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
@@ -34,6 +35,10 @@
 - [x] **Pre-checkout Discount Popup** (Web/Android only)
 - [x] **Admin Push Notifications via OneSignal**
 - [x] **RevenueCat Apple IAP for iOS Subscriptions** (Dec 2025)
+- [x] **Admin Test Purchases** (for PDFs and subscriptions without payment)
+- [x] **Monthly Reading List Locks** (enforced limits until new month)
+- [x] **Subscription Downgrades** via Settings
+- [x] **PDF Download to Device** (Capacitor Filesystem API for native apps)
 
 ## iOS App Store Compliance (CRITICAL)
 ### What's HIDDEN on iOS:
@@ -153,5 +158,16 @@
 - [ ] (P2) Reading statistics dashboard
 - [ ] Configure OneSignal dashboard for web push
 
+## Known Issues / User Verification Required
+### Resend Emails on Production
+- Preview environment is working correctly
+- Production may have missing `RESEND_API_KEY` or unverified domain
+- Admin can check config via: `GET /api/admin/email-config`
+- Admin can test via: `POST /api/admin/test-email?email=test@example.com`
+
+### Codemagic iOS Build
+- Using native `xcode-project` CLI to handle SPM + RevenueCat provisioning
+- User verification pending
+
 ---
-*Last updated: December 2025*
+*Last updated: June 2026*

@@ -145,6 +145,11 @@ async def send_welcome_email(email: str, name: str = None):
 
 async def send_verification_email(email: str, code: str):
     """Send email verification code"""
+    # Check if API key is configured
+    if not resend.api_key:
+        logger.error("RESEND_API_KEY not configured - cannot send verification email")
+        return False
+        
     try:
         params = {
             "from": RESEND_FROM_EMAIL,
@@ -173,11 +178,12 @@ async def send_verification_email(email: str, code: str):
             </div>
             """
         }
-        resend.Emails.send(params)
-        logger.info(f"Verification email sent to {email}")
+        logger.info(f"Attempting to send verification email to {email} from {RESEND_FROM_EMAIL}")
+        result = resend.Emails.send(params)
+        logger.info(f"Verification email sent to {email}, result: {result}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send verification email: {e}")
+        logger.error(f"Failed to send verification email to {email}: {type(e).__name__}: {str(e)}")
         return False
 
 
@@ -2141,6 +2147,40 @@ async def get_all_users(user: dict = Depends(get_admin_user)):
         {"_id": 0, "password_hash": 0}
     ).to_list(1000)
     return users
+
+
+@api_router.get("/admin/email-config")
+async def get_email_config(user: dict = Depends(get_admin_user)):
+    """Check email configuration status (admin only)"""
+    api_key_set = bool(resend.api_key)
+    api_key_preview = resend.api_key[:10] + "..." if resend.api_key else "NOT SET"
+    
+    return {
+        "resend_api_key_configured": api_key_set,
+        "api_key_preview": api_key_preview,
+        "from_email": RESEND_FROM_EMAIL,
+        "message": "Email configuration looks good!" if api_key_set else "RESEND_API_KEY is not configured in environment"
+    }
+
+@api_router.post("/admin/test-email")
+async def test_email_send(email: str, user: dict = Depends(get_admin_user)):
+    """Send a test email to verify Resend configuration (admin only)"""
+    if not resend.api_key:
+        raise HTTPException(status_code=500, detail="RESEND_API_KEY not configured")
+    
+    try:
+        params = {
+            "from": RESEND_FROM_EMAIL,
+            "to": [email],
+            "subject": "Test Email - Kitab Cloud Admin",
+            "html": "<p>This is a test email from Kitab Cloud to verify your email configuration is working.</p>"
+        }
+        result = resend.Emails.send(params)
+        return {"success": True, "message": f"Test email sent to {email}", "result": str(result)}
+    except Exception as e:
+        logger.error(f"Test email failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send test email: {type(e).__name__}: {str(e)}")
+
 
 
 @api_router.put("/admin/users/{user_id}/tier")

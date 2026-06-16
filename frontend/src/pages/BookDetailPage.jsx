@@ -11,7 +11,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { openPaymentUrl } from '../utils/browser';
-import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl, isIOSNativeApp } from '../utils/platform';
+import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl, isIOSNativeApp, isCapacitorApp } from '../utils/platform';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -427,42 +428,88 @@ const BookDetailPage = () => {
     }
   };
 
+  // Download PDF state
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  
   // Download PDF to device files
   const handleDownloadPdf = async () => {
-    if (!book?.pdf_url) {
-      toast.error('PDF not available');
+    if (!book?.pdf_url || !token) {
+      toast.error('PDF not available or please log in');
       return;
     }
     
+    setDownloadLoading(true);
+    toast.info('Preparing download...');
+    
     try {
-      toast.info('Starting download...');
+      // Fetch PDF through the authenticated API endpoint
+      const headers = { Authorization: `Bearer ${token}` };
+      const pdfResponse = await axios.get(`${API}/files/${book.pdf_url}`, {
+        headers,
+        withCredentials: true,
+        responseType: 'blob'
+      });
       
-      // For iOS/mobile, open in new tab which triggers native download
-      // For desktop, use direct download approach
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const pdfBlob = pdfResponse.data;
+      const fileName = `${book.title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.pdf`;
       
-      if (isIOS) {
-        // On iOS, opening the PDF URL in a new tab allows native sharing/saving
-        window.open(book.pdf_url, '_blank');
-        toast.success('PDF opened! Use the share button to save to Files.');
+      // Check if running in Capacitor native app
+      if (isCapacitorApp()) {
+        try {
+          // Convert blob to base64 for Capacitor Filesystem
+          const reader = new FileReader();
+          const base64Promise = new Promise((resolve, reject) => {
+            reader.onloadend = () => {
+              // Remove data:application/pdf;base64, prefix
+              const base64 = reader.result.split(',')[1];
+              resolve(base64);
+            };
+            reader.onerror = reject;
+          });
+          reader.readAsDataURL(pdfBlob);
+          const base64Data = await base64Promise;
+          
+          // Save to device Downloads/Documents folder
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Documents,
+            recursive: true
+          });
+          
+          toast.success(`PDF saved to Documents folder: ${fileName}`);
+          console.log('File saved at:', result.uri);
+        } catch (fsError) {
+          console.error('Filesystem error:', fsError);
+          // Fallback: open blob URL
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          window.open(blobUrl, '_blank');
+          toast.info('PDF opened. Use Share to save to Files.');
+        }
       } else {
-        // For desktop and Android, use anchor download
+        // Web browser - create download link
+        const blobUrl = URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
-        a.href = book.pdf_url;
-        a.download = `${book.title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.pdf`;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
+        a.href = blobUrl;
+        a.download = fileName;
+        a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
         toast.success('Download started!');
       }
     } catch (error) {
       console.error('Download error:', error);
-      // Fallback: just open in new tab
-      window.open(book.pdf_url, '_blank');
-      toast.info('PDF opened in new tab. Right-click to save.');
+      if (error.response?.status === 403) {
+        toast.error('Access denied. Please ensure you have purchased this PDF.');
+      } else if (error.response?.status === 401) {
+        toast.error('Please log in to download');
+      } else {
+        toast.error('Failed to download PDF. Please try again.');
+      }
+    } finally {
+      setDownloadLoading(false);
     }
   };
 
@@ -1024,11 +1071,21 @@ const BookDetailPage = () => {
                   <Button
                     size="lg"
                     onClick={handleDownloadPdf}
+                    disabled={downloadLoading}
                     className="bg-green-600 hover:bg-green-500 text-white"
                     data-testid="download-pdf-btn"
                   >
-                    <Download className="w-5 h-5 mr-2" />
-                    Download PDF
+                    {downloadLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5 mr-2" />
+                        Download PDF
+                      </>
+                    )}
                   </Button>
                 )}
 

@@ -25,6 +25,11 @@ export const isNativeApp = () => {
 };
 
 /**
+ * Alias for isNativeApp - checks if running in Capacitor
+ */
+export const isCapacitorApp = isNativeApp;
+
+/**
  * Check if external purchases (PDF, physical books) should be hidden
  * Returns true for iOS native app - these purchases are NOT allowed on iOS
  * Subscriptions use RevenueCat IAP instead
