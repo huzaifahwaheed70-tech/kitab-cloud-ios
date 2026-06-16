@@ -169,5 +169,10 @@
 - Using native `xcode-project` CLI to handle SPM + RevenueCat provisioning
 - User verification pending
 
+### Tier 1 Book Limit Showing 15 Instead of 10 (Production)
+- Preview API correctly returns `limit: 10` for Tier 1
+- If production shows 15, check Admin Dashboard → Tier Settings
+- Custom tier settings may have been saved with different values
+
 ---
 *Last updated: June 2026*
