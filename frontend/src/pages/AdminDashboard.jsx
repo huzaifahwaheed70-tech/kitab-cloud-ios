@@ -324,8 +324,14 @@ const AdminDashboard = () => {
   // Send Custom Email Campaign
   const handleSendCustomEmail = async (e) => {
     e.preventDefault();
-    if (!emailForm.subject.trim() || !emailForm.message.trim()) {
-      toast.error('Please enter both subject and message');
+    
+    // Validate form
+    if (!emailForm.subject || !emailForm.subject.trim()) {
+      toast.error('Please enter an email subject');
+      return;
+    }
+    if (!emailForm.message || !emailForm.message.trim()) {
+      toast.error('Please enter an email message');
       return;
     }
     
@@ -340,33 +346,45 @@ const AdminDashboard = () => {
       tier_4: 'Premium tier users'
     };
     
-    if (!window.confirm(`This will send the email to ${targetCount} ${targetNames[emailForm.target]}. Are you sure?`)) {
+    const confirmMessage = `This will send the email to ${targetCount} ${targetNames[emailForm.target] || 'users'}. Are you sure?`;
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     
     setEmailSending(true);
     try {
+      const payload = {
+        subject: emailForm.subject.trim(),
+        message: emailForm.message.trim(),
+        target: emailForm.target || 'all'
+      };
+      
+      // Only add button fields if both are provided
+      if (emailForm.buttonText && emailForm.buttonText.trim() && emailForm.buttonUrl && emailForm.buttonUrl.trim()) {
+        payload.button_text = emailForm.buttonText.trim();
+        payload.button_url = emailForm.buttonUrl.trim();
+      }
+      
+      console.log('Sending email with payload:', payload);
+      
       const response = await axios.post(
         `${API}/admin/send-announcement`,
-        {
-          subject: emailForm.subject,
-          message: emailForm.message,
-          target: emailForm.target,
-          button_text: emailForm.buttonText || null,
-          button_url: emailForm.buttonUrl || null
-        },
+        payload,
         { headers, withCredentials: true }
       );
       
+      console.log('Email response:', response.data);
       toast.success(`${response.data.message}`);
       if (response.data.fail_count > 0) {
         toast.warning(`${response.data.fail_count} emails failed to send`);
       }
       setEmailForm({ subject: '', message: '', target: 'all', buttonText: '', buttonUrl: '' });
-      fetchEmailStats(); // Refresh stats
+      fetchEmailStats();
     } catch (error) {
       console.error('Error sending email:', error);
-      toast.error(error.response?.data?.detail || 'Failed to send email');
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to send email';
+      toast.error(errorMessage);
     } finally {
       setEmailSending(false);
     }
@@ -1562,48 +1580,6 @@ const AdminDashboard = () => {
           {/* Emails Tab */}
           <TabsContent value="emails">
             <div className="max-w-4xl space-y-8">
-              {/* Price Drop Announcement */}
-              <div className="glass-card rounded-lg p-6 border border-gold/30">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <Megaphone className="w-5 h-5 text-green-400" />
-                  </div>
-                  <div>
-                    <h2 className="font-serif text-xl text-[#FDFBF7]">Price Drop Announcement</h2>
-                    <p className="text-[#B0C4BF] text-sm">Send the pre-made price reduction announcement to all users</p>
-                  </div>
-                </div>
-
-                <div className="bg-[#082E26] rounded-lg p-4 border border-gold/20 mb-4">
-                  <p className="text-sm text-[#B0C4BF] mb-2">This will send an email announcing:</p>
-                  <ul className="text-sm text-[#FDFBF7] space-y-1">
-                    <li>• Basic: <span className="text-gold font-bold">$8.95/mo</span></li>
-                    <li>• Standard: <span className="text-gold font-bold">$14.95/mo</span></li>
-                    <li>• Advanced: <span className="text-gold font-bold">$29.95/mo</span></li>
-                    <li>• Premium: <span className="text-gold font-bold">$44.95/mo</span></li>
-                  </ul>
-                </div>
-
-                <Button
-                  onClick={handleSendPriceDropEmail}
-                  disabled={priceDropSending}
-                  className="w-full bg-green-600 hover:bg-green-500 text-white"
-                  data-testid="send-price-drop-btn"
-                >
-                  {priceDropSending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending to All Users...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Price Drop Announcement to All Users
-                    </>
-                  )}
-                </Button>
-              </div>
-
               {/* Custom Email Campaign */}
               <div className="glass-card rounded-lg p-6 border border-gold/30">
                 <div className="flex items-center gap-3 mb-6">
@@ -1611,7 +1587,7 @@ const AdminDashboard = () => {
                     <Mail className="w-5 h-5 text-gold" />
                   </div>
                   <div>
-                    <h2 className="font-serif text-xl text-[#FDFBF7]">Custom Email Campaign</h2>
+                    <h2 className="font-serif text-xl text-[#FDFBF7]">Email Campaign</h2>
                     <p className="text-[#B0C4BF] text-sm">Create and send targeted emails to specific user groups</p>
                   </div>
                 </div>
