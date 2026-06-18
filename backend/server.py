@@ -2194,31 +2194,68 @@ async def test_email_send(email: str, user: dict = Depends(get_admin_user)):
         raise HTTPException(status_code=500, detail=f"Failed to send test email: {type(e).__name__}: {str(e)}")
 
 
+class EmailCampaignRequest(BaseModel):
+    subject: str
+    message: str
+    target: str = "all"  # all, unsubscribed, subscribed, tier_1, tier_2, tier_3, tier_4
+    button_text: Optional[str] = None
+    button_url: Optional[str] = None
+
+
 @api_router.post("/admin/send-announcement")
 async def send_announcement_email(
-    subject: str,
-    message: str,
+    request: EmailCampaignRequest,
     admin: dict = Depends(get_admin_user)
 ):
-    """Send an announcement email to all registered users (admin only)"""
+    """Send an announcement email to targeted users (admin only)"""
     if not resend.api_key:
         raise HTTPException(status_code=500, detail="RESEND_API_KEY not configured")
     
-    # Get all non-guest users with valid emails
-    users = await db.users.find(
-        {"$and": [
+    # Build query based on target
+    base_query = {
+        "$and": [
             {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
             {"email": {"$exists": True, "$ne": None, "$ne": ""}}
-        ]},
+        ]
+    }
+    
+    target_description = "all users"
+    
+    if request.target == "unsubscribed":
+        base_query["$and"].append({"$or": [{"subscription_tier": 0}, {"subscription_tier": {"$exists": False}}]})
+        target_description = "unsubscribed users"
+    elif request.target == "subscribed":
+        base_query["$and"].append({"subscription_tier": {"$gte": 1}})
+        target_description = "subscribed users"
+    elif request.target.startswith("tier_"):
+        tier = int(request.target.split("_")[1])
+        base_query["$and"].append({"subscription_tier": tier})
+        tier_names = {1: "Basic", 2: "Standard", 3: "Advanced", 4: "Premium"}
+        target_description = f"Tier {tier} ({tier_names.get(tier, 'Unknown')}) users"
+    
+    # Get targeted users
+    users = await db.users.find(
+        base_query,
         {"email": 1, "name": 1, "_id": 0}
     ).to_list(10000)
     
     if not users:
-        raise HTTPException(status_code=404, detail="No users found to email")
+        raise HTTPException(status_code=404, detail=f"No {target_description} found to email")
     
     success_count = 0
     fail_count = 0
     failed_emails = []
+    
+    # Build button HTML if provided
+    button_html = ""
+    if request.button_text and request.button_url:
+        button_html = f'''
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{request.button_url}" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                {request.button_text}
+            </a>
+        </div>
+        '''
     
     for user in users:
         try:
@@ -2226,20 +2263,16 @@ async def send_announcement_email(
             params = {
                 "from": RESEND_FROM_EMAIL,
                 "to": [user["email"]],
-                "subject": subject,
+                "subject": request.subject,
                 "html": f"""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #02120F; color: #FDFBF7;">
                     {get_email_header()}
                     <div style="padding: 30px 0;">
                         <h2 style="color: #FDFBF7;">Assalamu Alaikum {user_name}!</h2>
                         <div style="color: #B0C4BF; line-height: 1.8;">
-                            {message}
+                            {request.message}
                         </div>
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="https://kitab-cloud.emergent.host/pricing" style="background-color: #D4AF37; color: #02120F; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
-                                View New Pricing
-                            </a>
-                        </div>
+                        {button_html}
                     </div>
                     {get_email_footer()}
                 </div>
@@ -2254,10 +2287,52 @@ async def send_announcement_email(
             logger.error(f"Failed to send announcement to {user['email']}: {e}")
     
     return {
-        "message": f"Announcement sent to {success_count} users",
+        "message": f"Announcement sent to {success_count} {target_description}",
         "success_count": success_count,
         "fail_count": fail_count,
-        "failed_emails": failed_emails[:10] if failed_emails else []  # Only show first 10 failures
+        "total_targeted": len(users),
+        "target": request.target,
+        "failed_emails": failed_emails[:10] if failed_emails else []
+    }
+
+
+@api_router.get("/admin/email-stats")
+async def get_email_stats(admin: dict = Depends(get_admin_user)):
+    """Get user counts for email targeting"""
+    # Count users by category
+    total = await db.users.count_documents({
+        "$and": [
+            {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
+            {"email": {"$exists": True, "$ne": None, "$ne": ""}}
+        ]
+    })
+    
+    unsubscribed = await db.users.count_documents({
+        "$and": [
+            {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
+            {"email": {"$exists": True, "$ne": None, "$ne": ""}},
+            {"$or": [{"subscription_tier": 0}, {"subscription_tier": {"$exists": False}}]}
+        ]
+    })
+    
+    tier_counts = {}
+    for tier in [1, 2, 3, 4]:
+        count = await db.users.count_documents({
+            "$and": [
+                {"$or": [{"is_guest": {"$ne": True}}, {"is_guest": {"$exists": False}}]},
+                {"email": {"$exists": True, "$ne": None, "$ne": ""}},
+                {"subscription_tier": tier}
+            ]
+        })
+        tier_counts[f"tier_{tier}"] = count
+    
+    subscribed = sum(tier_counts.values())
+    
+    return {
+        "all": total,
+        "unsubscribed": unsubscribed,
+        "subscribed": subscribed,
+        **tier_counts
     }
 
 

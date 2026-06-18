@@ -84,10 +84,14 @@ const AdminDashboard = () => {
   // Email Campaign State
   const [emailForm, setEmailForm] = useState({
     subject: '',
-    message: ''
+    message: '',
+    target: 'all',
+    buttonText: '',
+    buttonUrl: ''
   });
   const [emailSending, setEmailSending] = useState(false);
   const [priceDropSending, setPriceDropSending] = useState(false);
+  const [emailStats, setEmailStats] = useState(null);
 
   // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -228,6 +232,12 @@ const AdminDashboard = () => {
     }
   }, [activeTab, token]);
 
+  useEffect(() => {
+    if (activeTab === 'emails' && token) {
+      fetchEmailStats();
+    }
+  }, [activeTab, token]);
+
   const fetchNotificationHistory = async () => {
     setNotificationHistoryLoading(true);
     try {
@@ -301,6 +311,16 @@ const AdminDashboard = () => {
     }
   };
 
+  // Fetch email stats for targeting
+  const fetchEmailStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/email-stats`, { headers, withCredentials: true });
+      setEmailStats(response.data);
+    } catch (error) {
+      console.error('Error fetching email stats:', error);
+    }
+  };
+
   // Send Custom Email Campaign
   const handleSendCustomEmail = async (e) => {
     e.preventDefault();
@@ -309,7 +329,18 @@ const AdminDashboard = () => {
       return;
     }
     
-    if (!window.confirm('This will send the email to ALL registered users. Are you sure?')) {
+    const targetCount = emailStats ? emailStats[emailForm.target] : 'unknown';
+    const targetNames = {
+      all: 'all users',
+      unsubscribed: 'unsubscribed users',
+      subscribed: 'subscribed users',
+      tier_1: 'Basic tier users',
+      tier_2: 'Standard tier users',
+      tier_3: 'Advanced tier users',
+      tier_4: 'Premium tier users'
+    };
+    
+    if (!window.confirm(`This will send the email to ${targetCount} ${targetNames[emailForm.target]}. Are you sure?`)) {
       return;
     }
     
@@ -317,22 +348,22 @@ const AdminDashboard = () => {
     try {
       const response = await axios.post(
         `${API}/admin/send-announcement`,
-        null,
-        { 
-          headers, 
-          withCredentials: true,
-          params: {
-            subject: emailForm.subject,
-            message: emailForm.message
-          }
-        }
+        {
+          subject: emailForm.subject,
+          message: emailForm.message,
+          target: emailForm.target,
+          button_text: emailForm.buttonText || null,
+          button_url: emailForm.buttonUrl || null
+        },
+        { headers, withCredentials: true }
       );
       
       toast.success(`${response.data.message}`);
       if (response.data.fail_count > 0) {
         toast.warning(`${response.data.fail_count} emails failed to send`);
       }
-      setEmailForm({ subject: '', message: '' });
+      setEmailForm({ subject: '', message: '', target: 'all', buttonText: '', buttonUrl: '' });
+      fetchEmailStats(); // Refresh stats
     } catch (error) {
       console.error('Error sending email:', error);
       toast.error(error.response?.data?.detail || 'Failed to send email');
@@ -1581,11 +1612,54 @@ const AdminDashboard = () => {
                   </div>
                   <div>
                     <h2 className="font-serif text-xl text-[#FDFBF7]">Custom Email Campaign</h2>
-                    <p className="text-[#B0C4BF] text-sm">Create and send a custom email to all registered users</p>
+                    <p className="text-[#B0C4BF] text-sm">Create and send targeted emails to specific user groups</p>
                   </div>
                 </div>
 
+                {/* User Stats */}
+                {emailStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    <div className="bg-[#082E26] rounded-lg p-3 border border-gold/10 text-center">
+                      <p className="text-2xl font-bold text-gold">{emailStats.all}</p>
+                      <p className="text-xs text-[#B0C4BF]">Total Users</p>
+                    </div>
+                    <div className="bg-[#082E26] rounded-lg p-3 border border-gold/10 text-center">
+                      <p className="text-2xl font-bold text-orange-400">{emailStats.unsubscribed}</p>
+                      <p className="text-xs text-[#B0C4BF]">Unsubscribed</p>
+                    </div>
+                    <div className="bg-[#082E26] rounded-lg p-3 border border-gold/10 text-center">
+                      <p className="text-2xl font-bold text-green-400">{emailStats.subscribed}</p>
+                      <p className="text-xs text-[#B0C4BF]">Subscribed</p>
+                    </div>
+                    <div className="bg-[#082E26] rounded-lg p-3 border border-gold/10 text-center">
+                      <p className="text-lg font-bold text-[#FDFBF7]">
+                        {emailStats.tier_1}/{emailStats.tier_2}/{emailStats.tier_3}/{emailStats.tier_4}
+                      </p>
+                      <p className="text-xs text-[#B0C4BF]">By Tier (1/2/3/4)</p>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleSendCustomEmail} className="space-y-4">
+                  {/* Target Audience */}
+                  <div>
+                    <Label className="text-[#FDFBF7]">Target Audience *</Label>
+                    <select
+                      value={emailForm.target}
+                      onChange={(e) => setEmailForm({ ...emailForm, target: e.target.value })}
+                      className="w-full px-3 py-2 bg-surface border border-gold/30 rounded-md text-[#FDFBF7] focus:outline-none focus:ring-2 focus:ring-gold/50"
+                      data-testid="email-target"
+                    >
+                      <option value="all">All Users ({emailStats?.all || '...'})</option>
+                      <option value="unsubscribed">Unsubscribed Only ({emailStats?.unsubscribed || '...'})</option>
+                      <option value="subscribed">All Subscribed ({emailStats?.subscribed || '...'})</option>
+                      <option value="tier_1">Tier 1 - Basic ({emailStats?.tier_1 || '...'})</option>
+                      <option value="tier_2">Tier 2 - Standard ({emailStats?.tier_2 || '...'})</option>
+                      <option value="tier_3">Tier 3 - Advanced ({emailStats?.tier_3 || '...'})</option>
+                      <option value="tier_4">Tier 4 - Premium ({emailStats?.tier_4 || '...'})</option>
+                    </select>
+                  </div>
+
                   <div>
                     <Label className="text-[#FDFBF7]">Email Subject *</Label>
                     <Input
@@ -1604,13 +1678,40 @@ const AdminDashboard = () => {
                       value={emailForm.message}
                       onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
                       placeholder="Write your message here... You can use HTML tags like <strong>, <p>, <ul>, <li> for formatting."
-                      className="bg-surface border-gold/30 text-[#FDFBF7] min-h-[200px] font-mono text-sm"
+                      className="bg-surface border-gold/30 text-[#FDFBF7] min-h-[150px] font-mono text-sm"
                       required
                       data-testid="email-message"
                     />
                     <p className="text-xs text-[#B0C4BF] mt-1">
                       Tip: Use &lt;strong&gt;text&lt;/strong&gt; for bold, &lt;p&gt;text&lt;/p&gt; for paragraphs
                     </p>
+                  </div>
+
+                  {/* Optional Call-to-Action Button */}
+                  <div className="border border-gold/20 rounded-lg p-4 bg-[#082E26]/50">
+                    <p className="text-sm text-[#FDFBF7] mb-3">Optional: Add a call-to-action button</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-[#B0C4BF] text-xs">Button Text</Label>
+                        <Input
+                          value={emailForm.buttonText}
+                          onChange={(e) => setEmailForm({ ...emailForm, buttonText: e.target.value })}
+                          placeholder="e.g., Subscribe Now"
+                          className="bg-surface border-gold/30 text-[#FDFBF7]"
+                          data-testid="email-btn-text"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[#B0C4BF] text-xs">Button URL</Label>
+                        <Input
+                          value={emailForm.buttonUrl}
+                          onChange={(e) => setEmailForm({ ...emailForm, buttonUrl: e.target.value })}
+                          placeholder="https://kitab-cloud.emergent.host/pricing"
+                          className="bg-surface border-gold/30 text-[#FDFBF7]"
+                          data-testid="email-btn-url"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Preview */}
@@ -1623,6 +1724,13 @@ const AdminDashboard = () => {
                           className="text-sm"
                           dangerouslySetInnerHTML={{ __html: emailForm.message }}
                         />
+                        {emailForm.buttonText && emailForm.buttonUrl && (
+                          <div className="mt-4 text-center">
+                            <span className="inline-block bg-amber-500 text-black px-4 py-2 rounded font-bold">
+                              {emailForm.buttonText}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1636,12 +1744,15 @@ const AdminDashboard = () => {
                     {emailSending ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending to All Users...
+                        Sending...
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4 mr-2" />
-                        Send Email to All Users
+                        Send Email to {emailForm.target === 'all' ? 'All Users' : 
+                          emailForm.target === 'unsubscribed' ? 'Unsubscribed Users' :
+                          emailForm.target === 'subscribed' ? 'Subscribed Users' :
+                          `Tier ${emailForm.target.split('_')[1]} Users`}
                       </>
                     )}
                   </Button>
