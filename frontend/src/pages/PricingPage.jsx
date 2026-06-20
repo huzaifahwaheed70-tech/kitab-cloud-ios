@@ -788,7 +788,10 @@ const PricingPage = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <img src="/logo.png" alt="Kitab Cloud" className="w-8 h-8 rounded-sm object-cover" />
-              <span className="font-serif text-lg text-[#FDFBF7]">Dar-Us-Salam Kitab Cloud</span>
+              <div className="flex flex-col">
+                <span className="font-serif text-lg text-[#FDFBF7] leading-tight">Kitab Cloud</span>
+                <span className="text-[10px] text-[#B0C4BF] leading-tight">By Dar-Us-Salam.com</span>
+              </div>
             </div>
             <div className="flex items-center gap-6">
               <Link to="/privacy" className="text-[#B0C4BF] hover:text-gold text-sm transition-colors">

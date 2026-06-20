@@ -114,7 +114,10 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 md:gap-3 min-h-[44px]" data-testid="nav-logo">
             <img src="/logo.png" alt="Kitab Cloud" className="w-9 h-9 md:w-10 md:h-10 rounded-sm object-cover" />
-            <span className="font-serif text-lg md:text-xl font-semibold text-[#FDFBF7]">Kitab Cloud</span>
+            <div className="flex flex-col">
+              <span className="font-serif text-lg md:text-xl font-semibold text-[#FDFBF7] leading-tight">Kitab Cloud</span>
+              <span className="text-[10px] md:text-xs text-[#B0C4BF] leading-tight">By Dar-Us-Salam.com</span>
+            </div>
           </Link>
           
           <div className="flex items-center gap-2 md:gap-4">
@@ -374,7 +377,10 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Kitab Cloud" className="w-8 h-8 rounded-sm object-cover" />
-            <span className="font-serif text-[#FDFBF7]">Kitab Cloud</span>
+            <div className="flex flex-col">
+              <span className="font-serif text-[#FDFBF7] leading-tight">Kitab Cloud</span>
+              <span className="text-[10px] text-[#B0C4BF] leading-tight">By Dar-Us-Salam.com</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="text-sm text-[#B0C4BF] hover:text-gold transition-colors">

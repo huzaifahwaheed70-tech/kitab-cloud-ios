@@ -10,8 +10,7 @@ const PrivacyPolicyPage = () => {
       <header className="bg-surface border-b border-[rgba(212,175,55,0.2)] sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <Logo size="sm" />
-            <span className="font-serif text-xl text-[#FDFBF7]">Kitab Cloud</span>
+            <Logo size="sm" showTagline={true} linkTo={null} />
           </Link>
           <Link 
             to="/"

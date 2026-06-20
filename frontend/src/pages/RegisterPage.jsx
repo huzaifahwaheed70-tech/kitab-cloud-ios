@@ -244,7 +244,7 @@ const RegisterPage = () => {
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <Logo className="mb-12" testId="register-logo" />
+          <Logo className="mb-12" showTagline={true} testId="register-logo" />
 
           <h1 className="font-serif text-4xl font-bold text-[#FDFBF7] mb-2">Create Account</h1>
           <p className="text-[#B0C4BF] mb-8">Join our community of learners</p>
