@@ -53,6 +53,7 @@ const SettingsPage = () => {
   // Google linking
   const [linkingGoogle, setLinkingGoogle] = useState(false);
   const [unlinkingGoogle, setUnlinkingGoogle] = useState(false);
+  const [googleLinkProcessed, setGoogleLinkProcessed] = useState(false);
   
   // Cancel subscription dialog
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -179,40 +180,61 @@ const SettingsPage = () => {
     }
   };
 
-  // Process Google link callback
+  // Process Google link callback - ONLY when returning from OAuth
   useEffect(() => {
     const processGoogleLink = async () => {
+      // Prevent processing multiple times
+      if (googleLinkProcessed) return;
+      
       const params = new URLSearchParams(location.search);
       const hash = window.location.hash;
       
-      // Check if we're returning from Google OAuth for linking
-      if (params.get('link_google') === 'true' && hash.includes('session_id=')) {
-        const hashParams = new URLSearchParams(hash.replace('#', ''));
-        const sessionId = hashParams.get('session_id');
-        
-        if (sessionId && token) {
-          try {
-            const authHeaders = { Authorization: `Bearer ${token}` };
-            const response = await axios.post(`${API}/auth/google/link`, 
-              { session_id: sessionId },
-              { headers: authHeaders, withCredentials: true }
-            );
-            toast.success('Google account linked successfully!');
-            fetchProfile();
-          } catch (error) {
-            toast.error(error.response?.data?.detail || 'Failed to link Google account');
-          }
-          
-          // Clear URL params
+      // CRITICAL: Only process if BOTH conditions are met:
+      // 1. link_google=true is in the query string (we initiated the link)
+      // 2. session_id is in the hash (Google OAuth completed)
+      const hasLinkFlag = params.get('link_google') === 'true';
+      const hasSessionId = hash.includes('session_id=');
+      
+      if (!hasLinkFlag || !hasSessionId) {
+        // If we have link_google but no session_id, user might have cancelled OAuth
+        // Clear the URL to prevent issues
+        if (hasLinkFlag && !hasSessionId) {
           window.history.replaceState(null, '', '/settings');
         }
+        return;
+      }
+      
+      const hashParams = new URLSearchParams(hash.replace('#', ''));
+      const sessionId = hashParams.get('session_id');
+      
+      if (!sessionId || !token) {
+        window.history.replaceState(null, '', '/settings');
+        return;
+      }
+      
+      // Mark as processed to prevent duplicate calls
+      setGoogleLinkProcessed(true);
+      
+      // Clear URL FIRST before making API call
+      window.history.replaceState(null, '', '/settings');
+      
+      try {
+        const authHeaders = { Authorization: `Bearer ${token}` };
+        await axios.post(`${API}/auth/google/link`, 
+          { session_id: sessionId },
+          { headers: authHeaders, withCredentials: true }
+        );
+        toast.success('Google account linked successfully!');
+        fetchProfile();
+      } catch (error) {
+        toast.error(error.response?.data?.detail || 'Failed to link Google account');
       }
     };
     
-    if (token) {
+    if (token && !googleLinkProcessed) {
       processGoogleLink();
     }
-  }, [location, token]);
+  }, [location, token, googleLinkProcessed]);
 
   useEffect(() => {
     // Fetch profile when user/token are available
