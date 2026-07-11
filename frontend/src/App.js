@@ -188,7 +188,11 @@ const AppRouter = () => {
   
   // CRITICAL: Check URL hash for session_id during render (NOT in useEffect)
   // This synchronous check prevents race conditions by processing OAuth callback FIRST
-  if (location.hash?.includes('session_id=')) {
+  // HOWEVER: Skip if this is a Google Link callback (link_google=true in query)
+  // The Settings page handles its own linking flow
+  const isGoogleLinkCallback = location.search?.includes('link_google=true');
+  
+  if (location.hash?.includes('session_id=') && !isGoogleLinkCallback) {
     return <AuthCallback />;
   }
   
