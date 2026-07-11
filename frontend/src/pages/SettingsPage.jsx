@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   User, ArrowLeft, Mail, Lock, CreditCard, AlertTriangle,
-  CheckCircle, XCircle, Calendar, Library, Crown, Trash2, Camera, Loader2, Info, ShoppingBag
+  CheckCircle, XCircle, Calendar, Library, Crown, Trash2, Camera, Loader2, Info, ShoppingBag, Link2, Unlink
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -19,9 +19,20 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 
+// Google Icon SVG Component
+const GoogleIcon = ({ className = "w-5 h-5" }) => (
+  <svg viewBox="0 0 24 24" className={className}>
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+  </svg>
+);
+
 const SettingsPage = () => {
   const { user, token, loading: authLoading, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
@@ -38,6 +49,10 @@ const SettingsPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  
+  // Google linking
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
+  const [unlinkingGoogle, setUnlinkingGoogle] = useState(false);
   
   // Cancel subscription dialog
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -138,6 +153,66 @@ const SettingsPage = () => {
       setUploadingPicture(false);
     }
   };
+
+  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+  const handleLinkGoogle = () => {
+    setLinkingGoogle(true);
+    // Redirect to Google OAuth, then back to settings with link_google flag
+    const redirectUrl = window.location.origin + '/settings?link_google=true';
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  const handleUnlinkGoogle = async () => {
+    setUnlinkingGoogle(true);
+    try {
+      const authHeaders = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API}/auth/google/unlink`, {}, {
+        headers: authHeaders,
+        withCredentials: true
+      });
+      toast.success('Google account unlinked');
+      fetchProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to unlink Google account');
+    } finally {
+      setUnlinkingGoogle(false);
+    }
+  };
+
+  // Process Google link callback
+  useEffect(() => {
+    const processGoogleLink = async () => {
+      const params = new URLSearchParams(location.search);
+      const hash = window.location.hash;
+      
+      // Check if we're returning from Google OAuth for linking
+      if (params.get('link_google') === 'true' && hash.includes('session_id=')) {
+        const hashParams = new URLSearchParams(hash.replace('#', ''));
+        const sessionId = hashParams.get('session_id');
+        
+        if (sessionId && token) {
+          try {
+            const authHeaders = { Authorization: `Bearer ${token}` };
+            const response = await axios.post(`${API}/auth/google/link`, 
+              { session_id: sessionId },
+              { headers: authHeaders, withCredentials: true }
+            );
+            toast.success('Google account linked successfully!');
+            fetchProfile();
+          } catch (error) {
+            toast.error(error.response?.data?.detail || 'Failed to link Google account');
+          }
+          
+          // Clear URL params
+          window.history.replaceState(null, '', '/settings');
+        }
+      }
+    };
+    
+    if (token) {
+      processGoogleLink();
+    }
+  }, [location, token]);
 
   useEffect(() => {
     // Fetch profile when user/token are available
@@ -501,13 +576,75 @@ const SettingsPage = () => {
 
         {/* Security Tab */}
         {activeTab === 'security' && (
-          <div className="glass-card rounded-sm p-6">
-            <h2 className="font-serif text-xl text-[#FDFBF7] mb-6">Change Password</h2>
+          <div className="space-y-6">
+            {/* Google Account Linking */}
+            <div className="glass-card rounded-xl p-6">
+              <h2 className="font-serif text-xl text-[#FDFBF7] mb-6 flex items-center gap-2">
+                <GoogleIcon className="w-5 h-5" />
+                Google Account
+              </h2>
+              
+              {profile?.google_linked ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[#FDFBF7] font-medium">Google Account Linked</p>
+                      <p className="text-sm text-[#B0C4BF]">
+                        You can sign in with Google for faster access
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {profile?.has_password && (
+                    <Button
+                      onClick={handleUnlinkGoogle}
+                      disabled={unlinkingGoogle}
+                      variant="outline"
+                      className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      data-testid="unlink-google-btn"
+                    >
+                      <Unlink className="w-4 h-4 mr-2" />
+                      {unlinkingGoogle ? 'Unlinking...' : 'Unlink Google Account'}
+                    </Button>
+                  )}
+                  
+                  {!profile?.has_password && (
+                    <p className="text-sm text-[#B0C4BF] bg-[#082E26] rounded-lg p-3">
+                      To unlink Google, please set a password first in the section below.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-[#B0C4BF]">
+                    Link your Google account for faster sign-in. You can use either your password or Google to log in.
+                  </p>
+                  <Button
+                    onClick={handleLinkGoogle}
+                    disabled={linkingGoogle}
+                    variant="outline"
+                    className="border-[rgba(212,175,55,0.3)] text-[#FDFBF7] hover:bg-[#082E26]"
+                    data-testid="link-google-btn"
+                  >
+                    <GoogleIcon className="w-5 h-5 mr-2" />
+                    {linkingGoogle ? 'Redirecting...' : 'Link Google Account'}
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            {/* Change Password */}
+            <div className="glass-card rounded-xl p-6">
+              <h2 className="font-serif text-xl text-[#FDFBF7] mb-6 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-gold" />
+                Password
+              </h2>
             
             {!profile?.has_password ? (
-              <div className="flex items-center gap-3 text-[#B0C4BF] bg-[#082E26] rounded-sm p-4">
+              <div className="flex items-center gap-3 text-[#B0C4BF] bg-[#082E26] rounded-lg p-4">
                 <Mail className="w-5 h-5 text-gold" />
-                <p>You signed in with Google. Password changes are managed through your Google account.</p>
+                <p>You signed in with Google. To set a password, use the "Forgot Password" flow on the login page.</p>
               </div>
             ) : (
               <form onSubmit={handleChangePassword} className="space-y-4">
@@ -560,6 +697,7 @@ const SettingsPage = () => {
                 </div>
               </form>
             )}
+            </div>
           </div>
         )}
 

@@ -1011,6 +1011,93 @@ async def google_auth_session(request: GoogleSessionRequest):
         raise HTTPException(status_code=500, detail="Authentication failed")
 
 
+@api_router.post("/auth/google/link")
+async def link_google_account(request: GoogleSessionRequest, user: dict = Depends(get_current_user)):
+    """Link Google account to existing user account"""
+    try:
+        # Call Emergent Auth to get session data
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": request.session_id},
+                timeout=30
+            )
+        
+        if response.status_code != 200:
+            logger.error(f"Google link failed: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        session_data = response.json()
+        google_email = session_data.get("email")
+        google_picture = session_data.get("picture")
+        
+        if not google_email:
+            raise HTTPException(status_code=400, detail="No email in Google session")
+        
+        # Check if Google email is already linked to another account
+        existing_google_user = await db.users.find_one(
+            {"email": google_email, "user_id": {"$ne": user["user_id"]}},
+            {"_id": 0}
+        )
+        if existing_google_user:
+            raise HTTPException(
+                status_code=400, 
+                detail="This Google account is already linked to another user"
+            )
+        
+        # Update current user with Google link
+        update_data = {
+            "google_linked": True,
+            "google_email": google_email
+        }
+        
+        # Optionally update profile picture if user doesn't have one
+        current_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        if not current_user.get("picture") and google_picture:
+            update_data["picture"] = google_picture
+        
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": update_data}
+        )
+        
+        logger.info(f"Google account linked for user: {user['email']} -> {google_email}")
+        return {
+            "message": "Google account linked successfully",
+            "google_email": google_email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google link error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to link Google account")
+
+
+@api_router.post("/auth/google/unlink")
+async def unlink_google_account(user: dict = Depends(get_current_user)):
+    """Unlink Google account from user account"""
+    # Check if user has a password - can't unlink if Google is the only auth method
+    current_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    
+    if not current_user.get("google_linked"):
+        raise HTTPException(status_code=400, detail="No Google account linked")
+    
+    if not current_user.get("password_hash"):
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot unlink Google - please set a password first"
+        )
+    
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$unset": {"google_linked": "", "google_email": ""}}
+    )
+    
+    logger.info(f"Google account unlinked for user: {user['email']}")
+    return {"message": "Google account unlinked successfully"}
+
+
 # Books Routes
 @api_router.get("/books", response_model=List[BookResponse])
 async def get_books(
@@ -3218,6 +3305,7 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
     return {
         **user_data,
         "has_password": has_password,
+        "google_linked": full_user_data.get("google_linked", False),
         "tier_info": tier_info,
         "subscription_start": subscription_start,
         "subscription_end": subscription_end,

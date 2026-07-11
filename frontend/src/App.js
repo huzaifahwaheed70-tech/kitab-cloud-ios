@@ -31,6 +31,13 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import AuthCallback from './pages/AuthCallback';
+import MobileWelcomeScreen from './pages/MobileWelcomeScreen';
+
+// Platform detection
+import { isCapacitorApp } from './utils/platform';
+
+// Components
+import { BookSpinner } from './components/BookLoader';
 
 // HARDCODED production URL for iOS Capacitor builds
 // Codemagic env vars may not be injected properly during React build
@@ -158,7 +165,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+        <BookSpinner size="lg" />
       </div>
     );
   }
@@ -177,6 +184,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 // App Router Component
 const AppRouter = () => {
   const location = useLocation();
+  const { user } = useAuth();
   
   // CRITICAL: Check URL hash for session_id during render (NOT in useEffect)
   // This synchronous check prevents race conditions by processing OAuth callback FIRST
@@ -184,9 +192,30 @@ const AppRouter = () => {
     return <AuthCallback />;
   }
   
+  // Determine home page based on platform and auth state
+  // - Capacitor app + not logged in = Mobile Welcome Screen
+  // - Capacitor app + logged in = Redirect to library
+  // - Web = Landing Page
+  const getHomePage = () => {
+    const isMobile = isCapacitorApp();
+    
+    if (isMobile) {
+      // If user is logged in on mobile, redirect to library
+      if (user) {
+        return <Navigate to="/library" replace />;
+      }
+      // Show mobile welcome screen for non-logged-in users
+      return <MobileWelcomeScreen />;
+    }
+    
+    // Web users see the landing page
+    return <LandingPage />;
+  };
+  
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={getHomePage()} />
+      <Route path="/welcome" element={<MobileWelcomeScreen />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
