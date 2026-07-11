@@ -509,6 +509,9 @@ class BookCreate(BaseModel):
     original_price: Optional[float] = None  # Original book price
     pdf_price: Optional[float] = None  # Price to buy PDF
     purchase_link: Optional[str] = None  # Link to buy physical book from Dar-Us-Salam
+    file_type: str = "pdf"  # 'pdf' or 'docx'
+    category: Optional[str] = None  # Book category for stats
+    page_count: Optional[int] = None  # Total pages for reading progress
 
 class BookResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -521,9 +524,13 @@ class BookResponse(BaseModel):
     description: Optional[str] = None
     cover_url: Optional[str] = None
     pdf_url: Optional[str] = None
+    docx_url: Optional[str] = None  # Word document URL
+    file_type: str = "pdf"  # 'pdf' or 'docx'
     original_price: Optional[float] = None
     pdf_price: Optional[float] = None
     purchase_link: Optional[str] = None
+    category: Optional[str] = None
+    page_count: Optional[int] = None
     created_at: str
 
 class PaymentCreate(BaseModel):
@@ -610,6 +617,40 @@ class AppleSubscriptionResponse(BaseModel):
     message: str
 
 
+# Reading Streak Models
+class ReadingStreakResponse(BaseModel):
+    current_streak: int = 0
+    longest_streak: int = 0
+    total_reading_days: int = 0
+    last_read_date: Optional[str] = None
+    reading_goal_days: int = 7  # Default weekly goal
+    goal_progress: int = 0  # Days read this week
+    
+class ReadingStatsResponse(BaseModel):
+    total_books_read: int = 0
+    total_pages_read: int = 0
+    total_reading_time_minutes: int = 0
+    favorite_category: Optional[str] = None
+    books_by_month: dict = {}
+    reading_history: list = []
+
+class ReadingSessionCreate(BaseModel):
+    book_id: str
+    pages_read: int = 0
+    reading_time_minutes: int = 0
+    current_page: Optional[int] = None
+
+# Admin Audit Log Models
+class AuditLogEntry(BaseModel):
+    log_id: str
+    admin_email: str
+    action: str
+    target_type: str  # 'book', 'user', 'discount', 'email', 'tier', etc.
+    target_id: Optional[str] = None
+    details: dict = {}
+    timestamp: str
+
+
 # Auth Helpers
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -652,6 +693,22 @@ async def get_admin_user(user: dict = Depends(get_current_user)):
     if not user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+# Admin Audit Log Helper
+async def log_admin_action(admin_email: str, action: str, target_type: str, target_id: str = None, details: dict = None):
+    """Log admin actions for audit trail"""
+    log_entry = {
+        "log_id": f"log_{uuid.uuid4().hex[:12]}",
+        "admin_email": admin_email,
+        "action": action,
+        "target_type": target_type,
+        "target_id": target_id,
+        "details": details or {},
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_audit_logs.insert_one(log_entry)
+    logger.info(f"Admin action logged: {action} on {target_type} by {admin_email}")
 
 
 # Root endpoint
@@ -1158,9 +1215,20 @@ async def create_book(book: BookCreate, user: dict = Depends(get_admin_user)):
         **book.model_dump(),
         "cover_url": None,
         "pdf_url": None,
+        "docx_url": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.books.insert_one(book_doc)
+    
+    # Audit log
+    await log_admin_action(
+        admin_email=user.get("email"),
+        action="create_book",
+        target_type="book",
+        target_id=book_id,
+        details={"title": book.title, "tier_level": book.tier_level, "file_type": book.file_type}
+    )
+    
     return BookResponse(**book_doc)
 
 
@@ -1173,15 +1241,35 @@ async def update_book(book_id: str, book: BookCreate, user: dict = Depends(get_a
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Book not found")
     
+    # Audit log
+    await log_admin_action(
+        admin_email=user.get("email"),
+        action="update_book",
+        target_type="book",
+        target_id=book_id,
+        details={"title": book.title, "changes": book.model_dump()}
+    )
+    
     updated = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     return updated
 
 
 @api_router.delete("/books/{book_id}")
 async def delete_book(book_id: str, user: dict = Depends(get_admin_user)):
+    book = await db.books.find_one({"book_id": book_id}, {"_id": 0})
     result = await db.books.delete_one({"book_id": book_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Book not found")
+    
+    # Audit log
+    await log_admin_action(
+        admin_email=user.get("email"),
+        action="delete_book",
+        target_type="book",
+        target_id=book_id,
+        details={"title": book.get("title") if book else "Unknown"}
+    )
+    
     return {"message": "Book deleted"}
 
 
@@ -1198,11 +1286,13 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
     
     # Generate thumbnail from first page of PDF
     cover_path = None
+    page_count = None
     try:
         import fitz  # PyMuPDF
         from io import BytesIO
         
         pdf_doc = fitz.open(stream=data, filetype="pdf")
+        page_count = pdf_doc.page_count
         if pdf_doc.page_count > 0:
             page = pdf_doc[0]
             # Render at 2x resolution for better quality
@@ -1219,17 +1309,64 @@ async def upload_pdf(book_id: str, file: UploadFile = File(...), user: dict = De
     except Exception as e:
         logger.warning(f"Failed to generate thumbnail: {e}")
     
-    # Update book with PDF URL and cover (if generated)
-    update_data = {"pdf_url": result["path"]}
+    # Update book with PDF URL, cover (if generated), and page count
+    update_data = {"pdf_url": result["path"], "file_type": "pdf"}
     if cover_path:
         update_data["cover_url"] = cover_path
+    if page_count:
+        update_data["page_count"] = page_count
     
     await db.books.update_one(
         {"book_id": book_id},
         {"$set": update_data}
     )
     
-    return {"pdf_url": result["path"], "cover_url": cover_path}
+    # Audit log
+    await log_admin_action(
+        admin_email=user.get("email"),
+        action="upload_pdf",
+        target_type="book",
+        target_id=book_id,
+        details={"filename": file.filename, "page_count": page_count}
+    )
+    
+    return {"pdf_url": result["path"], "cover_url": cover_path, "page_count": page_count}
+
+
+@api_router.post("/books/{book_id}/upload-docx")
+async def upload_docx(book_id: str, file: UploadFile = File(...), user: dict = Depends(get_admin_user)):
+    """Upload Word document for a book"""
+    book = await db.books.find_one({"book_id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    # Validate file type
+    if not file.filename.lower().endswith(('.docx', '.doc')):
+        raise HTTPException(status_code=400, detail="Only .docx and .doc files are allowed")
+    
+    path = f"{APP_NAME}/documents/{book_id}.docx"
+    data = await file.read()
+    
+    result = put_object(path, data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    
+    # Update book with DOCX URL
+    update_data = {"docx_url": result["path"], "file_type": "docx"}
+    
+    await db.books.update_one(
+        {"book_id": book_id},
+        {"$set": update_data}
+    )
+    
+    # Audit log
+    await log_admin_action(
+        admin_email=user.get("email"),
+        action="upload_docx",
+        target_type="book",
+        target_id=book_id,
+        details={"filename": file.filename}
+    )
+    
+    return {"docx_url": result["path"]}
 
 
 # Public access for cover images (no auth required)
@@ -1531,6 +1668,291 @@ async def get_favorites(user: dict = Depends(get_current_user)):
     books = await db.books.find({"book_id": {"$in": book_ids}}, {"_id": 0}).to_list(100)
     
     return {"books": books}
+
+
+# ===== READING STREAK & STATISTICS =====
+
+@api_router.post("/reading-session")
+async def log_reading_session(session: ReadingSessionCreate, user: dict = Depends(get_current_user)):
+    """Log a reading session for streak and stats tracking"""
+    user_id = user["user_id"]
+    today = datetime.now(timezone.utc).date().isoformat()
+    
+    # Get book info for category tracking
+    book = await db.books.find_one({"book_id": session.book_id}, {"_id": 0})
+    
+    # Create or update today's reading log
+    session_doc = {
+        "user_id": user_id,
+        "book_id": session.book_id,
+        "book_title": book.get("title") if book else "Unknown",
+        "category": book.get("category") if book else None,
+        "pages_read": session.pages_read,
+        "reading_time_minutes": session.reading_time_minutes,
+        "current_page": session.current_page,
+        "date": today,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.reading_sessions.insert_one(session_doc)
+    
+    # Update user's streak data
+    await update_reading_streak(user_id, today)
+    
+    # Also update reading progress
+    if session.current_page:
+        await db.reading_progress.update_one(
+            {"user_id": user_id, "book_id": session.book_id},
+            {
+                "$set": {
+                    "page": session.current_page,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$setOnInsert": {
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+    
+    return {"message": "Reading session logged", "date": today}
+
+
+async def update_reading_streak(user_id: str, today: str):
+    """Calculate and update user's reading streak"""
+    # Get or create streak document
+    streak_doc = await db.reading_streaks.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not streak_doc:
+        streak_doc = {
+            "user_id": user_id,
+            "current_streak": 1,
+            "longest_streak": 1,
+            "total_reading_days": 1,
+            "last_read_date": today,
+            "reading_goal_days": 7,
+            "streak_start_date": today
+        }
+        await db.reading_streaks.insert_one(streak_doc)
+        return
+    
+    last_read = streak_doc.get("last_read_date")
+    
+    if last_read == today:
+        # Already read today, no streak update needed
+        return
+    
+    # Parse dates
+    today_date = datetime.fromisoformat(today).date()
+    last_date = datetime.fromisoformat(last_read).date() if last_read else None
+    
+    current_streak = streak_doc.get("current_streak", 0)
+    longest_streak = streak_doc.get("longest_streak", 0)
+    total_days = streak_doc.get("total_reading_days", 0)
+    
+    if last_date:
+        days_diff = (today_date - last_date).days
+        
+        if days_diff == 1:
+            # Consecutive day - extend streak
+            current_streak += 1
+        elif days_diff > 1:
+            # Streak broken - reset
+            current_streak = 1
+    else:
+        current_streak = 1
+    
+    # Update longest streak if needed
+    if current_streak > longest_streak:
+        longest_streak = current_streak
+    
+    # Update document
+    await db.reading_streaks.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_reading_days": total_days + 1,
+            "last_read_date": today,
+            "streak_start_date": today if current_streak == 1 else streak_doc.get("streak_start_date", today)
+        }}
+    )
+
+
+@api_router.get("/reading-streak", response_model=ReadingStreakResponse)
+async def get_reading_streak(user: dict = Depends(get_current_user)):
+    """Get user's reading streak data"""
+    user_id = user["user_id"]
+    
+    streak_doc = await db.reading_streaks.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not streak_doc:
+        return ReadingStreakResponse()
+    
+    # Calculate goal progress (days read this week)
+    today = datetime.now(timezone.utc).date()
+    week_start = today - timedelta(days=today.weekday())
+    
+    week_sessions = await db.reading_sessions.distinct(
+        "date",
+        {
+            "user_id": user_id,
+            "date": {"$gte": week_start.isoformat()}
+        }
+    )
+    
+    return ReadingStreakResponse(
+        current_streak=streak_doc.get("current_streak", 0),
+        longest_streak=streak_doc.get("longest_streak", 0),
+        total_reading_days=streak_doc.get("total_reading_days", 0),
+        last_read_date=streak_doc.get("last_read_date"),
+        reading_goal_days=streak_doc.get("reading_goal_days", 7),
+        goal_progress=len(week_sessions)
+    )
+
+
+@api_router.put("/reading-streak/goal")
+async def update_reading_goal(goal_days: int, user: dict = Depends(get_current_user)):
+    """Update user's weekly reading goal"""
+    if goal_days < 1 or goal_days > 7:
+        raise HTTPException(status_code=400, detail="Goal must be between 1 and 7 days")
+    
+    user_id = user["user_id"]
+    
+    await db.reading_streaks.update_one(
+        {"user_id": user_id},
+        {"$set": {"reading_goal_days": goal_days}},
+        upsert=True
+    )
+    
+    return {"message": "Reading goal updated", "goal_days": goal_days}
+
+
+@api_router.get("/reading-stats", response_model=ReadingStatsResponse)
+async def get_reading_stats(user: dict = Depends(get_current_user)):
+    """Get comprehensive reading statistics"""
+    user_id = user["user_id"]
+    
+    # Get all reading sessions
+    sessions = await db.reading_sessions.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("timestamp", -1).to_list(1000)
+    
+    if not sessions:
+        return ReadingStatsResponse()
+    
+    # Calculate stats
+    total_pages = sum(s.get("pages_read", 0) for s in sessions)
+    total_time = sum(s.get("reading_time_minutes", 0) for s in sessions)
+    
+    # Get unique books read
+    unique_books = set(s.get("book_id") for s in sessions)
+    
+    # Find favorite category
+    category_counts = {}
+    for s in sessions:
+        cat = s.get("category")
+        if cat:
+            category_counts[cat] = category_counts.get(cat, 0) + s.get("reading_time_minutes", 0)
+    
+    favorite_category = max(category_counts, key=category_counts.get) if category_counts else None
+    
+    # Books read by month
+    books_by_month = {}
+    for s in sessions:
+        month = s.get("date", "")[:7]  # YYYY-MM
+        if month:
+            if month not in books_by_month:
+                books_by_month[month] = set()
+            books_by_month[month].add(s.get("book_id"))
+    
+    # Convert sets to counts
+    books_by_month = {k: len(v) for k, v in books_by_month.items()}
+    
+    # Recent reading history (last 10 sessions)
+    recent_history = [
+        {
+            "book_title": s.get("book_title"),
+            "book_id": s.get("book_id"),
+            "pages_read": s.get("pages_read", 0),
+            "reading_time_minutes": s.get("reading_time_minutes", 0),
+            "date": s.get("date")
+        }
+        for s in sessions[:10]
+    ]
+    
+    return ReadingStatsResponse(
+        total_books_read=len(unique_books),
+        total_pages_read=total_pages,
+        total_reading_time_minutes=total_time,
+        favorite_category=favorite_category,
+        books_by_month=books_by_month,
+        reading_history=recent_history
+    )
+
+
+# ===== ADVANCED SEARCH =====
+
+@api_router.get("/search/books")
+async def advanced_book_search(
+    q: str,
+    category: Optional[str] = None,
+    tier: Optional[int] = None,
+    file_type: Optional[str] = None,
+    sort_by: Optional[str] = "relevance",  # relevance, title, date
+    user: dict = Depends(get_current_user)
+):
+    """Advanced search across books with filters"""
+    user_tier = user.get("subscription_tier", 0)
+    
+    # Build search query
+    query = {
+        "$or": [
+            {"title": {"$regex": q, "$options": "i"}},
+            {"darussalam_code": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"category": {"$regex": q, "$options": "i"}}
+        ]
+    }
+    
+    # Apply filters
+    if category:
+        query["category"] = {"$regex": category, "$options": "i"}
+    
+    if tier is not None:
+        query["tier_level"] = tier
+    
+    if file_type:
+        query["file_type"] = file_type
+    
+    # Sort options
+    sort_options = {
+        "relevance": [("tier_level", 1)],
+        "title": [("title", 1)],
+        "date": [("created_at", -1)]
+    }
+    sort_order = sort_options.get(sort_by, sort_options["relevance"])
+    
+    books = await db.books.find(query, {"_id": 0}).sort(sort_order).to_list(50)
+    
+    # Mark which books are accessible
+    for book in books:
+        book["accessible"] = (
+            user_tier >= book.get("tier_level", 1) or 
+            user.get("purchased_books", []).count(book.get("book_id")) > 0
+        )
+    
+    return {"books": books, "total": len(books), "query": q}
+
+
+@api_router.get("/search/categories")
+async def get_book_categories():
+    """Get all unique book categories for filter dropdown"""
+    categories = await db.books.distinct("category")
+    # Filter out None and empty values
+    categories = [c for c in categories if c]
+    return {"categories": sorted(categories)}
 
 
 # PDF Purchase for Tier 0 users
@@ -3247,6 +3669,84 @@ async def get_visible_discounts():
         valid_discounts.append(d)
     
     return {"discounts": valid_discounts}
+
+
+# ===== ADMIN AUDIT LOG =====
+
+@api_router.get("/admin/audit-logs")
+async def get_admin_audit_logs(
+    limit: int = 50,
+    offset: int = 0,
+    action: Optional[str] = None,
+    target_type: Optional[str] = None,
+    admin_email: Optional[str] = None,
+    user: dict = Depends(get_admin_user)
+):
+    """Get admin audit logs with optional filters"""
+    query = {}
+    
+    if action:
+        query["action"] = action
+    if target_type:
+        query["target_type"] = target_type
+    if admin_email:
+        query["admin_email"] = admin_email
+    
+    logs = await db.admin_audit_logs.find(query, {"_id": 0}).sort("timestamp", -1).skip(offset).limit(limit).to_list(limit)
+    total = await db.admin_audit_logs.count_documents(query)
+    
+    return {
+        "logs": logs,
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@api_router.get("/admin/audit-logs/actions")
+async def get_audit_log_actions(user: dict = Depends(get_admin_user)):
+    """Get list of unique admin actions for filtering"""
+    actions = await db.admin_audit_logs.distinct("action")
+    target_types = await db.admin_audit_logs.distinct("target_type")
+    admin_emails = await db.admin_audit_logs.distinct("admin_email")
+    
+    return {
+        "actions": sorted(actions),
+        "target_types": sorted(target_types),
+        "admin_emails": sorted(admin_emails)
+    }
+
+
+@api_router.get("/admin/audit-logs/stats")
+async def get_audit_log_stats(user: dict = Depends(get_admin_user)):
+    """Get audit log statistics"""
+    # Get action counts
+    pipeline = [
+        {"$group": {"_id": "$action", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    action_counts = await db.admin_audit_logs.aggregate(pipeline).to_list(10)
+    
+    # Recent activity by day (last 7 days)
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    daily_pipeline = [
+        {"$match": {"timestamp": {"$gte": week_ago}}},
+        {"$group": {
+            "_id": {"$substr": ["$timestamp", 0, 10]},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    daily_activity = await db.admin_audit_logs.aggregate(daily_pipeline).to_list(7)
+    
+    total_logs = await db.admin_audit_logs.count_documents({})
+    
+    return {
+        "total_logs": total_logs,
+        "action_counts": {a["_id"]: a["count"] for a in action_counts},
+        "daily_activity": {d["_id"]: d["count"] for d in daily_activity}
+    }
 
 
 # ============== User Settings Endpoints ==============

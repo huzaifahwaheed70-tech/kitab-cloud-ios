@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Search, Grid, List, Lock, BookMarked, Heart,
-  LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart
+  LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart, Flame
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,6 +18,8 @@ import {
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { shouldHideExternalPurchases } from '../utils/platform';
+import ReadingStreakDashboard from '../components/ReadingStreakDashboard';
+import AdvancedSearch from '../components/AdvancedSearch';
 
 const LibraryPage = () => {
   const { user, token, logout } = useAuth();
@@ -31,6 +33,8 @@ const LibraryPage = () => {
   const [tierSettings, setTierSettings] = useState(null);
   const [isIOSApp, setIsIOSApp] = useState(false);
   const [bookshelf, setBookshelf] = useState({ books: [], count: 0, limit: null, is_locked: false });
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showStreakDashboard, setShowStreakDashboard] = useState(false);
 
   // Check if iOS app (hide external purchases like PDF and physical books)
   useEffect(() => {
@@ -154,14 +158,15 @@ const LibraryPage = () => {
 
             {/* Search Bar - Search by Title */}
             <div className="flex-1 max-w-md mx-4 hidden md:block">
-              <div className="relative">
+              <div className="relative cursor-pointer" onClick={() => setShowAdvancedSearch(true)}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
                 <Input
                   type="text"
-                  placeholder="Search by book title..."
+                  placeholder="Search books, categories..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] focus:ring-1 focus:ring-gold"
+                  onFocus={() => setShowAdvancedSearch(true)}
+                  className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] focus:ring-1 focus:ring-gold cursor-pointer"
                   data-testid="book-search-input"
                 />
               </div>
@@ -169,6 +174,16 @@ const LibraryPage = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-2">
+              {/* Reading Streak Button */}
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowStreakDashboard(!showStreakDashboard)}
+                className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" 
+                data-testid="nav-streak"
+              >
+                <Flame className="w-5 h-5 mr-2 text-orange-500" />
+                Streak
+              </Button>
               <Link to="/bookshelf">
                 <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" data-testid="nav-bookshelf">
                   <BookMarked className="w-5 h-5 mr-2" />
@@ -438,6 +453,18 @@ const LibraryPage = () => {
           </div>
         )}
 
+        {/* Reading Streak Dashboard - Expandable */}
+        {showStreakDashboard && (
+          <div className="mb-8 animate-in slide-in-from-top duration-200">
+            <ReadingStreakDashboard />
+          </div>
+        )}
+
+        {/* Compact Streak Widget for Mobile */}
+        <div className="md:hidden mb-6">
+          <ReadingStreakDashboard compact />
+        </div>
+
         {/* Reading List Status Banner for Subscribed Users */}
         {userTier > 0 && (
           <div className={`mb-8 p-6 rounded-sm border ${bookshelf.is_locked ? 'bg-gradient-to-r from-red-500/20 to-red-500/5 border-red-500/30' : 'bg-gradient-to-r from-[#082E26]/50 to-[#082E26]/20 border-gold/30'}`}>
@@ -543,6 +570,14 @@ const LibraryPage = () => {
           </div>
         )}
       </main>
+
+      {/* Advanced Search Modal */}
+      {showAdvancedSearch && (
+        <AdvancedSearch 
+          onClose={() => setShowAdvancedSearch(false)} 
+          initialQuery={searchQuery}
+        />
+      )}
     </div>
   );
 };

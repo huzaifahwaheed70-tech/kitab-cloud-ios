@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
   Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff,
-  Send, Loader2, Mail
+  Send, Loader2, Mail, History, FileText
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -28,6 +28,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
 import { Switch } from '../components/ui/switch';
+import AdminAuditLog from '../components/AdminAuditLog';
 
 const AdminDashboard = () => {
   const { token } = useAuth();
@@ -95,7 +96,9 @@ const AdminDashboard = () => {
     description: '',
     original_price: '',
     pdf_price: '',
-    purchase_link: ''
+    purchase_link: '',
+    file_type: 'pdf',
+    category: ''
   });
 
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -544,6 +547,23 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleUploadDocx = async (bookId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      toast.info('Uploading Word document...');
+      await axios.post(`${API}/books/${bookId}/upload-docx`, formData, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+        withCredentials: true
+      });
+      toast.success('Word document uploaded!');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to upload document');
+    }
+  };
+
   const handleUpdateUserTier = async (userId, tier) => {
     try {
       await axios.put(`${API}/admin/users/${userId}/tier?tier=${tier}`, {}, { headers, withCredentials: true });
@@ -574,7 +594,9 @@ const AdminDashboard = () => {
       description: '',
       original_price: '',
       pdf_price: '',
-      purchase_link: ''
+      purchase_link: '',
+      file_type: 'pdf',
+      category: ''
     });
     setEditingBook(null);
   };
@@ -692,14 +714,18 @@ const AdminDashboard = () => {
               <Mail className="w-4 h-4 mr-1" />
               Emails
             </TabsTrigger>
+            <TabsTrigger value="activity" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-activity">
+              <History className="w-4 h-4 mr-1" />
+              Activity
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
               <Settings className="w-4 h-4 mr-1" />
               Settings
             </TabsTrigger>
           </TabsList>
 
-          {/* Search (hidden on settings, discounts, and emails tab) */}
-          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'emails' && (
+          {/* Search (hidden on settings, discounts, emails, and activity tab) */}
+          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'emails' && activeTab !== 'activity' && (
           <div className="relative mb-6 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
             <Input
@@ -870,14 +896,25 @@ const AdminDashboard = () => {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-gold text-sm">{book.darussalam_code}</span>
                       <span className={`tier-badge tier-${book.tier_level} text-xs`}>T{book.tier_level}</span>
+                      {book.file_type === 'docx' && (
+                        <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded">DOCX</span>
+                      )}
+                      {book.category && (
+                        <span className="text-[#666] text-xs">{book.category}</span>
+                      )}
                     </div>
                     <h3 className="text-[#FDFBF7] font-medium truncate">{book.title}</h3>
-                    <div className="flex items-center gap-2 mt-2 text-xs">
+                    <div className="flex items-center gap-3 mt-2 text-xs">
                       {book.pdf_url ? (
-                        <span className="text-green-500">✓ PDF Uploaded</span>
+                        <span className="text-green-500">✓ PDF</span>
                       ) : (
-                        <span className="text-yellow-500">No PDF yet</span>
+                        <span className="text-yellow-500">No PDF</span>
                       )}
+                      {book.docx_url ? (
+                        <span className="text-blue-400">✓ DOCX</span>
+                      ) : book.file_type === 'docx' ? (
+                        <span className="text-yellow-500">No DOCX</span>
+                      ) : null}
                     </div>
                   </div>
                   
@@ -891,6 +928,18 @@ const AdminDashboard = () => {
                       />
                       <div className="px-3 py-2 bg-gold/10 hover:bg-gold/20 rounded-sm text-gold text-sm font-medium border border-gold/30 cursor-pointer">
                         {book.pdf_url ? 'Replace PDF' : 'Upload PDF'}
+                      </div>
+                    </label>
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".docx,.doc"
+                        className="hidden"
+                        onChange={(e) => e.target.files?.[0] && handleUploadDocx(book.book_id, e.target.files[0])}
+                      />
+                      <div className="px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-sm text-blue-400 text-sm font-medium border border-blue-500/30 cursor-pointer flex items-center gap-1">
+                        <FileText className="w-4 h-4" />
+                        {book.docx_url ? 'Replace' : 'DOCX'}
                       </div>
                     </label>
                     <Button variant="ghost" size="icon" onClick={() => openEditBook(book)} className="text-[#B0C4BF] hover:text-gold">
@@ -1618,6 +1667,11 @@ const AdminDashboard = () => {
                 </ul>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Activity Log Tab */}
+          <TabsContent value="activity">
+            <AdminAuditLog />
           </TabsContent>
 
           {/* Settings Tab */}
