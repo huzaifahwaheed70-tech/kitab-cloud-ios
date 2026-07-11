@@ -32,9 +32,19 @@ const useScrollAnimation = () => {
   return [ref, isVisible];
 };
 
-// Animated section component
-const AnimatedSection = ({ children, className = '', delay = 0 }) => {
+// Animated section component with slide directions
+const AnimatedSection = ({ children, className = '', delay = 0, direction = 'up' }) => {
   const [ref, isVisible] = useScrollAnimation();
+  
+  const getTransform = () => {
+    if (isVisible) return 'translate(0, 0)';
+    switch (direction) {
+      case 'left': return 'translateX(-50px)';
+      case 'right': return 'translateX(50px)';
+      case 'down': return 'translateY(-30px)';
+      default: return 'translateY(30px)';
+    }
+  };
   
   return (
     <div
@@ -42,11 +52,40 @@ const AnimatedSection = ({ children, className = '', delay = 0 }) => {
       className={`transition-all duration-700 ease-out ${className}`}
       style={{
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transform: getTransform(),
         transitionDelay: `${delay}ms`
       }}
     >
       {children}
+    </div>
+  );
+};
+
+// Sliding text animation component
+const SlidingText = ({ texts, className = '' }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % texts.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [texts.length]);
+  
+  return (
+    <div className={`relative h-8 overflow-hidden ${className}`}>
+      {texts.map((text, i) => (
+        <div
+          key={i}
+          className="absolute w-full transition-all duration-500 ease-in-out"
+          style={{
+            transform: `translateY(${(i - currentIndex) * 100}%)`,
+            opacity: i === currentIndex ? 1 : 0
+          }}
+        >
+          {text}
+        </div>
+      ))}
     </div>
   );
 };
@@ -229,12 +268,16 @@ const LandingPage = () => {
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gold/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }}></div>
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }}></div>
+          {/* Floating book decorations */}
+          <div className="absolute top-20 left-10 w-8 h-10 bg-gold/10 rounded transform rotate-12 animate-bounce" style={{ animationDuration: '3s' }}></div>
+          <div className="absolute top-40 right-20 w-6 h-8 bg-emerald-500/10 rounded transform -rotate-12 animate-bounce" style={{ animationDuration: '4s', animationDelay: '1s' }}></div>
+          <div className="absolute bottom-40 left-20 w-10 h-12 bg-gold/5 rounded transform rotate-6 animate-bounce" style={{ animationDuration: '5s', animationDelay: '0.5s' }}></div>
         </div>
         
         <div className="max-w-7xl mx-auto text-center relative z-10">
-          <AnimatedSection>
+          <AnimatedSection direction="down">
             <div className="inline-flex items-center gap-2 bg-gold/10 border border-gold/20 rounded-full px-4 py-2 mb-8">
-              <BookOpen className="w-4 h-4 text-gold" />
+              <BookOpen className="w-4 h-4 text-gold animate-pulse" />
               <span className="text-sm text-gold font-medium">Your Digital Islamic Library</span>
             </div>
           </AnimatedSection>
@@ -247,16 +290,22 @@ const LandingPage = () => {
           </AnimatedSection>
           
           <AnimatedSection delay={200}>
-            <p className="text-lg md:text-xl text-[#B0C4BF] max-w-2xl mx-auto mb-10 px-2 leading-relaxed">
-              {isIOSApp 
-                ? 'Access the complete Dar-Us-Salam digital collection. Log in to access your subscribed content.'
-                : 'Access the complete Dar-Us-Salam digital collection. Subscribe monthly or buy individual books.'
-              }
+            <p className="text-lg md:text-xl text-[#B0C4BF] max-w-2xl mx-auto mb-4 px-2 leading-relaxed">
+              Explore a curated selection of authentic Islamic books from Dar-Us-Salam Publications.
             </p>
+            <SlidingText 
+              texts={[
+                <span key="1" className="text-gold">Read anytime, anywhere</span>,
+                <span key="2" className="text-emerald-400">Download for offline access</span>,
+                <span key="3" className="text-gold">New books added regularly</span>,
+                <span key="4" className="text-emerald-400">Track your reading progress</span>
+              ]}
+              className="text-lg md:text-xl mb-6"
+            />
           </AnimatedSection>
           
-          <AnimatedSection delay={300}>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4">
+          <AnimatedSection delay={300} direction="up">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4 mt-6">
               {isIOSApp ? (
                 <>
                   <Link to="/login">
@@ -292,18 +341,18 @@ const LandingPage = () => {
           {/* Stats */}
           <AnimatedSection delay={400}>
             <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16 pt-8 border-t border-gold/10">
-              <div className="text-center">
+              <AnimatedSection delay={450} direction="left" className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-gold mb-1">4</div>
                 <div className="text-sm text-[#B0C4BF]">Subscription Tiers</div>
-              </div>
-              <div className="text-center">
+              </AnimatedSection>
+              <AnimatedSection delay={500} direction="up" className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-gold mb-1">24/7</div>
                 <div className="text-sm text-[#B0C4BF]">Access Anywhere</div>
-              </div>
-              <div className="text-center">
+              </AnimatedSection>
+              <AnimatedSection delay={550} direction="right" className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-gold mb-1">PDF</div>
                 <div className="text-sm text-[#B0C4BF]">Own Forever</div>
-              </div>
+              </AnimatedSection>
             </div>
           </AnimatedSection>
         </div>
@@ -312,7 +361,7 @@ const LandingPage = () => {
       {/* Browse Books Section */}
       <section id="browse-books" className="py-20 px-4 md:px-6 bg-gradient-to-b from-[#082E26]/30 to-transparent">
         <div className="max-w-7xl mx-auto">
-          <AnimatedSection>
+          <AnimatedSection direction="left">
             <div className="text-center mb-12">
               <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#FDFBF7] mb-4">Browse Our Collection</h2>
               <p className="text-[#B0C4BF] text-lg">Preview our library. Sign up to start reading!</p>
@@ -403,16 +452,16 @@ const LandingPage = () => {
       {/* Features Section */}
       <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
-          <AnimatedSection>
+          <AnimatedSection direction="right">
             <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#FDFBF7] text-center mb-4">Why Kitab Cloud?</h2>
             <p className="text-[#B0C4BF] text-center mb-12 max-w-2xl mx-auto">Everything you need for your Islamic reading journey</p>
           </AnimatedSection>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
-              <AnimatedSection key={index} delay={index * 100}>
-                <div className="glass-card p-6 rounded-2xl hover:border-gold/30 transition-all duration-300 hover:shadow-lg hover:shadow-gold/5 hover:-translate-y-1 h-full">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gold/20 to-gold/5 flex items-center justify-center text-gold mb-4">
+              <AnimatedSection key={index} delay={index * 100} direction={index % 2 === 0 ? 'left' : 'right'}>
+                <div className="glass-card p-6 rounded-2xl hover:border-gold/30 transition-all duration-300 hover:shadow-lg hover:shadow-gold/5 hover:-translate-y-1 h-full group">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gold/20 to-gold/5 flex items-center justify-center text-gold mb-4 group-hover:scale-110 transition-transform duration-300">
                     {feature.icon}
                   </div>
                   <h3 className="font-serif text-lg text-[#FDFBF7] mb-2">{feature.title}</h3>
@@ -427,7 +476,7 @@ const LandingPage = () => {
       {/* Pricing Section */}
       <section className="py-20 px-6 bg-gradient-to-b from-[#082E26]/30 to-transparent">
         <div className="max-w-7xl mx-auto">
-          <AnimatedSection>
+          <AnimatedSection direction="left">
             <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#FDFBF7] text-center mb-4">
               Simple Pricing
             </h2>
