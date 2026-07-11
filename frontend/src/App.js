@@ -30,6 +30,7 @@ import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import AuthCallback from './pages/AuthCallback';
 
 // HARDCODED production URL for iOS Capacitor builds
 // Codemagic env vars may not be injected properly during React build
@@ -81,6 +82,12 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    // CRITICAL: If returning from OAuth callback, skip the /me check.
+    // AuthCallback will exchange the session_id and establish the session first.
+    if (window.location.hash?.includes('session_id=')) {
+      setLoading(false);
+      return;
+    }
     checkAuth();
   }, [checkAuth]);
 
@@ -169,6 +176,14 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 
 // App Router Component
 const AppRouter = () => {
+  const location = useLocation();
+  
+  // CRITICAL: Check URL hash for session_id during render (NOT in useEffect)
+  // This synchronous check prevents race conditions by processing OAuth callback FIRST
+  if (location.hash?.includes('session_id=')) {
+    return <AuthCallback />;
+  }
+  
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />

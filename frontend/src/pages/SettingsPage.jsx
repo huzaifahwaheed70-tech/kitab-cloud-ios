@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   User, ArrowLeft, Mail, Lock, CreditCard, AlertTriangle,
-  CheckCircle, XCircle, Calendar, Library, Crown, Trash2
+  CheckCircle, XCircle, Calendar, Library, Crown, Trash2, Camera, Loader2, Info, ShoppingBag
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -20,16 +20,18 @@ import {
 } from '../components/ui/dialog';
 
 const SettingsPage = () => {
-  const { user, token, loading: authLoading, logout } = useAuth();
+  const { user, token, loading: authLoading, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
+  const fileInputRef = useRef(null);
   
   // Profile form
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
   
   // Password form
   const [currentPassword, setCurrentPassword] = useState('');
@@ -50,6 +52,10 @@ const SettingsPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  
+  // Purchases
+  const [purchases, setPurchases] = useState([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(false);
 
   const fetchProfile = async () => {
     if (!token) {
@@ -76,11 +82,68 @@ const SettingsPage = () => {
       setProfileLoading(false);
     }
   };
+  
+  const fetchPurchases = async () => {
+    if (!token) return;
+    setPurchasesLoading(true);
+    try {
+      const authHeaders = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API}/user/purchases`, { 
+        headers: authHeaders, 
+        withCredentials: true 
+      });
+      setPurchases(response.data.purchases || []);
+    } catch (error) {
+      console.error('Error fetching purchases:', error);
+    } finally {
+      setPurchasesLoading(false);
+    }
+  };
+
+  // Handle profile picture upload
+  const handlePictureUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+    
+    setUploadingPicture(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const authHeaders = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API}/user/profile-picture`, formData, {
+        headers: { ...authHeaders, 'Content-Type': 'multipart/form-data' },
+        withCredentials: true
+      });
+      
+      setProfile({ ...profile, picture: response.data.picture_url });
+      if (refreshUser) await refreshUser();
+      toast.success('Profile picture updated!');
+    } catch (error) {
+      console.error('Error uploading picture:', error);
+      toast.error('Failed to upload picture');
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
 
   useEffect(() => {
     // Fetch profile when user/token are available
     if (user && token) {
       fetchProfile();
+      fetchPurchases();
     } else if (!authLoading && !user) {
       // Auth check complete but no user - will be redirected by ProtectedRoute
       setProfileLoading(false);
@@ -281,6 +344,7 @@ const SettingsPage = () => {
             { id: 'profile', label: 'Profile', icon: User },
             { id: 'security', label: 'Security', icon: Lock },
             { id: 'subscription', label: 'Subscription', icon: CreditCard },
+            { id: 'purchases', label: 'Purchases', icon: ShoppingBag },
             { id: 'account', label: 'Account', icon: AlertTriangle }
           ].map(tab => (
             <button
@@ -301,8 +365,100 @@ const SettingsPage = () => {
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (
-          <div className="glass-card rounded-sm p-6">
-            <h2 className="font-serif text-xl text-[#FDFBF7] mb-6">Profile Information</h2>
+          <div className="space-y-6">
+            {/* Profile Picture */}
+            <div className="glass-card rounded-xl p-6">
+              <h2 className="font-serif text-xl text-[#FDFBF7] mb-6">Profile Picture</h2>
+              
+              <div className="flex items-center gap-6">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-[#082E26] border-2 border-gold/30">
+                    {profile?.picture ? (
+                      <img 
+                        src={profile.picture} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <User className="w-10 h-10 text-gold/50" />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPicture}
+                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-gold text-[#02120F] flex items-center justify-center hover:bg-[#E9C85C] transition-colors"
+                  >
+                    {uploadingPicture ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePictureUpload}
+                    className="hidden"
+                  />
+                </div>
+                <div>
+                  <p className="text-[#FDFBF7] font-medium">{profile?.name || 'No name set'}</p>
+                  <p className="text-sm text-[#B0C4BF]">{profile?.email}</p>
+                  <p className="text-xs text-[#B0C4BF] mt-1">Click the camera icon to change your picture</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Account Info */}
+            <div className="glass-card rounded-xl p-6">
+              <h2 className="font-serif text-xl text-[#FDFBF7] mb-6 flex items-center gap-2">
+                <Info className="w-5 h-5 text-gold" />
+                Account Information
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-[#082E26] rounded-lg p-4">
+                  <p className="text-xs text-[#B0C4BF] uppercase tracking-wide mb-1">Member Since</p>
+                  <p className="text-[#FDFBF7] font-medium">
+                    {profile?.created_at 
+                      ? new Date(profile.created_at).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                <div className="bg-[#082E26] rounded-lg p-4">
+                  <p className="text-xs text-[#B0C4BF] uppercase tracking-wide mb-1">User ID</p>
+                  <p className="text-[#FDFBF7] font-mono text-sm truncate">{profile?.user_id || 'N/A'}</p>
+                </div>
+                <div className="bg-[#082E26] rounded-lg p-4">
+                  <p className="text-xs text-[#B0C4BF] uppercase tracking-wide mb-1">Email Verified</p>
+                  <p className="text-[#FDFBF7] font-medium flex items-center gap-2">
+                    {profile?.email_verified ? (
+                      <><CheckCircle className="w-4 h-4 text-green-500" /> Verified</>
+                    ) : (
+                      <><XCircle className="w-4 h-4 text-red-500" /> Not Verified</>
+                    )}
+                  </p>
+                </div>
+                <div className="bg-[#082E26] rounded-lg p-4">
+                  <p className="text-xs text-[#B0C4BF] uppercase tracking-wide mb-1">Account Type</p>
+                  <p className="text-[#FDFBF7] font-medium">
+                    {profile?.is_admin ? 'Administrator' : profile?.is_guest ? 'Guest' : 'Standard User'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          
+            {/* Edit Profile */}
+            <div className="glass-card rounded-xl p-6">
+              <h2 className="font-serif text-xl text-[#FDFBF7] mb-6">Edit Profile</h2>
             
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
@@ -339,6 +495,7 @@ const SettingsPage = () => {
                 </Button>
               </div>
             </form>
+            </div>
           </div>
         )}
 
@@ -581,6 +738,58 @@ const SettingsPage = () => {
                     );
                   })}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Purchases Tab */}
+        {activeTab === 'purchases' && (
+          <div className="glass-card rounded-xl p-6">
+            <h2 className="font-serif text-xl text-[#FDFBF7] mb-6 flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-gold" />
+              Your Purchases
+            </h2>
+            
+            {purchasesLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 text-gold animate-spin" />
+              </div>
+            ) : purchases.length === 0 ? (
+              <div className="text-center py-12 text-[#B0C4BF]">
+                <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p>No purchases yet</p>
+                <p className="text-sm mt-2">Your PDF purchases will appear here</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {purchases.map((purchase, index) => (
+                  <div key={index} className="bg-[#082E26] rounded-lg p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      {purchase.cover_image ? (
+                        <img 
+                          src={purchase.cover_image} 
+                          alt={purchase.title} 
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-16 bg-[#041815] rounded flex items-center justify-center">
+                          <Library className="w-6 h-6 text-gold/30" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-[#FDFBF7] font-medium">{purchase.title || 'Unknown Book'}</p>
+                        <p className="text-sm text-[#B0C4BF]">
+                          Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-gold font-medium">${purchase.amount?.toFixed(2) || '0.00'}</p>
+                      <p className="text-xs text-[#B0C4BF]">PDF</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

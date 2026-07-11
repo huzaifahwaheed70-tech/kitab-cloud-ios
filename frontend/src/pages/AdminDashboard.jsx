@@ -79,8 +79,9 @@ const AdminDashboard = () => {
     buttonUrl: ''
   });
   const [emailSending, setEmailSending] = useState(false);
-  const [priceDropSending, setPriceDropSending] = useState(false);
   const [emailStats, setEmailStats] = useState(null);
+  const [savedDrafts, setSavedDrafts] = useState([]);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -217,6 +218,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeTab === 'emails' && token) {
       fetchEmailStats();
+      fetchEmailDrafts();
     }
   }, [activeTab, token]);
 
@@ -227,6 +229,70 @@ const AdminDashboard = () => {
       setEmailStats(response.data);
     } catch (error) {
       console.error('Error fetching email stats:', error);
+    }
+  };
+  
+  // Fetch email drafts
+  const fetchEmailDrafts = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/email-drafts`, { headers, withCredentials: true });
+      setSavedDrafts(response.data.drafts || []);
+    } catch (error) {
+      console.error('Error fetching email drafts:', error);
+    }
+  };
+  
+  // Save email draft
+  const handleSaveDraft = async () => {
+    if (!emailForm.subject.trim()) {
+      toast.error('Please enter a subject to save the draft');
+      return;
+    }
+    
+    setSavingDraft(true);
+    try {
+      await axios.post(
+        `${API}/admin/email-drafts`,
+        {
+          subject: emailForm.subject,
+          message: emailForm.message,
+          target: emailForm.target,
+          button_text: emailForm.buttonText || null,
+          button_url: emailForm.buttonUrl || null
+        },
+        { headers, withCredentials: true }
+      );
+      toast.success('Draft saved!');
+      fetchEmailDrafts();
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast.error('Failed to save draft');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+  
+  // Load draft into form
+  const handleLoadDraft = (draft) => {
+    setEmailForm({
+      subject: draft.subject || '',
+      message: draft.message || '',
+      target: draft.target || 'all',
+      buttonText: draft.button_text || '',
+      buttonUrl: draft.button_url || ''
+    });
+    toast.success('Draft loaded!');
+  };
+  
+  // Delete draft
+  const handleDeleteDraft = async (draftId) => {
+    try {
+      await axios.delete(`${API}/admin/email-drafts/${draftId}`, { headers, withCredentials: true });
+      toast.success('Draft deleted');
+      fetchEmailDrafts();
+    } catch (error) {
+      console.error('Error deleting draft:', error);
+      toast.error('Failed to delete draft');
     }
   };
 
@@ -1459,29 +1525,87 @@ const AdminDashboard = () => {
                     </div>
                   )}
 
-                  <Button
-                    type="submit"
-                    disabled={emailSending || !emailForm.subject.trim() || !emailForm.message.trim()}
-                    className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                    data-testid="send-email-btn"
-                  >
-                    {emailSending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        Send Email to {emailForm.target === 'all' ? 'All Users' : 
-                          emailForm.target === 'unsubscribed' ? 'Unsubscribed Users' :
-                          emailForm.target === 'subscribed' ? 'Subscribed Users' :
-                          `Tier ${emailForm.target.split('_')[1]} Users`}
-                      </>
-                    )}
-                  </Button>
+                  {/* Button Row: Save Draft and Send */}
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={savingDraft || !emailForm.subject.trim()}
+                      variant="outline"
+                      className="flex-1 border-gold/30 text-gold hover:bg-gold/10"
+                      data-testid="save-draft-btn"
+                    >
+                      {savingDraft ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Draft
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={emailSending || !emailForm.subject.trim() || !emailForm.message.trim()}
+                      className="flex-1 bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                      data-testid="send-email-btn"
+                    >
+                      {emailSending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          Send Now
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </form>
               </div>
+
+              {/* Saved Drafts */}
+              {savedDrafts.length > 0 && (
+                <div className="glass-card rounded-lg p-6 border border-gold/30">
+                  <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Saved Drafts</h3>
+                  <div className="space-y-3">
+                    {savedDrafts.map((draft) => (
+                      <div key={draft.draft_id} className="bg-[#082E26] rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[#FDFBF7] font-medium truncate">{draft.subject}</p>
+                          <p className="text-xs text-[#B0C4BF]">
+                            Target: {draft.target === 'all' ? 'All Users' : draft.target} • 
+                            Saved: {new Date(draft.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleLoadDraft(draft)}
+                            className="border-gold/30 text-gold hover:bg-gold/10"
+                          >
+                            Load
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteDraft(draft.draft_id)}
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Email Tips */}
               <div className="bg-[#082E26]/50 rounded-lg p-4 border border-gold/10">

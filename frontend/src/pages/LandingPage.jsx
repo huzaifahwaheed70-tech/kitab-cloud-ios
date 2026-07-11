@@ -293,16 +293,16 @@ const LandingPage = () => {
           <AnimatedSection delay={400}>
             <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16 pt-8 border-t border-gold/10">
               <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-gold mb-1">100+</div>
-                <div className="text-sm text-[#B0C4BF]">Books Available</div>
-              </div>
-              <div className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-gold mb-1">4</div>
                 <div className="text-sm text-[#B0C4BF]">Subscription Tiers</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-gold mb-1">24/7</div>
                 <div className="text-sm text-[#B0C4BF]">Access Anywhere</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-gold mb-1">PDF</div>
+                <div className="text-sm text-[#B0C4BF]">Own Forever</div>
               </div>
             </div>
           </AnimatedSection>

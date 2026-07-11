@@ -195,7 +195,7 @@ const PricingPage = () => {
 
     // iOS Native App - Show message to subscribe via web
     if (isIOSApp) {
-      toast.info('Please subscribe through our website for the best experience.');
+      toast.info('Please subscribe through our website.');
       return;
     }
 

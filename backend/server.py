@@ -924,6 +924,93 @@ async def logout():
     return {"message": "Logged out"}
 
 
+# Google OAuth Session Exchange
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+class GoogleSessionRequest(BaseModel):
+    session_id: str
+
+@api_router.post("/auth/google/session")
+async def google_auth_session(request: GoogleSessionRequest):
+    """Exchange Emergent Auth session_id for user data and JWT token"""
+    try:
+        # Call Emergent Auth to get session data
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": request.session_id},
+                timeout=30
+            )
+        
+        if response.status_code != 200:
+            logger.error(f"Google auth failed: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        session_data = response.json()
+        email = session_data.get("email")
+        name = session_data.get("name")
+        picture = session_data.get("picture")
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="No email in session data")
+        
+        # Check if user already exists
+        existing_user = await db.users.find_one({"email": email}, {"_id": 0})
+        
+        if existing_user:
+            # Update existing user with latest Google profile data
+            update_data = {}
+            if name and not existing_user.get("name"):
+                update_data["name"] = name
+            if picture:
+                update_data["picture"] = picture
+            update_data["google_linked"] = True
+            
+            if update_data:
+                await db.users.update_one(
+                    {"email": email},
+                    {"$set": update_data}
+                )
+            
+            # Refresh user data
+            user = await db.users.find_one({"email": email}, {"_id": 0})
+            token = create_jwt_token(user["user_id"])
+            
+            logger.info(f"Google login successful for existing user: {email}")
+            return {"token": token, "user": UserResponse(**user).model_dump()}
+        
+        # Create new user from Google data
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        user_doc = {
+            "user_id": user_id,
+            "email": email,
+            "name": name or email.split('@')[0],
+            "password_hash": None,  # No password for Google users
+            "picture": picture,
+            "subscription_tier": 0,
+            "is_admin": False,
+            "email_verified": True,  # Google emails are pre-verified
+            "google_linked": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(user_doc)
+        
+        # Send welcome email
+        try:
+            await send_welcome_email(email, name)
+        except Exception as e:
+            logger.warning(f"Failed to send welcome email to {email}: {e}")
+        
+        token = create_jwt_token(user_id)
+        logger.info(f"Google signup successful for new user: {email}")
+        return {"token": token, "user": UserResponse(**user_doc).model_dump()}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google auth error: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
+
+
 # Books Routes
 @api_router.get("/books", response_model=List[BookResponse])
 async def get_books(
@@ -2431,6 +2518,56 @@ async def send_price_drop_announcement(admin: dict = Depends(get_admin_user)):
     }
 
 
+# Email Drafts Management
+class EmailDraftRequest(BaseModel):
+    subject: str
+    message: str
+    target: str = "all"
+    button_text: Optional[str] = None
+    button_url: Optional[str] = None
+
+
+@api_router.get("/admin/email-drafts")
+async def get_email_drafts(admin: dict = Depends(get_admin_user)):
+    """Get all saved email drafts"""
+    drafts = await db.email_drafts.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"drafts": drafts}
+
+
+@api_router.post("/admin/email-drafts")
+async def save_email_draft(
+    request: EmailDraftRequest,
+    admin: dict = Depends(get_admin_user)
+):
+    """Save an email draft"""
+    draft = {
+        "draft_id": f"draft_{uuid.uuid4().hex[:12]}",
+        "subject": request.subject,
+        "message": request.message,
+        "target": request.target,
+        "button_text": request.button_text,
+        "button_url": request.button_url,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": admin.get("email")
+    }
+    
+    await db.email_drafts.insert_one(draft)
+    
+    return {"message": "Draft saved", "draft_id": draft["draft_id"]}
+
+
+@api_router.delete("/admin/email-drafts/{draft_id}")
+async def delete_email_draft(draft_id: str, admin: dict = Depends(get_admin_user)):
+    """Delete an email draft"""
+    result = await db.email_drafts.delete_one({"draft_id": draft_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    
+    return {"message": "Draft deleted"}
+
+
+
 
 @api_router.put("/admin/users/{user_id}/tier")
 async def update_user_tier(user_id: str, tier: int, admin: dict = Depends(get_admin_user)):
@@ -3113,6 +3250,73 @@ async def update_user_profile(profile: UpdateProfileRequest, user: dict = Depend
     )
     
     return {"message": "Profile updated successfully"}
+
+
+@api_router.post("/user/profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    """Upload user profile picture"""
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Read file content
+    content = await file.read()
+    
+    # Validate file size (max 5MB)
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be less than 5MB")
+    
+    try:
+        # Upload to storage
+        file_path = f"profile-pictures/{user['user_id']}.jpg"
+        upload_response = storage_client.upload(
+            path=file_path,
+            content=content,
+            content_type=file.content_type
+        )
+        
+        picture_url = upload_response.get('url', f"/api/files/{file_path}")
+        
+        # Update user profile
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"picture": picture_url}}
+        )
+        
+        return {"message": "Profile picture updated", "picture_url": picture_url}
+    except Exception as e:
+        logger.error(f"Error uploading profile picture: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload profile picture")
+
+
+@api_router.get("/user/purchases")
+async def get_user_purchases(user: dict = Depends(get_current_user)):
+    """Get user's PDF purchases"""
+    user_data = await db.users.find_one({"user_id": user["user_id"]})
+    
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    purchased_pdfs = user_data.get("purchased_pdfs", [])
+    
+    # Get book details for each purchase
+    purchases = []
+    for book_id in purchased_pdfs:
+        book = await db.books.find_one({"book_id": book_id})
+        if book:
+            purchases.append({
+                "book_id": book_id,
+                "title": book.get("title", "Unknown"),
+                "cover_image": book.get("cover_image"),
+                "amount": book.get("pdf_price", 0),
+                "purchased_at": book.get("purchased_at", user_data.get("created_at"))
+            })
+    
+    return {"purchases": purchases}
+
 
 
 @api_router.put("/user/password")
