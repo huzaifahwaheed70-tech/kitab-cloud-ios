@@ -647,6 +647,13 @@ const BookCard = ({ book, userTier, isIOSApp }) => {
             ${book.pdf_price}
           </div>
         )}
+        
+        {/* Page count badge */}
+        {book.page_count && (
+          <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+            {book.page_count} pages
+          </div>
+        )}
 
         {/* Hover Overlay */}
         {!isLocked && (
@@ -658,10 +665,15 @@ const BookCard = ({ book, userTier, isIOSApp }) => {
         <h3 className="font-serif text-[#FDFBF7] text-sm md:text-base line-clamp-2 group-hover:text-gold transition-colors">
           {book.title}
         </h3>
-        {/* Physical book price - Hide on iOS */}
-        {!isIOSApp && book.original_price && (
-          <p className="text-xs text-[#B0C4BF] mt-1">Book: ${book.original_price}</p>
-        )}
+        <div className="flex items-center justify-between mt-1">
+          {/* Physical book price - Hide on iOS */}
+          {!isIOSApp && book.original_price && (
+            <p className="text-xs text-[#B0C4BF]">Book: ${book.original_price}</p>
+          )}
+          {book.page_count && (
+            <p className="text-xs text-[#666]">{book.page_count} pages</p>
+          )}
+        </div>
       </div>
     </Link>
   );
@@ -707,6 +719,9 @@ const BookListItem = ({ book, userTier, isIOSApp }) => {
               )}
               {book.is_advanced && (
                 <span className="text-[10px] px-1.5 py-0.5 bg-red-500/80 text-white rounded">ADVANCED</span>
+              )}
+              {book.page_count && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-[#082E26] text-[#B0C4BF] rounded">{book.page_count} pages</span>
               )}
             </div>
           </div>

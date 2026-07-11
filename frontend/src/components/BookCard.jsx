@@ -106,6 +106,13 @@ const BookCard = ({
               DOCX
             </div>
           )}
+          
+          {/* Page Count Badge */}
+          {book.page_count && !isDocx && (
+            <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              {book.page_count} pages
+            </div>
+          )}
         </div>
         
         {/* Book Info */}
@@ -113,7 +120,12 @@ const BookCard = ({
           <h3 className="text-[#FDFBF7] font-medium text-sm line-clamp-2 mb-1 group-hover:text-gold transition-colors">
             {book.title}
           </h3>
-          <p className="text-[#B0C4BF] text-xs truncate">{book.darussalam_code}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[#B0C4BF] text-xs truncate">{book.darussalam_code}</p>
+            {book.page_count && (
+              <p className="text-[#666] text-xs">{book.page_count}p</p>
+            )}
+          </div>
           
           {/* Price if available */}
           {book.pdf_price && !isAccessible && (
