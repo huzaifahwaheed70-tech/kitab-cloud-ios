@@ -12,14 +12,16 @@
 - **Native Wrapper:** Capacitor v7 (iOS & Android)
 - **Payments:** 
   - **Web/Android:** Stripe Checkout
-  - **iOS:** RevenueCat Apple In-App Purchase (IAP)
 - **Emails:** Resend
 - **Storage:** Emergent Object Storage
-- **Push Notifications:** OneSignal (react-onesignal + @onesignal/capacitor-plugin)
+- **Authentication:** 
+  - Email/Password with JWT (1 year expiry)
+  - Google OAuth via Emergent-managed Auth
 - **File System (Native):** @capacitor/filesystem (PDF downloads)
 
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
+- [x] **Google OAuth Login** (via Emergent-managed Auth) - NEW
 - [x] Guest browsing mode
 - [x] 5-tier subscription system (0=Pay-per-book, 1-4=Monthly plans)
 - [x] Admin dashboard for book/user management
@@ -31,14 +33,14 @@
 - [x] Privacy Policy page
 - [x] ErrorBoundary for crash handling
 - [x] App Transport Security (ATS) configuration
-- [x] **Discount Code System** (Web/Android only - Apple has their own)
+- [x] **Discount Code System** (Web/Android only)
 - [x] **Pre-checkout Discount Popup** (Web/Android only)
-- [x] **Admin Push Notifications via OneSignal**
-- [x] **RevenueCat Apple IAP for iOS Subscriptions** (Dec 2025)
 - [x] **Admin Test Purchases** (for PDFs and subscriptions without payment)
 - [x] **Monthly Reading List Locks** (enforced limits until new month)
 - [x] **Subscription Downgrades** via Settings
 - [x] **PDF Download to Device** (Capacitor Filesystem API for native apps)
+- [x] **Admin Email Dashboard** with targeting and drafts
+- [x] **Safe Area/Notch support** for iOS/Android
 
 ## iOS App Store Compliance (CRITICAL)
 ### What's HIDDEN on iOS:
@@ -107,11 +109,11 @@
 
 ## Key API Endpoints
 - `/api/auth/login`, `/api/auth/register`
+- `/api/auth/google/session` - Google OAuth session exchange (NEW)
 - `/api/books/all`, `/api/books/{id}`
 - `/api/user/cancel-subscription`
-- `/api/user/sync-subscription` (RevenueCat iOS sync)
 - `/api/payments/create-checkout` (supports discount_code parameter)
-- `/api/admin/*` (admin routes including discount and notification management)
+- `/api/admin/*` (admin routes including discount and email management)
 
 ## Production URLs
 - **Web/API:** https://kitab-cloud.emergent.host
@@ -155,8 +157,16 @@
 - **Password:** admin123
 
 ## Backlog (Future Features)
+- [ ] (P0) Dedicated Mobile Welcome Screen (Capacitor-only)
+- [ ] (P0) Word Document Support (upload + reader)
+- [ ] (P1) Custom Book Loader Animation
+- [ ] (P1) Premium Reading Streak System
+- [ ] (P1) Advanced Search (books + in-book text)
+- [ ] (P1) Reading Experience Polish
+- [ ] (P2) Book Card Consistency & skeleton loaders
+- [ ] (P2) UI/UX Refinements
 - [ ] (P2) Reading statistics dashboard
-- [ ] Configure OneSignal dashboard for web push
+- [ ] (P2) Admin Audit Log / Past Works Tab
 
 ## Known Issues / User Verification Required
 ### Resend Emails on Production
@@ -175,4 +185,4 @@
 - Custom tier settings may have been saved with different values
 
 ---
-*Last updated: June 2026*
+*Last updated: July 2026*
