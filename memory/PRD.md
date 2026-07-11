@@ -22,6 +22,7 @@
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
 - [x] **Google OAuth Login** (via Emergent-managed Auth) - NEW
+- [x] **Link Google Account in Settings** (Security tab) - NEW
 - [x] Guest browsing mode
 - [x] 5-tier subscription system (0=Pay-per-book, 1-4=Monthly plans)
 - [x] Admin dashboard for book/user management
@@ -41,6 +42,8 @@
 - [x] **PDF Download to Device** (Capacitor Filesystem API for native apps)
 - [x] **Admin Email Dashboard** with targeting and drafts
 - [x] **Safe Area/Notch support** for iOS/Android
+- [x] **Mobile Welcome Screen** (Capacitor-only) - NEW
+- [x] **Custom Book Loader Animation** (chasing ring + opening book + dissolve) - NEW
 
 ## iOS App Store Compliance (CRITICAL)
 ### What's HIDDEN on iOS:
@@ -109,8 +112,11 @@
 
 ## Key API Endpoints
 - `/api/auth/login`, `/api/auth/register`
-- `/api/auth/google/session` - Google OAuth session exchange (NEW)
+- `/api/auth/google/session` - Google OAuth session exchange
+- `/api/auth/google/link` - Link Google account to existing user (NEW)
+- `/api/auth/google/unlink` - Unlink Google account (NEW)
 - `/api/books/all`, `/api/books/{id}`
+- `/api/user/profile` - Returns google_linked, has_password fields
 - `/api/user/cancel-subscription`
 - `/api/payments/create-checkout` (supports discount_code parameter)
 - `/api/admin/*` (admin routes including discount and email management)
@@ -157,9 +163,7 @@
 - **Password:** admin123
 
 ## Backlog (Future Features)
-- [ ] (P0) Dedicated Mobile Welcome Screen (Capacitor-only)
-- [ ] (P0) Word Document Support (upload + reader)
-- [ ] (P1) Custom Book Loader Animation
+- [ ] (P0) Word Document Support (upload + reader with text scaling/pinch-zoom)
 - [ ] (P1) Premium Reading Streak System
 - [ ] (P1) Advanced Search (books + in-book text)
 - [ ] (P1) Reading Experience Polish
