@@ -21,12 +21,13 @@
 
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
-- [x] **Google OAuth Login** (via Emergent-managed Auth) - NEW
-- [x] **Link Google Account in Settings** (Security tab) - NEW
+- [x] **Google OAuth Login** (via Emergent-managed Auth)
+- [x] **Link Google Account in Settings** (Security tab)
 - [x] Guest browsing mode
 - [x] 5-tier subscription system (0=Pay-per-book, 1-4=Monthly plans)
 - [x] Admin dashboard for book/user management
 - [x] PDF reading in-app
+- [x] **Word Document Support** - Admin upload + reader with text scaling/pinch-zoom - NEW
 - [x] Individual PDF purchases (Web/Android only)
 - [x] Monthly reading limits (configurable by admin)
 - [x] Email verification via Resend
@@ -42,8 +43,14 @@
 - [x] **PDF Download to Device** (Capacitor Filesystem API for native apps)
 - [x] **Admin Email Dashboard** with targeting and drafts
 - [x] **Safe Area/Notch support** for iOS/Android
-- [x] **Mobile Welcome Screen** (Capacitor-only) - NEW
-- [x] **Custom Book Loader Animation** (chasing ring + opening book + dissolve) - NEW
+- [x] **Mobile Welcome Screen** (Capacitor-only)
+- [x] **Custom Book Loader Animation** (chasing ring + opening book + dissolve)
+- [x] **Premium Reading Streak System** - Dashboard with current/longest streak, weekly goals, reading stats - NEW
+- [x] **Advanced Search** - Search books with category, tier, file type filters and sort options - NEW
+- [x] **Admin Audit Log** - Track all admin actions with filters and statistics - NEW
+- [x] **Book Card Consistency** - Uniform sizing, skeleton loaders, lazy loading with fade-in - NEW
+- [x] **UI/UX Refinements** - Ripple effects, 8px spacing, smooth transitions - NEW
+- [x] **Reading Statistics Dashboard** - Total books, pages, time, favorite category - NEW
 
 ## iOS App Store Compliance (CRITICAL)
 ### What's HIDDEN on iOS:
@@ -113,11 +120,19 @@
 ## Key API Endpoints
 - `/api/auth/login`, `/api/auth/register`
 - `/api/auth/google/session` - Google OAuth session exchange
-- `/api/auth/google/link` - Link Google account to existing user (NEW)
-- `/api/auth/google/unlink` - Unlink Google account (NEW)
+- `/api/auth/google/link` - Link Google account to existing user
+- `/api/auth/google/unlink` - Unlink Google account
 - `/api/books/all`, `/api/books/{id}`
+- `/api/books/{id}/upload-pdf` - Upload PDF
+- `/api/books/{id}/upload-docx` - Upload Word Document (NEW)
 - `/api/user/profile` - Returns google_linked, has_password fields
 - `/api/user/cancel-subscription`
+- `/api/reading-streak` - Get reading streak data (NEW)
+- `/api/reading-stats` - Get reading statistics (NEW)
+- `/api/reading-session` - Log reading session (NEW)
+- `/api/search/books` - Advanced search with filters (NEW)
+- `/api/search/categories` - Get book categories (NEW)
+- `/api/admin/audit-logs` - Admin action audit logs (NEW)
 - `/api/payments/create-checkout` (supports discount_code parameter)
 - `/api/admin/*` (admin routes including discount and email management)
 
@@ -163,14 +178,9 @@
 - **Password:** admin123
 
 ## Backlog (Future Features)
-- [ ] (P0) Word Document Support (upload + reader with text scaling/pinch-zoom)
-- [ ] (P1) Premium Reading Streak System
-- [ ] (P1) Advanced Search (books + in-book text)
-- [ ] (P1) Reading Experience Polish
-- [ ] (P2) Book Card Consistency & skeleton loaders
-- [ ] (P2) UI/UX Refinements
-- [ ] (P2) Reading statistics dashboard
-- [ ] (P2) Admin Audit Log / Past Works Tab
+- [ ] (P1) Reading Experience Polish - smooth page turns, beautiful book opening animation
+- [ ] (P2) In-book text search (search within PDFs)
+- [ ] (P2) Pop-up Recommendations - diverse book recommendations
 
 ## Known Issues / User Verification Required
 ### Resend Emails on Production
