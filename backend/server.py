@@ -37,7 +37,7 @@ resend.api_key = os.environ.get('RESEND_API_KEY')
 # Constants
 JWT_SECRET = os.environ.get('JWT_SECRET_KEY', 'default_secret')
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
+JWT_EXPIRATION_DAYS = 365  # 1 year - keep users logged in
 
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
@@ -620,7 +620,7 @@ def verify_password(password: str, hashed: str) -> bool:
 def create_jwt_token(user_id: str) -> str:
     payload = {
         "user_id": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+        "exp": datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRATION_DAYS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 

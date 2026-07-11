@@ -4,21 +4,6 @@ import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
-// OneSignal Push Notifications
-import { 
-  initializeOneSignal, 
-  setUserForNotifications, 
-  clearUserForNotifications,
-  updateUserTags 
-} from './utils/onesignal';
-
-// RevenueCat In-App Purchases (iOS)
-import {
-  initializeRevenueCat,
-  setRevenueCatUser,
-  clearRevenueCatUser
-} from './utils/revenuecat';
-
 // Global error handler for uncaught errors
 window.onerror = function(message, source, lineno, colno, error) {
   console.error('[App] Global error:', { message, source, lineno, colno, error });
@@ -76,12 +61,6 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
 
-  // Initialize OneSignal and RevenueCat on mount
-  useEffect(() => {
-    initializeOneSignal().catch(console.error);
-    initializeRevenueCat().catch(console.error);
-  }, []);
-
   const checkAuth = useCallback(async () => {
     try {
       const storedToken = localStorage.getItem('auth_token');
@@ -91,16 +70,6 @@ const AuthProvider = ({ children }) => {
         });
         setUser(response.data);
         setToken(storedToken);
-        
-        // Set user for OneSignal notifications
-        setUserForNotifications(
-          response.data.user_id, 
-          response.data.email, 
-          response.data.subscription_tier
-        ).catch(console.error);
-        
-        // Set user for RevenueCat
-        setRevenueCatUser(response.data.user_id).catch(console.error);
       }
     } catch (error) {
       setUser(null);
@@ -121,13 +90,6 @@ const AuthProvider = ({ children }) => {
     localStorage.setItem('auth_token', newToken);
     setToken(newToken);
     setUser(userData);
-    
-    // Set user for OneSignal
-    setUserForNotifications(userData.user_id, userData.email, userData.subscription_tier).catch(console.error);
-    
-    // Set user for RevenueCat
-    setRevenueCatUser(userData.user_id).catch(console.error);
-    
     return userData;
   };
 
@@ -137,13 +99,6 @@ const AuthProvider = ({ children }) => {
     localStorage.setItem('auth_token', newToken);
     setToken(newToken);
     setUser(userData);
-    
-    // Set user for OneSignal
-    setUserForNotifications(userData.user_id, userData.email, userData.subscription_tier).catch(console.error);
-    
-    // Set user for RevenueCat
-    setRevenueCatUser(userData.user_id).catch(console.error);
-    
     return userData;
   };
 
@@ -165,12 +120,6 @@ const AuthProvider = ({ children }) => {
     localStorage.removeItem('auth_token');
     setToken(null);
     setUser(null);
-    
-    // Clear OneSignal user association
-    clearUserForNotifications().catch(console.error);
-    
-    // Clear RevenueCat user
-    clearRevenueCatUser().catch(console.error);
   };
 
   const refreshUser = async () => {
@@ -181,12 +130,6 @@ const AuthProvider = ({ children }) => {
           headers: { Authorization: `Bearer ${storedToken}` }
         });
         setUser(response.data);
-        
-        // Update OneSignal tags if subscription changed
-        updateUserTags({
-          subscription_tier: String(response.data.subscription_tier || 0),
-          is_subscribed: response.data.subscription_tier > 0 ? 'true' : 'false',
-        }).catch(console.error);
       }
     } catch (error) {
       console.error('Refresh user error:', error);

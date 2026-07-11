@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
-import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2, Ticket, RotateCcw } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Crown, ExternalLink, X, Tag, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { openPaymentUrl } from '../utils/browser';
 import { shouldHideExternalPurchases, shouldHideDiscounts, getWebsiteUrl, isIOSNativeApp } from '../utils/platform';
-import { isIOSNative, purchaseSubscription, restorePurchases } from '../utils/revenuecat';
 import {
   Dialog,
   DialogContent,
@@ -25,8 +24,6 @@ const PricingPage = () => {
   const [tiers, setTiers] = useState([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [isIOSApp, setIsIOSApp] = useState(false);
-  const [isIOSNativeApp, setIsIOSNativeApp] = useState(false);
-  const [restoring, setRestoring] = useState(false);
   
   // Discount code state
   const [discountCode, setDiscountCode] = useState('');
@@ -52,9 +49,7 @@ const PricingPage = () => {
   // Check if iOS app
   useEffect(() => {
     // isIOSApp is used for hiding external purchase options (PDF, physical books)
-    // isIOSNativeApp is used for RevenueCat IAP
     setIsIOSApp(shouldHideExternalPurchases());
-    setIsIOSNativeApp(isIOSNative());
   }, []);
 
   // Default features for each tier
@@ -186,71 +181,9 @@ const PricingPage = () => {
 
     setLoading(tier);
     
-    try {
-      const result = await purchaseSubscription(tier);
-      
-      if (result.success) {
-        toast.success('Subscription successful! Thank you for subscribing.');
-        
-        // Update user's subscription on backend
-        try {
-          await axios.post(`${API}/user/sync-subscription`, 
-            { tier: result.tier },
-            { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
-          );
-          
-          // Refresh user data
-          if (refreshUser) {
-            await refreshUser();
-          }
-        } catch (syncError) {
-          console.error('Error syncing subscription:', syncError);
-        }
-        
-        navigate('/library');
-      } else if (result.cancelled) {
-        toast.info('Purchase cancelled');
-      }
-    } catch (error) {
-      console.error('iOS purchase error:', error);
-      toast.error(error.message || 'Failed to complete purchase');
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  // Handle restore purchases (iOS)
-  const handleRestorePurchases = async () => {
-    setRestoring(true);
-    
-    try {
-      const result = await restorePurchases();
-      
-      if (result.success && result.tier > 0) {
-        toast.success(`Restored Tier ${result.tier} subscription!`);
-        
-        // Sync with backend
-        try {
-          await axios.post(`${API}/user/sync-subscription`, 
-            { tier: result.tier },
-            { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
-          );
-          
-          if (refreshUser) {
-            await refreshUser();
-          }
-        } catch (syncError) {
-          console.error('Error syncing restored subscription:', syncError);
-        }
-      } else {
-        toast.info('No purchases to restore');
-      }
-    } catch (error) {
-      console.error('Restore error:', error);
-      toast.error('Failed to restore purchases');
-    } finally {
-      setRestoring(false);
-    }
+    // Removed iOS RevenueCat purchase - all purchases now through Stripe
+    toast.info('Opening checkout...');
+    setLoading(null);
   };
 
   const initiateSubscribe = (tier) => {
@@ -260,9 +193,9 @@ const PricingPage = () => {
       return;
     }
 
-    // iOS Native App - Use RevenueCat In-App Purchase
-    if (isIOSNativeApp) {
-      handleIOSPurchase(tier);
+    // iOS Native App - Show message to subscribe via web
+    if (isIOSApp) {
+      toast.info('Please subscribe through our website for the best experience.');
       return;
     }
 
@@ -469,13 +402,10 @@ const PricingPage = () => {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-gold uppercase tracking-[0.2em] text-sm font-medium mb-4">Membership Plans</p>
           <h1 className="font-serif text-4xl md:text-6xl font-bold text-[#FDFBF7] tracking-tight mb-6">
-            {isIOSNativeApp ? 'Choose Your Plan' : isIOSApp ? 'Access Your Books' : 'Choose Your Access Level'}
+            {isIOSApp ? 'Access Your Books' : 'Choose Your Access Level'}
           </h1>
           <p className="text-xl text-[#B0C4BF] max-w-2xl mx-auto">
-            {isIOSNativeApp
-              ? 'Subscribe to unlock unlimited access to our Islamic book collection.'
-              : 'Subscribe monthly to read books, or buy individual PDFs without a subscription.'
-            }
+            Subscribe monthly to read books, or buy individual PDFs without a subscription.
           </p>
           
           {userTier > 0 && (
@@ -553,92 +483,6 @@ const PricingPage = () => {
           {tiersLoading ? (
             <div className="flex justify-center py-20">
               <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : isIOSNativeApp ? (
-            /* iOS Native App - Full pricing with Apple In-App Purchase */
-            <div className="space-y-8">
-              {/* Restore Purchases Button */}
-              <div className="text-center">
-                <Button
-                  onClick={handleRestorePurchases}
-                  disabled={restoring}
-                  variant="outline"
-                  className="border-gold/30 text-gold hover:bg-gold/10"
-                  data-testid="restore-purchases-btn"
-                >
-                  {restoring ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Restoring...
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Restore Purchases
-                    </>
-                  )}
-                </Button>
-              </div>
-              
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {tiers.filter(t => t.tier > 0).map((tier) => (
-                  <div 
-                    key={tier.tier}
-                    className={`rounded-lg border p-6 ${
-                      tier.featured 
-                        ? 'bg-gradient-to-b from-gold/20 to-gold/5 border-gold' 
-                        : 'bg-surface border-[rgba(212,175,55,0.2)]'
-                    } ${userTier === tier.tier ? 'ring-2 ring-gold' : ''}`}
-                  >
-                    <div className={`tier-badge ${tier.color} inline-block mb-3`}>
-                      Tier {tier.tier}
-                    </div>
-                    <h3 className="font-serif text-xl font-semibold text-[#FDFBF7] mb-2">
-                      {tier.name}
-                    </h3>
-                    <p className="text-2xl font-bold text-gold mb-4">
-                      ${tier.price}<span className="text-sm text-[#B0C4BF]">/mo</span>
-                    </p>
-                    <ul className="space-y-2 mb-6">
-                      {tier.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-[#B0C4BF]">
-                          <Check className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    {userTier === tier.tier ? (
-                      <div className="text-center text-gold text-sm font-medium py-3 border border-gold/30 rounded">
-                        ✓ Current Plan
-                      </div>
-                    ) : userTier > tier.tier ? (
-                      <div className="text-center text-[#B0C4BF] text-sm py-3">
-                        Included in your plan
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={() => initiateSubscribe(tier.tier)}
-                        disabled={loading === tier.tier}
-                        className="w-full bg-gold text-[#02120F] hover:bg-[#E9C85C]"
-                        data-testid={`subscribe-tier-${tier.tier}`}
-                      >
-                        {loading === tier.tier ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Processing...
-                          </>
-                        ) : (
-                          'Subscribe'
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              <p className="text-center text-xs text-[#B0C4BF] mt-4">
-                Subscriptions auto-renew monthly. Cancel anytime in Settings.
-              </p>
             </div>
           ) : (
           /* Web/Android - Full pricing cards with purchase buttons */

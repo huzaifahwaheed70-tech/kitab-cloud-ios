@@ -8,7 +8,7 @@
     "allowNavigation": ["*"]
   },
   "ios": {
-    "contentInset": "automatic",
+    "contentInset": "always",
     "allowsLinkPreview": false,
     "scrollEnabled": true,
     "backgroundColor": "#02120F",
@@ -16,7 +16,8 @@
     "preferredContentMode": "mobile"
   },
   "android": {
-    "backgroundColor": "#02120F"
+    "backgroundColor": "#02120F",
+    "allowMixedContent": true
   },
   "plugins": {
     "SplashScreen": {
@@ -26,10 +27,8 @@
     },
     "StatusBar": {
       "style": "DARK",
-      "backgroundColor": "#02120F"
-    },
-    "OneSignal": {
-      "appId": "31bf8b91-fdf9-427b-8908-9e52914d6d11"
+      "backgroundColor": "#02120F",
+      "overlaysWebView": false
     }
   }
 }
