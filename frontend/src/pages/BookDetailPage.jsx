@@ -525,6 +525,13 @@ const BookDetailPage = () => {
   const onDocumentLoadSuccessWithDoc = (pdf) => {
     setNumPages(pdf.numPages);
     setPdfDocument(pdf);
+    
+    // Clamp page number if saved progress exceeds actual pages
+    // (e.g., if PDF was replaced with a shorter one)
+    if (pageNumber > pdf.numPages) {
+      setPageNumber(1);
+      console.log(`[PDF] Clamped page number from ${pageNumber} to 1 (PDF has ${pdf.numPages} pages)`);
+    }
   };
 
   // In-book search function
