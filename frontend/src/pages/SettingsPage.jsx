@@ -415,7 +415,7 @@ const SettingsPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+        <div className="spinner-gap spinner-gap-lg"></div>
       </div>
     );
   }
