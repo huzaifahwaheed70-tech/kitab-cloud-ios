@@ -16,7 +16,11 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Set up PDF.js worker - using jsDelivr for reliability and version support
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+// Log worker initialization for debugging
+console.log('[PDF.js] Worker version:', pdfjs.version, '| Source:', pdfjs.GlobalWorkerOptions.workerSrc);
 
 const BookDetailPage = () => {
   const { bookId } = useParams();
@@ -757,9 +761,30 @@ const BookDetailPage = () => {
             <Document
               file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccessWithDoc}
+              onLoadError={(error) => {
+                console.error('PDF load error:', error);
+                toast.error('Failed to load PDF. Please refresh and try again.');
+              }}
               loading={
-                <div className="flex items-center justify-center py-20">
-                  <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="spinner-gap spinner-gap-lg mb-4"></div>
+                  <p className="text-[#B0C4BF] text-sm">Loading PDF...</p>
+                </div>
+              }
+              error={
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="text-red-400 mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <p className="text-[#FDFBF7] mb-2">Failed to load PDF</p>
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                  >
+                    Refresh Page
+                  </Button>
                 </div>
               }
             >
