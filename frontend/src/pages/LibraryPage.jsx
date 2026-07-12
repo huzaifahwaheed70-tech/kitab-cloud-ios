@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Search, Grid, List, Lock, BookMarked, Heart,
-  LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart, Flame
+  LogOut, Menu, X, ChevronRight, User, Settings, PlayCircle, ShoppingCart, Flame, Crown
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -465,8 +465,8 @@ const LibraryPage = () => {
           <ReadingStreakDashboard compact />
         </div>
 
-        {/* Reading List Status Banner for Subscribed Users */}
-        {userTier > 0 && (
+        {/* Reading List Status Banner for Subscribed Users (Not shown for Tier 4 - unlimited access) */}
+        {userTier > 0 && userTier < 4 && (
           <div className={`mb-8 p-6 rounded-sm border ${bookshelf.is_locked ? 'bg-gradient-to-r from-red-500/20 to-red-500/5 border-red-500/30' : 'bg-gradient-to-r from-[#082E26]/50 to-[#082E26]/20 border-gold/30'}`}>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -489,12 +489,12 @@ const LibraryPage = () => {
                   ) : (
                     <>
                       <h3 className="font-serif text-xl text-[#FDFBF7] mb-1">
-                        Your Reading List: {bookshelf.count}/{bookshelf.limit === null ? '∞' : bookshelf.limit} books
+                        Your Reading List: {bookshelf.count}/{bookshelf.limit} books
                       </h3>
                       <p className="text-[#B0C4BF]">
                         {bookshelf.count === 0 
                           ? "Add books to your reading list to start reading. Click on a book and tap 'Add to Reading List'."
-                          : `You have ${bookshelf.limit === null ? 'unlimited' : (bookshelf.limit - bookshelf.count)} slots remaining this month.`
+                          : `You have ${bookshelf.limit - bookshelf.count} slots remaining this month.`
                         }
                       </p>
                     </>
@@ -510,6 +510,23 @@ const LibraryPage = () => {
                   {bookshelf.is_locked ? 'View Locked List' : 'View Reading List'}
                 </Button>
               </Link>
+            </div>
+          </div>
+        )}
+        
+        {/* Premium Tier 4 Banner - Unlimited Access */}
+        {userTier >= 4 && (
+          <div className="mb-8 p-6 rounded-sm border bg-gradient-to-r from-gold/10 to-amber-500/5 border-gold/30">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gold/20">
+                <Crown className="w-6 h-6 text-gold" />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl text-gold mb-1">Premium Unlimited Access</h3>
+                <p className="text-[#B0C4BF]">
+                  As a Premium member, you have unlimited access to all books. No monthly reading limits apply to your account.
+                </p>
+              </div>
             </div>
           </div>
         )}

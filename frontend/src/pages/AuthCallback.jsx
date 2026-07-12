@@ -64,7 +64,7 @@ const AuthCallback = () => {
   return (
     <div className="min-h-screen bg-dark flex items-center justify-center">
       <div className="text-center">
-        <div className="w-16 h-16 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <div className="spinner-gap spinner-gap-lg mx-auto mb-4"></div>
         <p className="text-[#B0C4BF]">Signing you in with Google...</p>
       </div>
     </div>

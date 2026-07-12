@@ -89,9 +89,14 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
+    // CRITICAL: If returning from OAuth callback for LOGIN (not linking), skip the /me check.
     // AuthCallback will exchange the session_id and establish the session first.
-    if (window.location.hash?.includes('session_id=')) {
+    // BUT: If this is a Google LINK callback (/settings with link_google=true), 
+    // we still need to check auth to keep the existing session
+    const isLinkCallback = window.location.search?.includes('link_google=true') ||
+      window.location.pathname === '/settings';
+    
+    if (window.location.hash?.includes('session_id=') && !isLinkCallback) {
       setLoading(false);
       return;
     }
@@ -165,7 +170,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <BookSpinner size="lg" />
+        <div className="spinner-gap spinner-gap-lg"></div>
       </div>
     );
   }
@@ -188,9 +193,10 @@ const AppRouter = () => {
   
   // CRITICAL: Check URL hash for session_id during render (NOT in useEffect)
   // This synchronous check prevents race conditions by processing OAuth callback FIRST
-  // HOWEVER: Skip if this is a Google Link callback (link_google=true in query)
+  // HOWEVER: Skip if this is a Google Link callback (link_google=true in query OR path is /settings)
   // The Settings page handles its own linking flow
-  const isGoogleLinkCallback = location.search?.includes('link_google=true');
+  const isGoogleLinkCallback = location.search?.includes('link_google=true') || 
+    (location.pathname === '/settings' && location.hash?.includes('session_id='));
   
   if (location.hash?.includes('session_id=') && !isGoogleLinkCallback) {
     return <AuthCallback />;
