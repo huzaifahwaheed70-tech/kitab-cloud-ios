@@ -34,7 +34,6 @@ const LibraryPage = () => {
   const [isIOSApp, setIsIOSApp] = useState(false);
   const [bookshelf, setBookshelf] = useState({ books: [], count: 0, limit: null, is_locked: false });
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
-  const [showStreakDashboard, setShowStreakDashboard] = useState(false);
 
   // Check if iOS app (hide external purchases like PDF and physical books)
   useEffect(() => {
@@ -458,15 +457,8 @@ const LibraryPage = () => {
           </div>
         )}
 
-        {/* Reading Streak Dashboard - Expandable */}
-        {showStreakDashboard && (
-          <div className="mb-8 animate-in slide-in-from-top duration-200">
-            <ReadingStreakDashboard />
-          </div>
-        )}
-
-        {/* Compact Streak Widget for Mobile */}
-        <div className="md:hidden mb-6">
+        {/* Compact Streak Widget - Clickable to full page */}
+        <div className="mb-6">
           <ReadingStreakDashboard compact />
         </div>
 
@@ -568,7 +560,7 @@ const LibraryPage = () => {
         {/* Loading State */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+            <div className="spinner-gap spinner-gap-lg"></div>
           </div>
         ) : books.length === 0 ? (
           <div className="text-center py-20">

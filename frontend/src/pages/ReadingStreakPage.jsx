@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Flame, Trophy, Target, Calendar, BookOpen, Clock, TrendingUp,
-  ArrowLeft, Star, Award, ChevronRight, Edit2, Check, X
+  ArrowLeft, Star, Award, ChevronRight, Edit2, Check, X, FileText
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -18,9 +18,12 @@ const ReadingStreakPage = () => {
   const [streak, setStreak] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [newGoal, setNewGoal] = useState(7);
+  const [editingGoal, setEditingGoal] = useState(null); // null, 'days', 'pages', 'minutes'
+  const [newGoalDays, setNewGoalDays] = useState(7);
+  const [newGoalPages, setNewGoalPages] = useState(20);
+  const [newGoalMinutes, setNewGoalMinutes] = useState(30);
   const [activeTab, setActiveTab] = useState('overview'); // overview, history, goals
+  const [savingGoal, setSavingGoal] = useState(false);
   
   useEffect(() => {
     if (token) {
@@ -39,7 +42,9 @@ const ReadingStreakPage = () => {
       
       setStreak(streakRes.data);
       setStats(statsRes.data);
-      setNewGoal(streakRes.data?.reading_goal_days || 7);
+      setNewGoalDays(streakRes.data?.reading_goal_days || 7);
+      setNewGoalPages(streakRes.data?.reading_goal_pages || 20);
+      setNewGoalMinutes(streakRes.data?.reading_goal_minutes || 30);
     } catch (error) {
       console.error('Error fetching reading data:', error);
       toast.error('Failed to load reading data');
@@ -48,15 +53,28 @@ const ReadingStreakPage = () => {
     }
   };
   
-  const updateGoal = async () => {
+  const updateGoal = async (type) => {
+    setSavingGoal(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API}/reading-streak/goal?goal_days=${newGoal}`, {}, { headers });
-      toast.success('Reading goal updated!');
-      setEditingGoal(false);
+      let params = new URLSearchParams();
+      
+      if (type === 'days') {
+        params.append('goal_days', newGoalDays);
+      } else if (type === 'pages') {
+        params.append('goal_pages', newGoalPages);
+      } else if (type === 'minutes') {
+        params.append('goal_minutes', newGoalMinutes);
+      }
+      
+      await axios.put(`${API}/reading-streak/goal?${params.toString()}`, {}, { headers });
+      toast.success('Goal updated!');
+      setEditingGoal(null);
       fetchData();
     } catch (error) {
-      toast.error('Failed to update goal');
+      toast.error(error.response?.data?.detail || 'Failed to update goal');
+    } finally {
+      setSavingGoal(false);
     }
   };
   
@@ -157,6 +175,43 @@ const ReadingStreakPage = () => {
                 </div>
                 <p className="text-3xl font-bold text-[#FDFBF7]">{streak?.total_reading_days || 0}</p>
                 <p className="text-sm text-[#B0C4BF]">Total Days</p>
+              </div>
+            </div>
+            
+            {/* Today's Progress */}
+            <div className="glass-card p-6 rounded-xl">
+              <h2 className="font-serif text-lg text-[#FDFBF7] mb-4">Today's Progress</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[#B0C4BF] text-sm flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Pages
+                    </span>
+                    <span className="text-gold font-medium">{streak?.pages_today || 0}/{streak?.reading_goal_pages || 20}</span>
+                  </div>
+                  <div className="h-3 bg-[#02120F] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-700"
+                      style={{ width: `${Math.min(100, ((streak?.pages_today || 0) / (streak?.reading_goal_pages || 20)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[#B0C4BF] text-sm flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Time
+                    </span>
+                    <span className="text-gold font-medium">{streak?.minutes_today || 0}/{streak?.reading_goal_minutes || 30}m</span>
+                  </div>
+                  <div className="h-3 bg-[#02120F] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-700"
+                      style={{ width: `${Math.min(100, ((streak?.minutes_today || 0) / (streak?.reading_goal_minutes || 30)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -317,18 +372,23 @@ const ReadingStreakPage = () => {
         {/* Goals Tab */}
         {activeTab === 'goals' && (
           <div className="space-y-6">
-            {/* Weekly Goal Setting */}
+            {/* Days Per Week Goal */}
             <div className="glass-card p-6 rounded-xl">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <Target className="w-6 h-6 text-gold" />
-                  <h2 className="font-serif text-lg text-[#FDFBF7]">Weekly Reading Goal</h2>
+                  <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-gold" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-lg text-[#FDFBF7]">Days Per Week</h2>
+                    <p className="text-sm text-[#B0C4BF]">How many days do you want to read each week?</p>
+                  </div>
                 </div>
-                {!editingGoal && (
+                {editingGoal !== 'days' && (
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => setEditingGoal(true)}
+                    onClick={() => setEditingGoal('days')}
                     className="text-gold hover:bg-gold/10"
                   >
                     <Edit2 className="w-4 h-4 mr-1" />
@@ -337,16 +397,15 @@ const ReadingStreakPage = () => {
                 )}
               </div>
               
-              {editingGoal ? (
+              {editingGoal === 'days' ? (
                 <div className="space-y-4">
-                  <p className="text-[#B0C4BF]">How many days per week do you want to read?</p>
                   <div className="flex gap-2 flex-wrap">
                     {[1, 2, 3, 4, 5, 6, 7].map(days => (
                       <button
                         key={days}
-                        onClick={() => setNewGoal(days)}
+                        onClick={() => setNewGoalDays(days)}
                         className={`w-12 h-12 rounded-lg font-bold transition-all ${
-                          newGoal === days
+                          newGoalDays === days
                             ? 'bg-gold text-[#02120F]'
                             : 'bg-[#082E26] text-[#B0C4BF] hover:border-gold/30 border border-transparent'
                         }`}
@@ -356,29 +415,154 @@ const ReadingStreakPage = () => {
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={updateGoal} className="bg-gold text-[#02120F] hover:bg-[#E9C85C]">
-                      <Check className="w-4 h-4 mr-1" />
+                    <Button 
+                      onClick={() => updateGoal('days')} 
+                      disabled={savingGoal}
+                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                    >
+                      {savingGoal ? <div className="spinner-gap spinner-gap-sm mr-2"></div> : <Check className="w-4 h-4 mr-1" />}
                       Save
                     </Button>
-                    <Button variant="outline" onClick={() => setEditingGoal(false)} className="border-gold/30 text-[#FDFBF7]">
+                    <Button variant="outline" onClick={() => setEditingGoal(null)} className="border-gold/30 text-[#FDFBF7]">
                       <X className="w-4 h-4 mr-1" />
                       Cancel
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div>
-                  <p className="text-4xl font-bold text-gold mb-2">{streak?.reading_goal_days || 7} days</p>
-                  <p className="text-[#B0C4BF]">
-                    You've read {streak?.goal_progress || 0} out of {streak?.reading_goal_days || 7} days this week
-                  </p>
-                  
-                  {(streak?.goal_progress || 0) >= (streak?.reading_goal_days || 7) && (
-                    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center gap-2">
-                      <Check className="w-5 h-5 text-emerald-400" />
-                      <span className="text-emerald-400 font-medium">Goal achieved this week! 🎉</span>
-                    </div>
-                  )}
+                <div className="flex items-center justify-between">
+                  <p className="text-4xl font-bold text-gold">{streak?.reading_goal_days || 7} days</p>
+                  <p className="text-[#B0C4BF]">{streak?.goal_progress || 0}/{streak?.reading_goal_days || 7} this week</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Daily Pages Goal */}
+            <div className="glass-card p-6 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-lg text-[#FDFBF7]">Daily Pages Goal</h2>
+                    <p className="text-sm text-[#B0C4BF]">How many pages do you want to read each day?</p>
+                  </div>
+                </div>
+                {editingGoal !== 'pages' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setEditingGoal('pages')}
+                    className="text-gold hover:bg-gold/10"
+                  >
+                    <Edit2 className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+              
+              {editingGoal === 'pages' ? (
+                <div className="space-y-4">
+                  <div className="flex gap-2 flex-wrap">
+                    {[5, 10, 15, 20, 30, 50, 75, 100].map(pages => (
+                      <button
+                        key={pages}
+                        onClick={() => setNewGoalPages(pages)}
+                        className={`px-4 py-3 rounded-lg font-bold transition-all ${
+                          newGoalPages === pages
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-[#082E26] text-[#B0C4BF] hover:border-blue-500/30 border border-transparent'
+                        }`}
+                      >
+                        {pages}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => updateGoal('pages')} 
+                      disabled={savingGoal}
+                      className="bg-blue-500 text-white hover:bg-blue-400"
+                    >
+                      {savingGoal ? <div className="spinner-gap spinner-gap-sm mr-2"></div> : <Check className="w-4 h-4 mr-1" />}
+                      Save
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingGoal(null)} className="border-gold/30 text-[#FDFBF7]">
+                      <X className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-4xl font-bold text-blue-400">{streak?.reading_goal_pages || 20} pages</p>
+                  <p className="text-[#B0C4BF]">{streak?.pages_today || 0}/{streak?.reading_goal_pages || 20} today</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Daily Reading Time Goal */}
+            <div className="glass-card p-6 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-lg text-[#FDFBF7]">Daily Reading Time</h2>
+                    <p className="text-sm text-[#B0C4BF]">How many minutes do you want to read each day?</p>
+                  </div>
+                </div>
+                {editingGoal !== 'minutes' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setEditingGoal('minutes')}
+                    className="text-gold hover:bg-gold/10"
+                  >
+                    <Edit2 className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+              
+              {editingGoal === 'minutes' ? (
+                <div className="space-y-4">
+                  <div className="flex gap-2 flex-wrap">
+                    {[10, 15, 20, 30, 45, 60, 90, 120].map(mins => (
+                      <button
+                        key={mins}
+                        onClick={() => setNewGoalMinutes(mins)}
+                        className={`px-4 py-3 rounded-lg font-bold transition-all ${
+                          newGoalMinutes === mins
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-[#082E26] text-[#B0C4BF] hover:border-purple-500/30 border border-transparent'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => updateGoal('minutes')} 
+                      disabled={savingGoal}
+                      className="bg-purple-500 text-white hover:bg-purple-400"
+                    >
+                      {savingGoal ? <div className="spinner-gap spinner-gap-sm mr-2"></div> : <Check className="w-4 h-4 mr-1" />}
+                      Save
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingGoal(null)} className="border-gold/30 text-[#FDFBF7]">
+                      <X className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-4xl font-bold text-purple-400">{streak?.reading_goal_minutes || 30} min</p>
+                  <p className="text-[#B0C4BF]">{streak?.minutes_today || 0}/{streak?.reading_goal_minutes || 30}m today</p>
                 </div>
               )}
             </div>

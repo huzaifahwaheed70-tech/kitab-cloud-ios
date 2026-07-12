@@ -623,8 +623,12 @@ class ReadingStreakResponse(BaseModel):
     longest_streak: int = 0
     total_reading_days: int = 0
     last_read_date: Optional[str] = None
-    reading_goal_days: int = 7  # Default weekly goal
+    reading_goal_days: int = 7  # Default weekly goal (days per week)
+    reading_goal_pages: int = 20  # Default daily pages goal
+    reading_goal_minutes: int = 30  # Default daily reading time goal (minutes)
     goal_progress: int = 0  # Days read this week
+    pages_today: int = 0  # Pages read today
+    minutes_today: int = 0  # Minutes read today
     
 class ReadingStatsResponse(BaseModel):
     total_books_read: int = 0
@@ -1801,31 +1805,69 @@ async def get_reading_streak(user: dict = Depends(get_current_user)):
         }
     )
     
+    # Calculate today's progress
+    today_sessions = await db.reading_sessions.find(
+        {
+            "user_id": user_id,
+            "date": today.isoformat()
+        },
+        {"_id": 0}
+    ).to_list(100)
+    
+    pages_today = sum(s.get("pages_read", 0) for s in today_sessions)
+    minutes_today = sum(s.get("reading_time_minutes", 0) for s in today_sessions)
+    
     return ReadingStreakResponse(
         current_streak=streak_doc.get("current_streak", 0),
         longest_streak=streak_doc.get("longest_streak", 0),
         total_reading_days=streak_doc.get("total_reading_days", 0),
         last_read_date=streak_doc.get("last_read_date"),
         reading_goal_days=streak_doc.get("reading_goal_days", 7),
-        goal_progress=len(week_sessions)
+        reading_goal_pages=streak_doc.get("reading_goal_pages", 20),
+        reading_goal_minutes=streak_doc.get("reading_goal_minutes", 30),
+        goal_progress=len(week_sessions),
+        pages_today=pages_today,
+        minutes_today=minutes_today
     )
 
 
 @api_router.put("/reading-streak/goal")
-async def update_reading_goal(goal_days: int, user: dict = Depends(get_current_user)):
-    """Update user's weekly reading goal"""
-    if goal_days < 1 or goal_days > 7:
-        raise HTTPException(status_code=400, detail="Goal must be between 1 and 7 days")
-    
+async def update_reading_goal(
+    goal_days: Optional[int] = None,
+    goal_pages: Optional[int] = None,
+    goal_minutes: Optional[int] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Update user's reading goals (days per week, pages per day, minutes per day)"""
     user_id = user["user_id"]
+    
+    update_fields = {}
+    
+    if goal_days is not None:
+        if goal_days < 1 or goal_days > 7:
+            raise HTTPException(status_code=400, detail="Days goal must be between 1 and 7")
+        update_fields["reading_goal_days"] = goal_days
+    
+    if goal_pages is not None:
+        if goal_pages < 1 or goal_pages > 500:
+            raise HTTPException(status_code=400, detail="Pages goal must be between 1 and 500")
+        update_fields["reading_goal_pages"] = goal_pages
+    
+    if goal_minutes is not None:
+        if goal_minutes < 5 or goal_minutes > 480:
+            raise HTTPException(status_code=400, detail="Minutes goal must be between 5 and 480")
+        update_fields["reading_goal_minutes"] = goal_minutes
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="At least one goal must be provided")
     
     await db.reading_streaks.update_one(
         {"user_id": user_id},
-        {"$set": {"reading_goal_days": goal_days}},
+        {"$set": update_fields},
         upsert=True
     )
     
-    return {"message": "Reading goal updated", "goal_days": goal_days}
+    return {"message": "Reading goals updated", **update_fields}
 
 
 @api_router.get("/reading-stats", response_model=ReadingStatsResponse)

@@ -630,7 +630,7 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+        <div className="spinner-gap spinner-gap-lg"></div>
       </div>
     );
   }
@@ -1716,7 +1716,7 @@ const AdminDashboard = () => {
 
               {tierLoading ? (
                 <div className="flex justify-center py-12">
-                  <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                  <div className="spinner-gap spinner-gap-md"></div>
                 </div>
               ) : Object.keys(tierSettings).length === 0 ? (
                 <div className="text-center py-12">

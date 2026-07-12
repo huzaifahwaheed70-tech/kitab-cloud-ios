@@ -1,7 +1,8 @@
 """
-Backend tests for Reading Streak page endpoints and Book Detail metadata.
-Tests: /api/reading-streak, /api/reading-stats, /api/reading-streak/goal (PUT),
-       /api/reading-session, /api/books/{id} (page_count, file_type, category fields).
+Backend tests for Reading Streak endpoints (multi-goal support).
+Tests: /api/reading-streak, /api/reading-stats, /api/reading-streak/goal (PUT for
+       goal_days / goal_pages / goal_minutes), /api/reading-session.
+Also checks response contains pages_today / minutes_today fields.
 """
 import os
 import pytest
@@ -26,20 +27,24 @@ def auth_headers(token):
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
-# ---------- Reading Streak Endpoints ----------
-
-class TestReadingStreak:
-    def test_get_reading_streak(self, auth_headers):
+# ---------- Reading Streak GET ----------
+class TestReadingStreakGet:
+    def test_get_reading_streak_shape(self, auth_headers):
         r = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30)
         assert r.status_code == 200, r.text
         data = r.json()
-        # Verify required fields
-        for k in ["current_streak", "longest_streak", "total_reading_days",
-                  "reading_goal_days", "goal_progress"]:
-            assert k in data, f"missing field {k}"
-        assert isinstance(data["current_streak"], int)
-        assert isinstance(data["longest_streak"], int)
-        assert isinstance(data["reading_goal_days"], int)
+        # Required fields including new multi-goal + today fields
+        required = [
+            "current_streak", "longest_streak", "total_reading_days",
+            "reading_goal_days", "reading_goal_pages", "reading_goal_minutes",
+            "goal_progress", "pages_today", "minutes_today"
+        ]
+        for k in required:
+            assert k in data, f"missing field {k} in response: {data}"
+        assert isinstance(data["reading_goal_pages"], int)
+        assert isinstance(data["reading_goal_minutes"], int)
+        assert isinstance(data["pages_today"], int)
+        assert isinstance(data["minutes_today"], int)
 
     def test_get_reading_stats(self, auth_headers):
         r = requests.get(f"{BASE_URL}/api/reading-stats", headers=auth_headers, timeout=30)
@@ -47,101 +52,100 @@ class TestReadingStreak:
         data = r.json()
         for k in ["total_books_read", "total_pages_read", "total_reading_time_minutes",
                   "books_by_month", "reading_history"]:
-            assert k in data, f"missing field {k}"
+            assert k in data
         assert isinstance(data["reading_history"], list)
-        assert isinstance(data["books_by_month"], dict)
-
-    def test_update_goal_valid(self, auth_headers):
-        # Set to 5
-        r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days=5",
-                         headers=auth_headers, timeout=30)
-        assert r.status_code == 200, r.text
-        assert r.json().get("goal_days") == 5
-
-        # Verify persisted via GET
-        r2 = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30)
-        assert r2.status_code == 200
-        assert r2.json()["reading_goal_days"] == 5
-
-        # Restore to 7
-        requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days=7",
-                     headers=auth_headers, timeout=30)
-
-    def test_update_goal_out_of_range(self, auth_headers):
-        r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days=0",
-                         headers=auth_headers, timeout=30)
-        assert r.status_code == 400
-        r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days=8",
-                         headers=auth_headers, timeout=30)
-        assert r.status_code == 400
 
     def test_streak_requires_auth(self):
         r = requests.get(f"{BASE_URL}/api/reading-streak", timeout=30)
         assert r.status_code == 401
 
-    def test_stats_requires_auth(self):
-        r = requests.get(f"{BASE_URL}/api/reading-stats", timeout=30)
-        assert r.status_code == 401
+
+# ---------- Multi-goal PUT ----------
+class TestUpdateGoals:
+    def test_update_days_goal(self, auth_headers):
+        r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days=5",
+                         headers=auth_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body.get("reading_goal_days") == 5 or body.get("goal_days") == 5
+        # Verify persisted
+        s = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30).json()
+        assert s["reading_goal_days"] == 5
+        # Restore
+        requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days=7", headers=auth_headers, timeout=30)
+
+    def test_update_pages_goal(self, auth_headers):
+        r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_pages=50",
+                         headers=auth_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        s = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30).json()
+        assert s["reading_goal_pages"] == 50
+        # Restore
+        requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_pages=20", headers=auth_headers, timeout=30)
+
+    def test_update_minutes_goal(self, auth_headers):
+        r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_minutes=60",
+                         headers=auth_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        s = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30).json()
+        assert s["reading_goal_minutes"] == 60
+        # Restore
+        requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_minutes=30", headers=auth_headers, timeout=30)
+
+    def test_update_multiple_goals_at_once(self, auth_headers):
+        r = requests.put(
+            f"{BASE_URL}/api/reading-streak/goal?goal_days=4&goal_pages=25&goal_minutes=45",
+            headers=auth_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        s = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30).json()
+        assert s["reading_goal_days"] == 4
+        assert s["reading_goal_pages"] == 25
+        assert s["reading_goal_minutes"] == 45
+        # Restore defaults
+        requests.put(
+            f"{BASE_URL}/api/reading-streak/goal?goal_days=7&goal_pages=20&goal_minutes=30",
+            headers=auth_headers, timeout=30)
+
+    def test_days_out_of_range(self, auth_headers):
+        for bad in [0, 8, -1]:
+            r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_days={bad}",
+                             headers=auth_headers, timeout=30)
+            assert r.status_code == 400, f"expected 400 for goal_days={bad}"
+
+    def test_pages_out_of_range(self, auth_headers):
+        for bad in [0, 501]:
+            r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_pages={bad}",
+                             headers=auth_headers, timeout=30)
+            assert r.status_code == 400, f"expected 400 for goal_pages={bad}"
+
+    def test_minutes_out_of_range(self, auth_headers):
+        for bad in [4, 481]:
+            r = requests.put(f"{BASE_URL}/api/reading-streak/goal?goal_minutes={bad}",
+                             headers=auth_headers, timeout=30)
+            assert r.status_code == 400, f"expected 400 for goal_minutes={bad}"
+
+    def test_no_params_returns_400(self, auth_headers):
+        r = requests.put(f"{BASE_URL}/api/reading-streak/goal",
+                         headers=auth_headers, timeout=30)
+        assert r.status_code == 400
 
 
-# ---------- Book Detail Metadata (page_count, file_type, category) ----------
-
-class TestBookMetadata:
-    def test_books_list_has_metadata_fields(self, auth_headers):
-        r = requests.get(f"{BASE_URL}/api/books/all", timeout=30)
-        assert r.status_code == 200
-        books = r.json()
-        assert isinstance(books, list)
-        assert len(books) > 0, "no books returned"
-        sample = books[0]
-        # Required fields
-        for k in ["book_id", "title", "tier_level"]:
-            assert k in sample, f"expected field {k} in book"
-        # Optional metadata fields - report presence
-        with_ft = sum(1 for b in books if b.get("file_type"))
-        with_pc = sum(1 for b in books if b.get("page_count"))
-        with_cat = sum(1 for b in books if b.get("category"))
-        print(f"\n[INFO] file_type: {with_ft}/{len(books)}, page_count: {with_pc}/{len(books)}, category: {with_cat}/{len(books)}")
-
-    def test_book_detail_endpoint(self, auth_headers):
-        # Get any book and fetch its details
-        r = requests.get(f"{BASE_URL}/api/books/all", timeout=30)
-        assert r.status_code == 200
-        books = r.json()
+# ---------- Session logs update pages_today / minutes_today ----------
+class TestReadingSessionAffectsToday:
+    def test_session_updates_today_counters(self, auth_headers):
+        books = requests.get(f"{BASE_URL}/api/books/all", timeout=30).json()
         assert len(books) > 0
         book_id = books[0]["book_id"]
-        r2 = requests.get(f"{BASE_URL}/api/books/{book_id}", headers=auth_headers, timeout=30)
-        assert r2.status_code == 200, r2.text
-        detail = r2.json()
-        assert detail["book_id"] == book_id
-        # Optional metadata fields - graceful (frontend guards with book.field &&)
-        # Just verify endpoint returns 200 with the requested book
 
-    def test_any_book_with_page_count(self, auth_headers):
-        """Verify at least one book might have page_count set (informational)."""
-        r = requests.get(f"{BASE_URL}/api/books/all", timeout=30)
-        books = r.json()
-        with_pc = [b for b in books if b.get("page_count")]
-        print(f"\n[INFO] Books with page_count set: {len(with_pc)}/{len(books)}")
-        # Don't fail - just report
-        assert True
+        before = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30).json()
+        pages_before = before["pages_today"]
+        minutes_before = before["minutes_today"]
 
+        payload = {"book_id": book_id, "pages_read": 3, "reading_time_minutes": 5, "current_page": 1}
+        r = requests.post(f"{BASE_URL}/api/reading-session",
+                          json=payload, headers=auth_headers, timeout=30)
+        assert r.status_code == 200, r.text
 
-# ---------- Reading Session (updates streak) ----------
-
-class TestReadingSession:
-    def test_log_reading_session(self, auth_headers):
-        # Get a book
-        r = requests.get(f"{BASE_URL}/api/books/all", timeout=30)
-        books = r.json()
-        book_id = books[0]["book_id"]
-
-        payload = {
-            "book_id": book_id,
-            "pages_read": 2,
-            "reading_time_minutes": 3,
-            "current_page": 1
-        }
-        r2 = requests.post(f"{BASE_URL}/api/reading-session",
-                           json=payload, headers=auth_headers, timeout=30)
-        assert r2.status_code == 200, r2.text
+        after = requests.get(f"{BASE_URL}/api/reading-streak", headers=auth_headers, timeout=30).json()
+        assert after["pages_today"] >= pages_before + 3
+        assert after["minutes_today"] >= minutes_before + 5

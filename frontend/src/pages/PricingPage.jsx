@@ -482,7 +482,7 @@ const PricingPage = () => {
         <div className="max-w-7xl mx-auto px-6">
           {tiersLoading ? (
             <div className="flex justify-center py-20">
-              <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+              <div className="spinner-gap spinner-gap-lg"></div>
             </div>
           ) : (
           /* Web/Android - Full pricing cards with purchase buttons */

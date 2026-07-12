@@ -195,7 +195,7 @@ const LandingPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+        <div className="spinner-gap spinner-gap-lg"></div>
       </div>
     );
   }
@@ -370,7 +370,7 @@ const LandingPage = () => {
           
           {loadingBooks ? (
             <div className="flex justify-center py-12">
-              <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+              <div className="spinner-gap spinner-gap-md"></div>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">

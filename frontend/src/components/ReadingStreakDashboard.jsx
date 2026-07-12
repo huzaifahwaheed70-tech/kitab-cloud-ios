@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 /**
  * Reading Streak Dashboard Component
  * Shows current streak, longest streak, reading goals, and statistics
+ * Compact mode links to the full Reading Streak page
  */
 const ReadingStreakDashboard = ({ compact = false }) => {
   const { token } = useAuth();
@@ -59,22 +61,29 @@ const ReadingStreakDashboard = ({ compact = false }) => {
   
   if (loading) {
     return (
-      <div className="animate-pulse">
-        <div className="h-24 bg-gold/10 rounded-xl"></div>
+      <div className="glass-card rounded-xl p-4">
+        <div className="spinner-gap spinner-gap-sm mx-auto"></div>
       </div>
     );
   }
   
-  // Compact view for sidebar or small spaces
+  // Compact view for sidebar or small spaces - clickable to full page
   if (compact) {
     return (
-      <div className="bg-gradient-to-br from-[#0a3d32] to-[#082E26] rounded-xl p-4 border border-gold/20">
+      <Link 
+        to="/reading-streak" 
+        className="block bg-gradient-to-br from-[#0a3d32] to-[#082E26] rounded-xl p-4 border border-gold/20 hover:border-gold/40 transition-colors group"
+        data-testid="compact-streak-dashboard"
+      >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Flame className="w-5 h-5 text-orange-500" />
             <span className="text-[#FDFBF7] font-semibold">Reading Streak</span>
           </div>
-          <span className="text-2xl font-bold text-gold">{streak?.current_streak || 0}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold text-gold">{streak?.current_streak || 0}</span>
+            <ChevronRight className="w-4 h-4 text-gold/50 group-hover:text-gold transition-colors" />
+          </div>
         </div>
         
         {/* Weekly Progress Bar */}
@@ -96,9 +105,9 @@ const ReadingStreakDashboard = ({ compact = false }) => {
             <Trophy className="w-3 h-3 text-gold" />
             Best: {streak?.longest_streak || 0} days
           </span>
-          <span>{streak?.total_reading_days || 0} total days</span>
+          <span className="text-gold/70 group-hover:text-gold">View Details →</span>
         </div>
-      </div>
+      </Link>
     );
   }
   
