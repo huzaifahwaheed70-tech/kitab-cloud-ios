@@ -30,14 +30,11 @@ import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import AuthCallback from './pages/AuthCallback';
 import MobileWelcomeScreen from './pages/MobileWelcomeScreen';
+import ReadingStreakPage from './pages/ReadingStreakPage';
 
 // Platform detection
 import { isCapacitorApp } from './utils/platform';
-
-// Components
-import { BookSpinner } from './components/BookLoader';
 
 // HARDCODED production URL for iOS Capacitor builds
 // Codemagic env vars may not be injected properly during React build
@@ -89,17 +86,6 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // CRITICAL: If returning from OAuth callback for LOGIN (not linking), skip the /me check.
-    // AuthCallback will exchange the session_id and establish the session first.
-    // BUT: If this is a Google LINK callback (/settings with link_google=true), 
-    // we still need to check auth to keep the existing session
-    const isLinkCallback = window.location.search?.includes('link_google=true') ||
-      window.location.pathname === '/settings';
-    
-    if (window.location.hash?.includes('session_id=') && !isLinkCallback) {
-      setLoading(false);
-      return;
-    }
     checkAuth();
   }, [checkAuth]);
 
@@ -188,19 +174,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 
 // App Router Component
 const AppRouter = () => {
-  const location = useLocation();
   const { user } = useAuth();
-  
-  // CRITICAL: Check URL hash for session_id during render (NOT in useEffect)
-  // This synchronous check prevents race conditions by processing OAuth callback FIRST
-  // HOWEVER: Skip if this is a Google Link callback (link_google=true in query OR path is /settings)
-  // The Settings page handles its own linking flow
-  const isGoogleLinkCallback = location.search?.includes('link_google=true') || 
-    (location.pathname === '/settings' && location.hash?.includes('session_id='));
-  
-  if (location.hash?.includes('session_id=') && !isGoogleLinkCallback) {
-    return <AuthCallback />;
-  }
   
   // Determine home page based on platform and auth state
   // - Capacitor app + not logged in = Mobile Welcome Screen
@@ -254,6 +228,12 @@ const AppRouter = () => {
       <Route path="/favorites" element={
         <ProtectedRoute>
           <FavoritesPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/reading-streak" element={
+        <ProtectedRoute>
+          <ReadingStreakPage />
         </ProtectedRoute>
       } />
       

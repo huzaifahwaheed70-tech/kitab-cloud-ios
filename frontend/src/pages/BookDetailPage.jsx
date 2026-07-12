@@ -931,6 +931,31 @@ const BookDetailPage = () => {
                 </div>
               </div>
 
+              {/* Book Metadata: Page Count, Tier, Search */}
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                {book.page_count && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded border border-[rgba(212,175,55,0.2)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-[#FDFBF7] font-medium">{book.page_count} Pages</span>
+                  </div>
+                )}
+                {book.file_type && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded border border-[rgba(212,175,55,0.2)]">
+                    <span className={`text-xs font-bold uppercase ${book.file_type === 'pdf' ? 'text-red-400' : 'text-blue-400'}`}>
+                      {book.file_type}
+                    </span>
+                  </div>
+                )}
+                {book.category && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-surface rounded border border-[rgba(212,175,55,0.2)]">
+                    <Tag className="w-4 h-4 text-gold" />
+                    <span className="text-[#B0C4BF]">{book.category}</span>
+                  </div>
+                )}
+              </div>
+
               {book.description && (
                 <p className="text-[#B0C4BF] leading-relaxed text-lg">
                   {book.description}

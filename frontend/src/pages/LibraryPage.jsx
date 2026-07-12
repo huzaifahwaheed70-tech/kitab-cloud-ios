@@ -174,16 +174,17 @@ const LibraryPage = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-2">
-              {/* Reading Streak Button */}
-              <Button 
-                variant="ghost" 
-                onClick={() => setShowStreakDashboard(!showStreakDashboard)}
-                className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" 
-                data-testid="nav-streak"
-              >
-                <Flame className="w-5 h-5 mr-2 text-orange-500" />
-                Streak
-              </Button>
+              {/* Reading Streak Button - Link to full page */}
+              <Link to="/reading-streak">
+                <Button 
+                  variant="ghost" 
+                  className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" 
+                  data-testid="nav-streak"
+                >
+                  <Flame className="w-5 h-5 mr-2 text-orange-500" />
+                  Streak
+                </Button>
+              </Link>
               <Link to="/bookshelf">
                 <Button variant="ghost" className="text-[#B0C4BF] hover:text-[#FDFBF7] hover:bg-[#082E26] min-h-[44px]" data-testid="nav-bookshelf">
                   <BookMarked className="w-5 h-5 mr-2" />
@@ -348,6 +349,10 @@ const LibraryPage = () => {
                   <Link to="/favorites" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
                     <Heart className="w-5 h-5" />
                     Favorites
+                  </Link>
+                  <Link to="/reading-streak" className="flex items-center gap-3 py-3 text-[#FDFBF7] min-h-[48px]" onClick={() => setMobileMenuOpen(false)} data-testid="mobile-streak-link">
+                    <Flame className="w-5 h-5 text-orange-500" />
+                    Reading Streak
                   </Link>
                   {userTier < 4 && (
                     <Link to="/pricing" className="flex items-center gap-3 py-3 text-gold min-h-[48px]" onClick={() => setMobileMenuOpen(false)}>
