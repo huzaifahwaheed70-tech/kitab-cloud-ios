@@ -7,13 +7,7 @@
 - **Subscription Tier:** 4 (Premium)
 
 ## Test User Accounts
-N/A - Create via registration or Google OAuth
-
-## Google OAuth
-- Google OAuth is integrated via Emergent-managed Google Auth
-- Users can sign up/login with any Google account
-- No test Google accounts are pre-configured
-- Google-linked users have `google_linked: true` flag in database
+N/A - Create via registration
 
 ## API Testing
 ```bash

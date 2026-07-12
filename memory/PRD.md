@@ -16,13 +16,10 @@
 - **Storage:** Emergent Object Storage
 - **Authentication:** 
   - Email/Password with JWT (1 year expiry)
-  - Google OAuth via Emergent-managed Auth
 - **File System (Native):** @capacitor/filesystem (PDF downloads)
 
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
-- [x] **Google OAuth Login** (via Emergent-managed Auth)
-- [x] **Link Google Account in Settings** (Security tab)
 - [x] Guest browsing mode
 - [x] 5-tier subscription system (0=Pay-per-book, 1-4=Monthly plans)
 - [x] Admin dashboard for book/user management
@@ -45,12 +42,16 @@
 - [x] **Safe Area/Notch support** for iOS/Android
 - [x] **Mobile Welcome Screen** (Capacitor-only)
 - [x] **Custom Book Loader Animation** (chasing ring + opening book + dissolve)
-- [x] **Premium Reading Streak System** - Dashboard with current/longest streak, weekly goals, reading stats - NEW
-- [x] **Advanced Search** - Search books with category, tier, file type filters and sort options - NEW
-- [x] **Admin Audit Log** - Track all admin actions with filters and statistics - NEW
-- [x] **Book Card Consistency** - Uniform sizing, skeleton loaders, lazy loading with fade-in - NEW
-- [x] **UI/UX Refinements** - Ripple effects, 8px spacing, smooth transitions - NEW
-- [x] **Reading Statistics Dashboard** - Total books, pages, time, favorite category - NEW
+- [x] **Premium Reading Streak System** - Dashboard with current/longest streak, weekly goals, reading stats
+- [x] **Advanced Search** - Search books with category, tier, file type filters and sort options
+- [x] **Admin Audit Log** - Track all admin actions with filters and statistics
+- [x] **Book Card Consistency** - Uniform sizing, skeleton loaders, lazy loading with fade-in
+- [x] **UI/UX Refinements** - Ripple effects, 8px spacing, smooth transitions
+- [x] **Reading Statistics Dashboard** - Total books, pages, time, favorite category
+- [x] **Full Reading Streak Page** - Dedicated /reading-streak page with Overview/History/Goals tabs - July 2026
+- [x] **Goal Setting** - Users can set weekly reading goals (1-7 days) from the Goals tab - July 2026
+- [x] **Book Metadata Display** - Page count, file type, category badges on Book Detail page (when available) - July 2026
+- [x] **Google Auth Removed** - Completely stripped out per user request - July 2026
 
 ## iOS App Store Compliance (CRITICAL)
 ### What's HIDDEN on iOS:
