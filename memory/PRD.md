@@ -51,8 +51,12 @@
 - [x] **Full Reading Streak Page** - Dedicated /reading-streak page with Overview/History/Goals tabs - July 2026
 - [x] **Goal Setting** - Users can set weekly reading goals (1-7 days) from the Goals tab - July 2026
 - [x] **Multi-Goal Types** - Daily pages goal (1-500 pages) and daily reading time goal (5-480 minutes) in addition to days per week - July 2026
+- [x] **Custom Goal Values** - Users can enter any custom value within valid ranges, not just presets - July 2026
 - [x] **Today's Progress** - Overview shows pages and time progress bars with current/goal values - July 2026
-- [x] **Clickable Streak Widget** - Compact library streak widget navigates to full /reading-streak page - July 2026
+- [x] **Customizable Widget Dashboard** - Library page shows widgets for Streak, My Books, Favorites, Settings, Reading List - July 2026
+- [x] **Widget Long-Press to Remove** - Hold any widget for 600ms to show remove overlay, tap to hide - July 2026
+- [x] **Widget Add Back** - Click "Add Widget" button to add hidden widgets back to dashboard - July 2026
+- [x] **Widget Preferences Persist** - Widget visibility saved to localStorage - July 2026
 - [x] **Unified Loading Spinners** - Page-level loaders use consistent spinner-gap animation - July 2026
 - [x] **Book Metadata Display** - Page count, file type, category badges on Book Detail page (when available) - July 2026
 - [x] **Google Auth Removed** - Completely stripped out per user request - July 2026

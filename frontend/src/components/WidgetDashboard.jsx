@@ -90,7 +90,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     const newPrefs = { ...visibleWidgets, [widgetId]: false };
     savePreferences(newPrefs);
     setLongPressTarget(null);
-    toast.success('Widget hidden. Hold empty area to add it back.');
+    toast.success('Widget hidden. Tap + Add Widget below to restore.');
   };
 
   const handleAddWidget = (widgetId) => {
@@ -258,6 +258,16 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {orderedWidgets.map(widgetId => {
           const w = widgets[widgetId];
+          const isLongPressed = longPressTarget === widgetId;
+          
+          const handleClick = (e) => {
+            // If long press overlay is showing, prevent navigation
+            if (isLongPressed) {
+              e.preventDefault();
+              return;
+            }
+          };
+          
           return (
             <Link
               key={widgetId}
@@ -269,20 +279,21 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
               onMouseDown={() => handleTouchStart(widgetId)}
               onMouseUp={handleTouchEnd}
               onMouseLeave={handleTouchEnd}
+              onClick={handleClick}
               data-testid={`widget-${widgetId}`}
             >
               {w.render()}
               
               {/* Long press remove overlay */}
-              {longPressTarget === widgetId && (
+              {isLongPressed && (
                 <div 
-                  className="absolute inset-0 bg-red-500/90 rounded-xl flex items-center justify-center animate-in fade-in duration-200"
+                  className="absolute inset-0 z-50 bg-red-500/90 rounded-xl flex items-center justify-center animate-in fade-in duration-200"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveWidget(widgetId); }}
                 >
                   <div className="text-center">
                     <X className="w-8 h-8 text-white mx-auto mb-2" />
                     <p className="text-white font-medium">Tap to hide widget</p>
-                    <p className="text-white/70 text-xs mt-1">Hold again to add back</p>
+                    <p className="text-white/70 text-xs mt-1">Tap + Add Widget below to restore</p>
                   </div>
                 </div>
               )}
@@ -308,13 +319,6 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       {hiddenWidgets.length > 0 && (
         <button
           onClick={() => setShowAddWidget(true)}
-          onTouchStart={() => {
-            longPressTimer.current = setTimeout(() => {
-              setShowAddWidget(true);
-              if (navigator.vibrate) navigator.vibrate(50);
-            }, 600);
-          }}
-          onTouchEnd={handleTouchEnd}
           className="w-full p-4 rounded-xl border border-dashed border-gold/30 text-[#B0C4BF] hover:text-gold 
             hover:border-gold/50 transition-all flex items-center justify-center gap-2"
           data-testid="add-widget-btn"
