@@ -22,6 +22,10 @@ const ReadingStreakPage = () => {
   const [newGoalDays, setNewGoalDays] = useState(7);
   const [newGoalPages, setNewGoalPages] = useState(20);
   const [newGoalMinutes, setNewGoalMinutes] = useState(30);
+  const [customPagesInput, setCustomPagesInput] = useState('');
+  const [customMinutesInput, setCustomMinutesInput] = useState('');
+  const [showCustomPages, setShowCustomPages] = useState(false);
+  const [showCustomMinutes, setShowCustomMinutes] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // overview, history, goals
   const [savingGoal, setSavingGoal] = useState(false);
   
@@ -62,14 +66,32 @@ const ReadingStreakPage = () => {
       if (type === 'days') {
         params.append('goal_days', newGoalDays);
       } else if (type === 'pages') {
-        params.append('goal_pages', newGoalPages);
+        const finalPages = showCustomPages && customPagesInput ? parseInt(customPagesInput) : newGoalPages;
+        if (finalPages < 1 || finalPages > 500) {
+          toast.error('Pages must be between 1 and 500');
+          setSavingGoal(false);
+          return;
+        }
+        params.append('goal_pages', finalPages);
+        setNewGoalPages(finalPages);
       } else if (type === 'minutes') {
-        params.append('goal_minutes', newGoalMinutes);
+        const finalMinutes = showCustomMinutes && customMinutesInput ? parseInt(customMinutesInput) : newGoalMinutes;
+        if (finalMinutes < 5 || finalMinutes > 480) {
+          toast.error('Minutes must be between 5 and 480');
+          setSavingGoal(false);
+          return;
+        }
+        params.append('goal_minutes', finalMinutes);
+        setNewGoalMinutes(finalMinutes);
       }
       
       await axios.put(`${API}/reading-streak/goal?${params.toString()}`, {}, { headers });
       toast.success('Goal updated!');
       setEditingGoal(null);
+      setShowCustomPages(false);
+      setShowCustomMinutes(false);
+      setCustomPagesInput('');
+      setCustomMinutesInput('');
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update goal');
@@ -180,7 +202,7 @@ const ReadingStreakPage = () => {
             
             {/* Today's Progress */}
             <div className="glass-card p-6 rounded-xl">
-              <h2 className="font-serif text-lg text-[#FDFBF7] mb-4">Today's Progress</h2>
+              <h2 className="font-serif text-lg text-[#FDFBF7] mb-4">Todays Progress</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -453,7 +475,7 @@ const ReadingStreakPage = () => {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => setEditingGoal('pages')}
+                    onClick={() => { setEditingGoal('pages'); setShowCustomPages(false); }}
                     className="text-gold hover:bg-gold/10"
                   >
                     <Edit2 className="w-4 h-4 mr-1" />
@@ -464,31 +486,60 @@ const ReadingStreakPage = () => {
               
               {editingGoal === 'pages' ? (
                 <div className="space-y-4">
-                  <div className="flex gap-2 flex-wrap">
-                    {[5, 10, 15, 20, 30, 50, 75, 100].map(pages => (
+                  {!showCustomPages ? (
+                    <>
+                      <div className="flex gap-2 flex-wrap">
+                        {[5, 10, 15, 20, 30, 50, 75, 100].map(pages => (
+                          <button
+                            key={pages}
+                            onClick={() => setNewGoalPages(pages)}
+                            className={`px-4 py-3 rounded-lg font-bold transition-all ${
+                              newGoalPages === pages
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-[#082E26] text-[#B0C4BF] hover:border-blue-500/30 border border-transparent'
+                            }`}
+                          >
+                            {pages}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setShowCustomPages(true)}
+                          className="px-4 py-3 rounded-lg font-bold transition-all bg-[#082E26] text-[#B0C4BF] hover:border-blue-500/30 border border-dashed border-blue-500/30"
+                        >
+                          Custom
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-[#B0C4BF]">Enter a custom value (1-500 pages)</p>
+                      <input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={customPagesInput}
+                        onChange={(e) => setCustomPagesInput(e.target.value)}
+                        placeholder="Enter pages..."
+                        className="w-full px-4 py-3 rounded-lg bg-[#082E26] border border-blue-500/30 text-[#FDFBF7] placeholder-[#666] focus:outline-none focus:border-blue-500"
+                      />
                       <button
-                        key={pages}
-                        onClick={() => setNewGoalPages(pages)}
-                        className={`px-4 py-3 rounded-lg font-bold transition-all ${
-                          newGoalPages === pages
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-[#082E26] text-[#B0C4BF] hover:border-blue-500/30 border border-transparent'
-                        }`}
+                        onClick={() => setShowCustomPages(false)}
+                        className="text-sm text-blue-400 hover:underline"
                       >
-                        {pages}
+                        ← Back to presets
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button 
                       onClick={() => updateGoal('pages')} 
-                      disabled={savingGoal}
+                      disabled={savingGoal || (showCustomPages && !customPagesInput)}
                       className="bg-blue-500 text-white hover:bg-blue-400"
                     >
                       {savingGoal ? <div className="spinner-gap spinner-gap-sm mr-2"></div> : <Check className="w-4 h-4 mr-1" />}
                       Save
                     </Button>
-                    <Button variant="outline" onClick={() => setEditingGoal(null)} className="border-gold/30 text-[#FDFBF7]">
+                    <Button variant="outline" onClick={() => { setEditingGoal(null); setShowCustomPages(false); }} className="border-gold/30 text-[#FDFBF7]">
                       <X className="w-4 h-4 mr-1" />
                       Cancel
                     </Button>
@@ -518,7 +569,7 @@ const ReadingStreakPage = () => {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => setEditingGoal('minutes')}
+                    onClick={() => { setEditingGoal('minutes'); setShowCustomMinutes(false); }}
                     className="text-gold hover:bg-gold/10"
                   >
                     <Edit2 className="w-4 h-4 mr-1" />
@@ -529,31 +580,60 @@ const ReadingStreakPage = () => {
               
               {editingGoal === 'minutes' ? (
                 <div className="space-y-4">
-                  <div className="flex gap-2 flex-wrap">
-                    {[10, 15, 20, 30, 45, 60, 90, 120].map(mins => (
+                  {!showCustomMinutes ? (
+                    <>
+                      <div className="flex gap-2 flex-wrap">
+                        {[10, 15, 20, 30, 45, 60, 90, 120].map(mins => (
+                          <button
+                            key={mins}
+                            onClick={() => setNewGoalMinutes(mins)}
+                            className={`px-4 py-3 rounded-lg font-bold transition-all ${
+                              newGoalMinutes === mins
+                                ? 'bg-purple-500 text-white'
+                                : 'bg-[#082E26] text-[#B0C4BF] hover:border-purple-500/30 border border-transparent'
+                            }`}
+                          >
+                            {mins}m
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setShowCustomMinutes(true)}
+                          className="px-4 py-3 rounded-lg font-bold transition-all bg-[#082E26] text-[#B0C4BF] hover:border-purple-500/30 border border-dashed border-purple-500/30"
+                        >
+                          Custom
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-[#B0C4BF]">Enter a custom value (5-480 minutes)</p>
+                      <input
+                        type="number"
+                        min="5"
+                        max="480"
+                        value={customMinutesInput}
+                        onChange={(e) => setCustomMinutesInput(e.target.value)}
+                        placeholder="Enter minutes..."
+                        className="w-full px-4 py-3 rounded-lg bg-[#082E26] border border-purple-500/30 text-[#FDFBF7] placeholder-[#666] focus:outline-none focus:border-purple-500"
+                      />
                       <button
-                        key={mins}
-                        onClick={() => setNewGoalMinutes(mins)}
-                        className={`px-4 py-3 rounded-lg font-bold transition-all ${
-                          newGoalMinutes === mins
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-[#082E26] text-[#B0C4BF] hover:border-purple-500/30 border border-transparent'
-                        }`}
+                        onClick={() => setShowCustomMinutes(false)}
+                        className="text-sm text-purple-400 hover:underline"
                       >
-                        {mins}m
+                        ← Back to presets
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button 
                       onClick={() => updateGoal('minutes')} 
-                      disabled={savingGoal}
+                      disabled={savingGoal || (showCustomMinutes && !customMinutesInput)}
                       className="bg-purple-500 text-white hover:bg-purple-400"
                     >
                       {savingGoal ? <div className="spinner-gap spinner-gap-sm mr-2"></div> : <Check className="w-4 h-4 mr-1" />}
                       Save
                     </Button>
-                    <Button variant="outline" onClick={() => setEditingGoal(null)} className="border-gold/30 text-[#FDFBF7]">
+                    <Button variant="outline" onClick={() => { setEditingGoal(null); setShowCustomMinutes(false); }} className="border-gold/30 text-[#FDFBF7]">
                       <X className="w-4 h-4 mr-1" />
                       Cancel
                     </Button>

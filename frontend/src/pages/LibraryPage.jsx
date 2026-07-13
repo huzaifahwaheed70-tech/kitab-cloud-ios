@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import { shouldHideExternalPurchases } from '../utils/platform';
-import ReadingStreakDashboard from '../components/ReadingStreakDashboard';
+import WidgetDashboard from '../components/WidgetDashboard';
 import AdvancedSearch from '../components/AdvancedSearch';
 
 const LibraryPage = () => {
@@ -34,6 +34,7 @@ const LibraryPage = () => {
   const [isIOSApp, setIsIOSApp] = useState(false);
   const [bookshelf, setBookshelf] = useState({ books: [], count: 0, limit: null, is_locked: false });
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [favorites, setFavorites] = useState([]);
 
   // Check if iOS app (hide external purchases like PDF and physical books)
   useEffect(() => {
@@ -44,8 +45,22 @@ const LibraryPage = () => {
     fetchBooks();
     fetchContinueReading();
     fetchTierSettings();
-    if (token) fetchBookshelf();
+    if (token) {
+      fetchBookshelf();
+      fetchFavorites();
+    }
   }, [searchQuery, token]);
+
+  const fetchFavorites = async () => {
+    if (!token) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API}/favorites`, { headers });
+      setFavorites(response.data || []);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
 
   const fetchBookshelf = async () => {
     if (!token) return;
@@ -457,75 +472,14 @@ const LibraryPage = () => {
           </div>
         )}
 
-        {/* Compact Streak Widget - Clickable to full page */}
-        <div className="mb-6">
-          <ReadingStreakDashboard compact />
-        </div>
-
-        {/* Reading List Status Banner for Subscribed Users (Not shown for Tier 4 - unlimited access) */}
-        {userTier > 0 && userTier < 4 && (
-          <div className={`mb-8 p-6 rounded-sm border ${bookshelf.is_locked ? 'bg-gradient-to-r from-red-500/20 to-red-500/5 border-red-500/30' : 'bg-gradient-to-r from-[#082E26]/50 to-[#082E26]/20 border-gold/30'}`}>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${bookshelf.is_locked ? 'bg-red-500/20' : 'bg-gold/20'}`}>
-                  {bookshelf.is_locked ? (
-                    <Lock className="w-6 h-6 text-red-400" />
-                  ) : (
-                    <BookMarked className="w-6 h-6 text-gold" />
-                  )}
-                </div>
-                <div>
-                  {bookshelf.is_locked ? (
-                    <>
-                      <h3 className="font-serif text-xl text-[#FDFBF7] mb-1">Reading List Full</h3>
-                      <p className="text-[#B0C4BF]">
-                        You've reached your monthly limit of {bookshelf.limit} books. 
-                        Your reading list is locked until next month. Enjoy reading your selected books!
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <h3 className="font-serif text-xl text-[#FDFBF7] mb-1">
-                        Your Reading List: {bookshelf.count}/{bookshelf.limit} books
-                      </h3>
-                      <p className="text-[#B0C4BF]">
-                        {bookshelf.count === 0 
-                          ? "Add books to your reading list to start reading. Click on a book and tap 'Add to Reading List'."
-                          : `You have ${bookshelf.limit - bookshelf.count} slots remaining this month.`
-                        }
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <Link to="/bookshelf">
-                <Button 
-                  variant={bookshelf.is_locked ? "outline" : "default"}
-                  className={bookshelf.is_locked ? "border-red-400 text-red-400" : "bg-gold text-[#02120F] hover:bg-[#E9C85C]"}
-                  data-testid="view-reading-list-btn"
-                >
-                  {bookshelf.is_locked ? 'View Locked List' : 'View Reading List'}
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
-        
-        {/* Premium Tier 4 Banner - Unlimited Access */}
-        {userTier >= 4 && (
-          <div className="mb-8 p-6 rounded-sm border bg-gradient-to-r from-gold/10 to-amber-500/5 border-gold/30">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gold/20">
-                <Crown className="w-6 h-6 text-gold" />
-              </div>
-              <div>
-                <h3 className="font-serif text-xl text-gold mb-1">Premium Unlimited Access</h3>
-                <p className="text-[#B0C4BF]">
-                  As a Premium member, you have unlimited access to all books. No monthly reading limits apply to your account.
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Widget Dashboard - Customizable widgets */}
+        {token && (
+          <WidgetDashboard 
+            bookshelf={bookshelf}
+            userTier={userTier}
+            favorites={favorites}
+            continueReading={continueReading}
+          />
         )}
 
         {/* View Toggle */}
