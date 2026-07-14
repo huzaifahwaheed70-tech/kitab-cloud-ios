@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Flame, BookOpen, Heart, Settings, BookMarked, Plus, X, Lock,
-  ChevronRight, Trophy, Star, Clock, Crown, GripVertical
+  ChevronRight, Trophy, Clock, Crown, GripVertical, Pencil, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,8 +26,9 @@ import { CSS } from '@dnd-kit/utilities';
 
 /**
  * Widget Dashboard Component
- * Customizable widgets with drag-and-drop reordering
- * Long-press to hide widgets, long-press empty area to add them back
+ * - Swipe left/right to remove widgets
+ * - Plus icon to add widgets
+ * - Pencil icon to enable drag mode for reordering
  */
 
 const WIDGET_STORAGE_KEY = 'kitab_widget_preferences';
@@ -37,15 +38,20 @@ const DEFAULT_WIDGETS = {
   streak: true,
   myBooks: true,
   favorites: true,
-  settings: true,  // Show settings by default for clean first-time experience
+  settings: true,
   monthlyList: true,
-  premium: true  // Premium banner is now a widget
+  premium: true
 };
 
 const DEFAULT_ORDER = ['streak', 'myBooks', 'favorites', 'monthlyList', 'premium', 'settings'];
 
-// Sortable Widget Component
-const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onLongPressEnd, onRemove }) => {
+// Swipeable Widget Component
+const SwipeableWidget = ({ widgetId, widget, onRemove, isEditMode }) => {
+  const [swipeX, setSwipeX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const startX = useRef(0);
+  const containerRef = useRef(null);
+  
   const {
     attributes,
     listeners,
@@ -53,69 +59,130 @@ const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onL
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: widgetId });
+  } = useSortable({ id: widgetId, disabled: !isEditMode });
 
-  const style = {
+  const style = isEditMode ? {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.7 : 1,
     zIndex: isDragging ? 100 : 1,
+  } : {};
+
+  const handleTouchStart = (e) => {
+    if (isEditMode) return;
+    startX.current = e.touches[0].clientX;
+    setIsSwiping(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isSwiping || isEditMode) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX.current;
+    // Limit swipe distance
+    const limitedDiff = Math.max(-100, Math.min(100, diff));
+    setSwipeX(limitedDiff);
+  };
+
+  const handleTouchEnd = () => {
+    if (isEditMode) return;
+    setIsSwiping(false);
+    // If swiped far enough, show delete
+    if (Math.abs(swipeX) > 60) {
+      setSwipeX(swipeX > 0 ? 80 : -80);
+    } else {
+      setSwipeX(0);
+    }
+  };
+
+  const handleMouseDown = (e) => {
+    if (isEditMode) return;
+    startX.current = e.clientX;
+    setIsSwiping(true);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isSwiping || isEditMode) return;
+    const diff = e.clientX - startX.current;
+    const limitedDiff = Math.max(-100, Math.min(100, diff));
+    setSwipeX(limitedDiff);
+  };
+
+  const handleMouseUp = () => {
+    if (isEditMode) return;
+    setIsSwiping(false);
+    if (Math.abs(swipeX) > 60) {
+      setSwipeX(swipeX > 0 ? 80 : -80);
+    } else {
+      setSwipeX(0);
+    }
+  };
+
+  const handleRemove = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRemove(widgetId);
+    setSwipeX(0);
+  };
+
+  const resetSwipe = () => {
+    setSwipeX(0);
   };
 
   const content = (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        containerRef.current = node;
+        if (isEditMode) setNodeRef(node);
+      }}
       style={style}
-      className={`relative p-4 rounded-xl border border-gold/20 bg-gradient-to-br ${widget.bgGradient} 
-        hover:border-gold/40 transition-all group ${isDragging ? 'shadow-xl' : ''}`}
+      className={`relative overflow-hidden rounded-xl ${isDragging ? 'shadow-xl' : ''}`}
       data-testid={`widget-${widgetId}`}
-      onTouchStart={() => onLongPressStart(widgetId)}
-      onTouchEnd={onLongPressEnd}
-      onMouseDown={() => onLongPressStart(widgetId)}
-      onMouseUp={onLongPressEnd}
-      onMouseLeave={onLongPressEnd}
     >
-      {/* Drag Handle */}
-      <div 
-        {...attributes} 
-        {...listeners}
-        className="absolute top-2 right-2 p-1 rounded hover:bg-white/10 cursor-grab active:cursor-grabbing touch-none"
-        data-testid={`widget-drag-${widgetId}`}
-      >
-        <GripVertical className="w-4 h-4 text-[#666]" />
+      {/* Delete background - appears on swipe */}
+      <div className={`absolute inset-y-0 flex items-center transition-opacity duration-200 ${
+        swipeX !== 0 ? 'opacity-100' : 'opacity-0'
+      } ${swipeX > 0 ? 'left-0 pl-4' : 'right-0 pr-4'}`}>
+        <button
+          onClick={handleRemove}
+          className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg"
+          data-testid={`remove-${widgetId}`}
+        >
+          <X className="w-6 h-6" />
+        </button>
       </div>
 
-      {/* Widget Content */}
-      {widget.render()}
-      
-      {/* Long press remove overlay */}
-      {isLongPressed && (
-        <div 
-          className="absolute inset-0 z-50 bg-red-500/90 rounded-xl flex items-center justify-center animate-in fade-in duration-200"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(widgetId); }}
-        >
-          <div className="text-center">
-            <X className="w-8 h-8 text-white mx-auto mb-2" />
-            <p className="text-white font-medium">Tap to hide widget</p>
-            <p className="text-white/70 text-xs mt-1">Long-press empty area to add back</p>
+      {/* Widget content - slides on swipe */}
+      <div
+        className={`relative p-4 border border-gold/20 bg-gradient-to-br ${widget.bgGradient} rounded-xl transition-transform duration-200`}
+        style={{ transform: `translateX(${swipeX}px)` }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => { if (isSwiping) handleMouseUp(); }}
+      >
+        {/* Edit mode drag handle */}
+        {isEditMode && (
+          <div 
+            {...attributes} 
+            {...listeners}
+            className="absolute top-2 right-2 p-2 rounded-lg bg-gold/20 cursor-grab active:cursor-grabbing touch-none z-10"
+          >
+            <GripVertical className="w-5 h-5 text-gold" />
           </div>
-        </div>
-      )}
+        )}
+
+        {widget.render()}
+      </div>
     </div>
   );
 
-  // If widget has a link, wrap in Link
-  if (widget.link) {
+  // If widget has a link and not in edit mode, wrap in Link
+  if (widget.link && !isEditMode && swipeX === 0) {
     return (
-      <Link 
-        to={widget.link} 
-        className="block"
-        onClick={(e) => {
-          if (isLongPressed) {
-            e.preventDefault();
-          }
-        }}
-      >
+      <Link to={widget.link} className="block" onClick={(e) => swipeX !== 0 && e.preventDefault()}>
         {content}
       </Link>
     );
@@ -129,12 +196,11 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
   const [visibleWidgets, setVisibleWidgets] = useState(DEFAULT_WIDGETS);
   const [widgetOrder, setWidgetOrder] = useState(DEFAULT_ORDER);
   const [streak, setStreak] = useState(null);
-  const [longPressTarget, setLongPressTarget] = useState(null);
   const [showAddWidget, setShowAddWidget] = useState(false);
-  const longPressTimer = useRef(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [loadingStreak, setLoadingStreak] = useState(true);
 
-  // DnD sensors
+  // DnD sensors - only active in edit mode
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -154,7 +220,6 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     if (savedWidgets) {
       try {
         const parsed = JSON.parse(savedWidgets);
-        // Merge with defaults to handle new widgets
         setVisibleWidgets({ ...DEFAULT_WIDGETS, ...parsed });
       } catch (e) {
         console.error('Failed to parse widget preferences');
@@ -164,7 +229,6 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     if (savedOrder) {
       try {
         const parsed = JSON.parse(savedOrder);
-        // Add any new widgets not in saved order
         const allWidgets = [...new Set([...parsed, ...DEFAULT_ORDER])];
         setWidgetOrder(allWidgets);
       } catch (e) {
@@ -173,7 +237,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     }
   }, []);
 
-  // Save preferences to localStorage
+  // Save preferences
   const savePreferences = (prefs) => {
     setVisibleWidgets(prefs);
     localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(prefs));
@@ -204,43 +268,19 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     }
   };
 
-  // Long press handlers
-  const handleTouchStart = (widgetId) => {
-    longPressTimer.current = setTimeout(() => {
-      setLongPressTarget(widgetId);
-      if (navigator.vibrate) navigator.vibrate(50);
-    }, 600);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-  };
-
-  // Long press on empty area to show add modal
-  const handleEmptyAreaLongPress = () => {
-    longPressTimer.current = setTimeout(() => {
-      if (navigator.vibrate) navigator.vibrate(50);
-      setShowAddWidget(true);
-    }, 600);
-  };
-
   const handleRemoveWidget = (widgetId) => {
     const newPrefs = { ...visibleWidgets, [widgetId]: false };
     savePreferences(newPrefs);
-    setLongPressTarget(null);
-    toast.success('Widget hidden. Long-press empty area to add it back.');
+    toast.success('Widget removed');
   };
 
   const handleAddWidget = (widgetId) => {
     const newPrefs = { ...visibleWidgets, [widgetId]: true };
     savePreferences(newPrefs);
     setShowAddWidget(false);
-    toast.success('Widget added!');
+    toast.success('Widget added');
   };
 
-  // Drag end handler
   const handleDragEnd = (event) => {
     const { active, over } = event;
     
@@ -249,6 +289,13 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       const newIndex = widgetOrder.indexOf(over.id);
       const newOrder = arrayMove(widgetOrder, oldIndex, newIndex);
       saveOrder(newOrder);
+    }
+  };
+
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+    if (isEditMode) {
+      toast.success('Changes saved');
     }
   };
 
@@ -262,7 +309,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-orange-500/20 to-orange-500/5',
       link: '/reading-streak',
       render: () => (
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Flame className="w-5 h-5 text-orange-500" />
@@ -294,7 +341,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-emerald-500/20 to-emerald-500/5',
       link: '/bookshelf',
       render: () => (
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <BookOpen className="w-5 h-5 text-emerald-400" />
@@ -319,7 +366,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-rose-500/20 to-rose-500/5',
       link: '/favorites',
       render: () => (
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Heart className="w-5 h-5 text-rose-400" />
@@ -334,13 +381,13 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     },
     settings: {
       id: 'settings',
-      title: 'Quick Settings',
+      title: 'Settings',
       icon: Settings,
       iconColor: 'text-blue-400',
       bgGradient: 'from-blue-500/20 to-blue-500/5',
       link: '/settings',
       render: () => (
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Settings className="w-5 h-5 text-blue-400" />
@@ -362,7 +409,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       link: '/bookshelf',
       show: userTier > 0 && userTier < 4,
       render: () => (
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               {bookshelf?.is_locked ? (
@@ -389,14 +436,14 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     },
     premium: {
       id: 'premium',
-      title: 'Premium Unlimited',
+      title: 'Premium',
       icon: Crown,
       iconColor: 'text-gold',
       bgGradient: 'from-gold/20 to-amber-500/5',
-      link: null, // No link - just informational
+      link: null,
       show: userTier >= 4,
       render: () => (
-        <div className="flex items-center gap-3 pr-6">
+        <div className="flex items-center gap-3">
           <Crown className="w-6 h-6 text-gold flex-shrink-0" />
           <div>
             <p className="text-[#FDFBF7] font-semibold">Premium Unlimited Access</p>
@@ -420,7 +467,20 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
 
   return (
     <div className="space-y-4 mb-6">
-      {/* Widget Grid with Drag and Drop */}
+      {/* Edit Mode Banner */}
+      {isEditMode && (
+        <div className="bg-gold/20 border border-gold/30 rounded-lg px-4 py-2 flex items-center justify-between">
+          <span className="text-gold text-sm font-medium">Drag widgets to reorder</span>
+          <button 
+            onClick={toggleEditMode}
+            className="text-gold hover:text-[#FDFBF7] transition-colors"
+          >
+            <Check className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Widget Grid */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -433,14 +493,12 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
               if (!w) return null;
               
               return (
-                <SortableWidget
+                <SwipeableWidget
                   key={widgetId}
                   widgetId={widgetId}
                   widget={w}
-                  isLongPressed={longPressTarget === widgetId}
-                  onLongPressStart={handleTouchStart}
-                  onLongPressEnd={handleTouchEnd}
                   onRemove={handleRemoveWidget}
+                  isEditMode={isEditMode}
                 />
               );
             })}
@@ -448,28 +506,31 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
         </SortableContext>
       </DndContext>
 
-      {/* Empty Area for Long Press to Add - Only show if there are hidden widgets */}
-      {hiddenWidgets.length > 0 && (
-        <div
-          className="h-16 rounded-xl border border-dashed border-gold/20 flex items-center justify-center text-[#666] text-sm cursor-pointer hover:border-gold/30 transition-colors"
-          onTouchStart={handleEmptyAreaLongPress}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleEmptyAreaLongPress}
-          onMouseUp={handleTouchEnd}
-          onMouseLeave={handleTouchEnd}
-          onClick={() => setShowAddWidget(true)}
-          data-testid="widget-add-area"
-        >
-          <span>Hold to customize • {hiddenWidgets.length} widget{hiddenWidgets.length > 1 ? 's' : ''} hidden</span>
-        </div>
-      )}
-
-      {/* Drag Hint - only if multiple widgets */}
-      {orderedWidgets.length > 1 && (
-        <p className="text-center text-xs text-[#666]">
-          Drag ⋮⋮ to reorder • Long press to hide
-        </p>
-      )}
+      {/* Bottom Controls - Plus and Edit icons */}
+      <div className="flex items-center justify-center gap-3">
+        {hiddenWidgets.length > 0 && (
+          <button
+            onClick={() => setShowAddWidget(true)}
+            className="w-10 h-10 rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center text-gold hover:bg-gold/30 transition-colors"
+            data-testid="add-widget-btn"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        )}
+        {orderedWidgets.length > 1 && (
+          <button
+            onClick={toggleEditMode}
+            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+              isEditMode 
+                ? 'bg-gold border-gold text-[#02120F]' 
+                : 'bg-gold/20 border-gold/30 text-gold hover:bg-gold/30'
+            }`}
+            data-testid="edit-widgets-btn"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       {/* Add Widget Modal */}
       {showAddWidget && (
@@ -489,42 +550,29 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
             </div>
             
             <div className="p-4 space-y-3">
-              {hiddenWidgets.length === 0 ? (
-                <p className="text-[#B0C4BF] text-center py-8">All widgets are visible!</p>
-              ) : (
-                hiddenWidgets.map(widgetId => {
-                  const w = widgets[widgetId];
-                  if (!w) return null;
-                  return (
-                    <button
-                      key={widgetId}
-                      onClick={() => handleAddWidget(widgetId)}
-                      className={`w-full p-4 rounded-xl border border-gold/20 bg-gradient-to-br ${w.bgGradient}
-                        hover:border-gold/40 transition-all flex items-center gap-3 text-left`}
-                    >
-                      <div className={`w-10 h-10 rounded-full bg-surface flex items-center justify-center ${w.iconColor}`}>
-                        <w.icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-[#FDFBF7] font-medium">{w.title}</p>
-                        <p className="text-xs text-[#B0C4BF]">Tap to add to dashboard</p>
-                      </div>
-                      <Plus className="w-5 h-5 text-gold ml-auto" />
-                    </button>
-                  );
-                })
-              )}
+              {hiddenWidgets.map(widgetId => {
+                const w = widgets[widgetId];
+                if (!w) return null;
+                return (
+                  <button
+                    key={widgetId}
+                    onClick={() => handleAddWidget(widgetId)}
+                    className={`w-full p-4 rounded-xl border border-gold/20 bg-gradient-to-br ${w.bgGradient}
+                      hover:border-gold/40 transition-all flex items-center gap-3 text-left`}
+                  >
+                    <div className={`w-10 h-10 rounded-full bg-surface flex items-center justify-center ${w.iconColor}`}>
+                      <w.icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[#FDFBF7] font-medium">{w.title}</p>
+                    </div>
+                    <Plus className="w-5 h-5 text-gold" />
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
-      )}
-
-      {/* Cancel long press overlay */}
-      {longPressTarget && (
-        <div 
-          className="fixed inset-0 z-40"
-          onClick={() => setLongPressTarget(null)}
-        />
       )}
     </div>
   );
