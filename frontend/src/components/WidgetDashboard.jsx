@@ -37,9 +37,9 @@ const DEFAULT_WIDGETS = {
   streak: true,
   myBooks: true,
   favorites: true,
-  settings: false,
+  settings: true,  // Show settings by default for clean first-time experience
   monthlyList: true,
-  premium: true  // New: Premium banner is now a widget
+  premium: true  // Premium banner is now a widget
 };
 
 const DEFAULT_ORDER = ['streak', 'myBooks', 'favorites', 'monthlyList', 'premium', 'settings'];

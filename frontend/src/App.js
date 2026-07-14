@@ -17,8 +17,9 @@ window.onunhandledrejection = function(event) {
 
 // Loading fallback component
 const PageLoader = () => (
-  <div className="min-h-screen bg-dark flex items-center justify-center">
+  <div className="min-h-screen bg-dark flex flex-col items-center justify-center gap-4">
     <div className="spinner-gap spinner-gap-lg"></div>
+    <p className="text-[#B0C4BF] text-sm">Loading...</p>
   </div>
 );
 
