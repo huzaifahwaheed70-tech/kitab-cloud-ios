@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, File, UploadFile, Depends, Request, Response, Query, Header
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.gzip import GZipMiddleware
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -432,6 +433,9 @@ async def get_apple_subscription_status(original_transaction_id: str) -> dict:
 
 # Create the main app
 app = FastAPI()
+
+# Add GZip compression for responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -1431,7 +1435,13 @@ async def get_file(path: str, user: dict = Depends(get_current_user)):
     
     try:
         data, content_type = get_object(path)
-        return Response(content=data, media_type=content_type)
+        # Add caching headers for PDFs and images
+        headers = {}
+        if path.endswith('.pdf'):
+            headers["Cache-Control"] = "private, max-age=3600"  # Cache for 1 hour
+        elif any(path.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']):
+            headers["Cache-Control"] = "public, max-age=86400"  # Cache images for 24 hours
+        return Response(content=data, media_type=content_type, headers=headers)
     except Exception as e:
         logger.error(f"File fetch error: {e}")
         raise HTTPException(status_code=404, detail="File not found")

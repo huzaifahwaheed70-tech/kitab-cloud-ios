@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Toaster } from './components/ui/sonner';
@@ -15,23 +15,30 @@ window.onunhandledrejection = function(event) {
   console.error('[App] Unhandled promise rejection:', event.reason);
 };
 
-// Pages
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import LibraryPage from './pages/LibraryPage';
-import BookDetailPage from './pages/BookDetailPage';
-import BookshelfPage from './pages/BookshelfPage';
-import FavoritesPage from './pages/FavoritesPage';
-import PricingPage from './pages/PricingPage';
-import PaymentSuccessPage from './pages/PaymentSuccessPage';
-import AdminDashboard from './pages/AdminDashboard';
-import SettingsPage from './pages/SettingsPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import MobileWelcomeScreen from './pages/MobileWelcomeScreen';
-import ReadingStreakPage from './pages/ReadingStreakPage';
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen bg-dark flex items-center justify-center">
+    <div className="spinner-gap spinner-gap-lg"></div>
+  </div>
+);
+
+// Lazy loaded pages for better performance
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const LibraryPage = lazy(() => import('./pages/LibraryPage'));
+const BookDetailPage = lazy(() => import('./pages/BookDetailPage'));
+const BookshelfPage = lazy(() => import('./pages/BookshelfPage'));
+const FavoritesPage = lazy(() => import('./pages/FavoritesPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const MobileWelcomeScreen = lazy(() => import('./pages/MobileWelcomeScreen'));
+const ReadingStreakPage = lazy(() => import('./pages/ReadingStreakPage'));
 
 // Platform detection
 import { isCapacitorApp } from './utils/platform';
@@ -197,62 +204,64 @@ const AppRouter = () => {
   };
   
   return (
-    <Routes>
-      <Route path="/" element={getHomePage()} />
-      <Route path="/welcome" element={<MobileWelcomeScreen />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/pricing" element={<PricingPage />} />
-      <Route path="/payment-success" element={<PaymentSuccessPage />} />
-      
-      <Route path="/library" element={
-        <ProtectedRoute>
-          <LibraryPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/book/:bookId" element={
-        <ProtectedRoute>
-          <BookDetailPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/bookshelf" element={
-        <ProtectedRoute>
-          <BookshelfPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/favorites" element={
-        <ProtectedRoute>
-          <FavoritesPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/reading-streak" element={
-        <ProtectedRoute>
-          <ReadingStreakPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/settings" element={
-        <ProtectedRoute>
-          <SettingsPage />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/admin" element={
-        <ProtectedRoute requireAdmin>
-          <AdminDashboard />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/privacy" element={<PrivacyPolicyPage />} />
-      
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={getHomePage()} />
+        <Route path="/welcome" element={<MobileWelcomeScreen />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/payment-success" element={<PaymentSuccessPage />} />
+        
+        <Route path="/library" element={
+          <ProtectedRoute>
+            <LibraryPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/book/:bookId" element={
+          <ProtectedRoute>
+            <BookDetailPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/bookshelf" element={
+          <ProtectedRoute>
+            <BookshelfPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/favorites" element={
+          <ProtectedRoute>
+            <FavoritesPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/reading-streak" element={
+          <ProtectedRoute>
+            <ReadingStreakPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin" element={
+          <ProtectedRoute requireAdmin>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 };
 

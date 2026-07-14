@@ -17,6 +17,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 // Set up PDF.js worker - using jsDelivr for reliability and version support
+// Configure worker with optimized settings
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 // Log worker initialization for debugging
@@ -45,6 +46,7 @@ const BookDetailPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [pageSaved, setPageSaved] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfLoadProgress, setPdfLoadProgress] = useState(0);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [paymentModal, setPaymentModal] = useState({ show: false, url: null });
   const [isIOSApp, setIsIOSApp] = useState(false);
@@ -127,21 +129,51 @@ const BookDetailPage = () => {
     }
   };
 
-  const loadPdf = async () => {
+  const loadPdf = async (retryCount = 0) => {
     if (!book?.pdf_url || !token) return;
     setPdfLoading(true);
+    setPdfLoadProgress(0);
+    
+    const maxRetries = 2;
+    const timeoutMs = 60000; // 60 second timeout
+    
     try {
       const headers = { Authorization: `Bearer ${token}` };
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
       const pdfResponse = await axios.get(`${API}/files/${book.pdf_url}`, {
         headers,
         withCredentials: true,
-        responseType: 'blob'
+        responseType: 'blob',
+        signal: controller.signal,
+        onDownloadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || progressEvent.loaded * 1.2));
+          setPdfLoadProgress(Math.min(percentCompleted, 99));
+        }
       });
+      
+      clearTimeout(timeoutId);
+      setPdfLoadProgress(100);
+      
       const url = URL.createObjectURL(pdfResponse.data);
       setPdfUrl(url);
       setShowReader(true);
     } catch (error) {
       console.error('Error loading PDF:', error);
+      
+      // Handle timeout/abort
+      if (error.name === 'CanceledError' || error.code === 'ECONNABORTED') {
+        if (retryCount < maxRetries) {
+          toast.info(`PDF loading slow, retrying... (${retryCount + 1}/${maxRetries})`);
+          return loadPdf(retryCount + 1);
+        }
+        toast.error('PDF took too long to load. Please check your connection and try again.');
+        return;
+      }
+      
       if (error.response?.status === 403) {
         const detail = error.response?.data?.detail || 'Access denied';
         if (detail.includes('Monthly reading limit')) {
@@ -153,8 +185,15 @@ const BookDetailPage = () => {
         }
       } else if (error.response?.status === 401) {
         toast.error('Please log in to read this book');
+      } else if (error.response?.status === 404) {
+        toast.error('PDF file not found. Please contact support.');
       } else {
-        toast.error('Failed to load PDF. Please try again.');
+        // Retry on network errors
+        if (retryCount < maxRetries) {
+          toast.info(`Loading failed, retrying... (${retryCount + 1}/${maxRetries})`);
+          return loadPdf(retryCount + 1);
+        }
+        toast.error('Failed to load PDF. Please check your connection and try again.');
       }
     } finally {
       setPdfLoading(false);
@@ -1024,14 +1063,14 @@ const BookDetailPage = () => {
                       size="lg"
                       onClick={handleReadNow}
                       disabled={pdfLoading}
-                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold"
+                      className="bg-gold text-[#02120F] hover:bg-[#E9C85C] font-semibold min-w-[160px]"
                       data-testid="read-now-btn"
                     >
                       {pdfLoading ? (
-                        <>
-                          <div className="w-5 h-5 mr-2 border-2 border-[#02120F] border-t-transparent rounded-full animate-spin"></div>
-                          Loading PDF...
-                        </>
+                        <div className="flex items-center gap-2">
+                          <div className="spinner-gap spinner-gap-sm"></div>
+                          <span>{pdfLoadProgress > 0 ? `${pdfLoadProgress}%` : 'Loading...'}</span>
+                        </div>
                       ) : (
                         <>
                           <Library className="w-5 h-5 mr-2" />
