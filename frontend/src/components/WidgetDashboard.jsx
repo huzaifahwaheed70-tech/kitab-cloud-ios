@@ -27,7 +27,7 @@ import { CSS } from '@dnd-kit/utilities';
 /**
  * Widget Dashboard Component
  * Customizable widgets with drag-and-drop reordering
- * Widgets: Reading Streak, My Books, Favorites, Settings, Monthly Reading List
+ * Long-press to hide widgets, long-press empty area to add them back
  */
 
 const WIDGET_STORAGE_KEY = 'kitab_widget_preferences';
@@ -38,13 +38,14 @@ const DEFAULT_WIDGETS = {
   myBooks: true,
   favorites: true,
   settings: false,
-  monthlyList: true
+  monthlyList: true,
+  premium: true  // New: Premium banner is now a widget
 };
 
-const DEFAULT_ORDER = ['streak', 'myBooks', 'favorites', 'monthlyList', 'settings'];
+const DEFAULT_ORDER = ['streak', 'myBooks', 'favorites', 'monthlyList', 'premium', 'settings'];
 
 // Sortable Widget Component
-const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onLongPressEnd, onRemove, onClick }) => {
+const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onLongPressEnd, onRemove }) => {
   const {
     attributes,
     listeners,
@@ -61,13 +62,18 @@ const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onL
     zIndex: isDragging ? 100 : 1,
   };
 
-  return (
+  const content = (
     <div
       ref={setNodeRef}
       style={style}
       className={`relative p-4 rounded-xl border border-gold/20 bg-gradient-to-br ${widget.bgGradient} 
         hover:border-gold/40 transition-all group ${isDragging ? 'shadow-xl' : ''}`}
       data-testid={`widget-${widgetId}`}
+      onTouchStart={() => onLongPressStart(widgetId)}
+      onTouchEnd={onLongPressEnd}
+      onMouseDown={() => onLongPressStart(widgetId)}
+      onMouseUp={onLongPressEnd}
+      onMouseLeave={onLongPressEnd}
     >
       {/* Drag Handle */}
       <div 
@@ -79,23 +85,8 @@ const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onL
         <GripVertical className="w-4 h-4 text-[#666]" />
       </div>
 
-      {/* Widget Content - Clickable */}
-      <Link
-        to={widget.link}
-        className="block"
-        onTouchStart={() => onLongPressStart(widgetId)}
-        onTouchEnd={onLongPressEnd}
-        onMouseDown={() => onLongPressStart(widgetId)}
-        onMouseUp={onLongPressEnd}
-        onMouseLeave={onLongPressEnd}
-        onClick={(e) => {
-          if (isLongPressed) {
-            e.preventDefault();
-          }
-        }}
-      >
-        {widget.render()}
-      </Link>
+      {/* Widget Content */}
+      {widget.render()}
       
       {/* Long press remove overlay */}
       {isLongPressed && (
@@ -106,12 +97,31 @@ const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onL
           <div className="text-center">
             <X className="w-8 h-8 text-white mx-auto mb-2" />
             <p className="text-white font-medium">Tap to hide widget</p>
-            <p className="text-white/70 text-xs mt-1">Tap + Add Widget below to restore</p>
+            <p className="text-white/70 text-xs mt-1">Long-press empty area to add back</p>
           </div>
         </div>
       )}
     </div>
   );
+
+  // If widget has a link, wrap in Link
+  if (widget.link) {
+    return (
+      <Link 
+        to={widget.link} 
+        className="block"
+        onClick={(e) => {
+          if (isLongPressed) {
+            e.preventDefault();
+          }
+        }}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 };
 
 const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading = [] }) => {
@@ -143,7 +153,9 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     
     if (savedWidgets) {
       try {
-        setVisibleWidgets(JSON.parse(savedWidgets));
+        const parsed = JSON.parse(savedWidgets);
+        // Merge with defaults to handle new widgets
+        setVisibleWidgets({ ...DEFAULT_WIDGETS, ...parsed });
       } catch (e) {
         console.error('Failed to parse widget preferences');
       }
@@ -151,7 +163,10 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     
     if (savedOrder) {
       try {
-        setWidgetOrder(JSON.parse(savedOrder));
+        const parsed = JSON.parse(savedOrder);
+        // Add any new widgets not in saved order
+        const allWidgets = [...new Set([...parsed, ...DEFAULT_ORDER])];
+        setWidgetOrder(allWidgets);
       } catch (e) {
         console.error('Failed to parse widget order');
       }
@@ -203,11 +218,19 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     }
   };
 
+  // Long press on empty area to show add modal
+  const handleEmptyAreaLongPress = () => {
+    longPressTimer.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(50);
+      setShowAddWidget(true);
+    }, 600);
+  };
+
   const handleRemoveWidget = (widgetId) => {
     const newPrefs = { ...visibleWidgets, [widgetId]: false };
     savePreferences(newPrefs);
     setLongPressTarget(null);
-    toast.success('Widget hidden. Tap + Add Widget below to restore.');
+    toast.success('Widget hidden. Long-press empty area to add it back.');
   };
 
   const handleAddWidget = (widgetId) => {
@@ -226,7 +249,6 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       const newIndex = widgetOrder.indexOf(over.id);
       const newOrder = arrayMove(widgetOrder, oldIndex, newIndex);
       saveOrder(newOrder);
-      toast.success('Widget order updated');
     }
   };
 
@@ -364,18 +386,36 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
           <ChevronRight className="w-5 h-5 text-gold/50" />
         </div>
       )
+    },
+    premium: {
+      id: 'premium',
+      title: 'Premium Unlimited',
+      icon: Crown,
+      iconColor: 'text-gold',
+      bgGradient: 'from-gold/20 to-amber-500/5',
+      link: null, // No link - just informational
+      show: userTier >= 4,
+      render: () => (
+        <div className="flex items-center gap-3 pr-6">
+          <Crown className="w-6 h-6 text-gold flex-shrink-0" />
+          <div>
+            <p className="text-[#FDFBF7] font-semibold">Premium Unlimited Access</p>
+            <p className="text-sm text-[#B0C4BF]">No monthly limits. Read any book, anytime.</p>
+          </div>
+        </div>
+      )
     }
   };
 
   // Get ordered visible widgets
   const orderedWidgets = widgetOrder.filter(id => {
     const w = widgets[id];
-    return visibleWidgets[id] && w && (w.show === undefined || w.show);
+    return w && visibleWidgets[id] && (w.show === undefined || w.show);
   });
 
   const hiddenWidgets = Object.keys(widgets).filter(id => {
     const w = widgets[id];
-    return !visibleWidgets[id] && (w.show === undefined || w.show);
+    return w && !visibleWidgets[id] && (w.show === undefined || w.show);
   });
 
   return (
@@ -408,36 +448,26 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
         </SortableContext>
       </DndContext>
 
-      {/* Tier 4 Premium Banner (always visible) */}
-      {userTier >= 4 && (
-        <div className="p-4 rounded-xl border border-gold/30 bg-gradient-to-br from-gold/10 to-amber-500/5">
-          <div className="flex items-center gap-3">
-            <Crown className="w-6 h-6 text-gold" />
-            <div>
-              <p className="text-[#FDFBF7] font-semibold">Premium Unlimited Access</p>
-              <p className="text-sm text-[#B0C4BF]">No monthly limits. Read any book, anytime.</p>
-            </div>
-          </div>
+      {/* Empty Area for Long Press to Add - Only show if there are hidden widgets */}
+      {hiddenWidgets.length > 0 && (
+        <div
+          className="h-16 rounded-xl border border-dashed border-gold/20 flex items-center justify-center text-[#666] text-sm cursor-pointer hover:border-gold/30 transition-colors"
+          onTouchStart={handleEmptyAreaLongPress}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleEmptyAreaLongPress}
+          onMouseUp={handleTouchEnd}
+          onMouseLeave={handleTouchEnd}
+          onClick={() => setShowAddWidget(true)}
+          data-testid="widget-add-area"
+        >
+          <span>Hold to customize • {hiddenWidgets.length} widget{hiddenWidgets.length > 1 ? 's' : ''} hidden</span>
         </div>
       )}
 
-      {/* Add Widget Button (shows when widgets are hidden) */}
-      {hiddenWidgets.length > 0 && (
-        <button
-          onClick={() => setShowAddWidget(true)}
-          className="w-full p-4 rounded-xl border border-dashed border-gold/30 text-[#B0C4BF] hover:text-gold 
-            hover:border-gold/50 transition-all flex items-center justify-center gap-2"
-          data-testid="add-widget-btn"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Widget ({hiddenWidgets.length} hidden)</span>
-        </button>
-      )}
-
-      {/* Drag Hint */}
+      {/* Drag Hint - only if multiple widgets */}
       {orderedWidgets.length > 1 && (
         <p className="text-center text-xs text-[#666]">
-          Drag widgets by the ⋮⋮ handle to reorder • Long press to hide
+          Drag ⋮⋮ to reorder • Long press to hide
         </p>
       )}
 
@@ -464,6 +494,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
               ) : (
                 hiddenWidgets.map(widgetId => {
                   const w = widgets[widgetId];
+                  if (!w) return null;
                   return (
                     <button
                       key={widgetId}
