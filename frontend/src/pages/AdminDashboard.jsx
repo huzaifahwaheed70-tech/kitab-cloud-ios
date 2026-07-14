@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
   Library, Users, ArrowLeft, Plus, Edit, Trash2, 
   Search, Save, Settings, DollarSign, RefreshCw, Tag, Eye, EyeOff,
-  Send, Loader2, Mail, History, FileText
+  Send, Loader2, Mail, History, FileText, BarChart3, TrendingUp, BookOpen, Clock, Flame
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -53,6 +53,11 @@ const AdminDashboard = () => {
   const [discountLoading, setDiscountLoading] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState(null);
+  
+  // Reading Analytics State
+  const [readingStats, setReadingStats] = useState(null);
+  const [readingStatsLoading, setReadingStatsLoading] = useState(false);
+  
   const [discountForm, setDiscountForm] = useState({
     code: '',
     name: '',
@@ -224,6 +229,26 @@ const AdminDashboard = () => {
       fetchEmailDrafts();
     }
   }, [activeTab, token]);
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && token) {
+      fetchReadingStats();
+    }
+  }, [activeTab, token]);
+
+  // Fetch reading analytics
+  const fetchReadingStats = async () => {
+    setReadingStatsLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/reading-stats`, { headers, withCredentials: true });
+      setReadingStats(response.data);
+    } catch (error) {
+      console.error('Error fetching reading stats:', error);
+      toast.error('Failed to load reading analytics');
+    } finally {
+      setReadingStatsLoading(false);
+    }
+  };
 
   // Fetch email stats for targeting
   const fetchEmailStats = async () => {
@@ -718,14 +743,18 @@ const AdminDashboard = () => {
               <History className="w-4 h-4 mr-1" />
               Activity
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-analytics">
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
               <Settings className="w-4 h-4 mr-1" />
               Settings
             </TabsTrigger>
           </TabsList>
 
-          {/* Search (hidden on settings, discounts, emails, and activity tab) */}
-          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'emails' && activeTab !== 'activity' && (
+          {/* Search (hidden on settings, discounts, emails, activity, and analytics tab) */}
+          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'emails' && activeTab !== 'activity' && activeTab !== 'analytics' && (
           <div className="relative mb-6 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
             <Input
@@ -1814,6 +1843,199 @@ const AdminDashboard = () => {
                   </li>
                 </ul>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Analytics Tab - Reading Statistics */}
+          <TabsContent value="analytics">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="font-serif text-2xl text-[#FDFBF7]">Reading Analytics</h2>
+                <Button 
+                  onClick={fetchReadingStats} 
+                  variant="outline" 
+                  className="border-gold/30 text-gold"
+                  disabled={readingStatsLoading}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${readingStatsLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+
+              {readingStatsLoading ? (
+                <div className="flex justify-center py-20">
+                  <div className="spinner-gap spinner-gap-lg"></div>
+                </div>
+              ) : readingStats ? (
+                <>
+                  {/* Overview Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BookOpen className="w-5 h-5 text-gold" />
+                        <span className="text-[#B0C4BF] text-sm">Total Sessions</span>
+                      </div>
+                      <p className="text-2xl font-bold text-[#FDFBF7]">{readingStats.overview?.total_reading_sessions?.toLocaleString() || 0}</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="w-5 h-5 text-blue-400" />
+                        <span className="text-[#B0C4BF] text-sm">Pages Read</span>
+                      </div>
+                      <p className="text-2xl font-bold text-[#FDFBF7]">{readingStats.overview?.total_pages_read?.toLocaleString() || 0}</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-5 h-5 text-purple-400" />
+                        <span className="text-[#B0C4BF] text-sm">Reading Time</span>
+                      </div>
+                      <p className="text-2xl font-bold text-[#FDFBF7]">{readingStats.overview?.total_reading_hours || 0}h</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-5 h-5 text-emerald-400" />
+                        <span className="text-[#B0C4BF] text-sm">Unique Readers</span>
+                      </div>
+                      <p className="text-2xl font-bold text-[#FDFBF7]">{readingStats.overview?.unique_readers_all_time || 0}</p>
+                    </div>
+                  </div>
+
+                  {/* Activity Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="glass-card p-4 rounded-xl text-center">
+                      <p className="text-3xl font-bold text-emerald-400">{readingStats.activity?.readers_today || 0}</p>
+                      <p className="text-[#B0C4BF] text-sm">Active Today</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-xl text-center">
+                      <p className="text-3xl font-bold text-blue-400">{readingStats.activity?.readers_this_week || 0}</p>
+                      <p className="text-[#B0C4BF] text-sm">This Week</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-xl text-center">
+                      <p className="text-3xl font-bold text-gold">{readingStats.activity?.readers_this_month || 0}</p>
+                      <p className="text-[#B0C4BF] text-sm">This Month</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Popular Books */}
+                    <div className="glass-card p-6 rounded-xl">
+                      <h3 className="font-serif text-lg text-[#FDFBF7] mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-gold" />
+                        Most Popular Books
+                      </h3>
+                      {readingStats.popular_books?.length > 0 ? (
+                        <div className="space-y-3">
+                          {readingStats.popular_books.slice(0, 5).map((book, i) => (
+                            <div key={book.book_id} className="flex items-center gap-3">
+                              <span className="w-6 h-6 rounded-full bg-gold/20 flex items-center justify-center text-gold text-sm font-bold">
+                                {i + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[#FDFBF7] truncate">{book.title}</p>
+                                <p className="text-xs text-[#B0C4BF]">{book.sessions} sessions • {book.pages_read} pages</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[#B0C4BF] text-center py-4">No reading data yet</p>
+                      )}
+                    </div>
+
+                    {/* Top Streaks */}
+                    <div className="glass-card p-6 rounded-xl">
+                      <h3 className="font-serif text-lg text-[#FDFBF7] mb-4 flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-orange-500" />
+                        Top Reading Streaks
+                      </h3>
+                      {readingStats.top_streaks?.length > 0 ? (
+                        <div className="space-y-3">
+                          {readingStats.top_streaks.slice(0, 5).map((streak, i) => (
+                            <div key={streak.user_id} className="flex items-center gap-3">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${
+                                i === 0 ? 'bg-gold text-[#02120F]' : 'bg-orange-500/20 text-orange-400'
+                              }`}>
+                                {i + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[#FDFBF7] truncate">{streak.name}</p>
+                                <p className="text-xs text-[#B0C4BF]">
+                                  {streak.current_streak} day streak • Best: {streak.longest_streak}
+                                </p>
+                              </div>
+                              <span className="text-orange-400 font-bold">{streak.current_streak}🔥</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[#B0C4BF] text-center py-4">No active streaks</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Daily Reading Chart */}
+                  {readingStats.daily_reading?.length > 0 && (
+                    <div className="glass-card p-6 rounded-xl">
+                      <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Reading Activity (Last 30 Days)</h3>
+                      <div className="h-40 flex items-end gap-1">
+                        {readingStats.daily_reading.slice(-30).map((day, i) => {
+                          const maxPages = Math.max(...readingStats.daily_reading.map(d => d.pages));
+                          const height = maxPages > 0 ? (day.pages / maxPages) * 100 : 0;
+                          return (
+                            <div 
+                              key={day.date}
+                              className="flex-1 bg-gold/60 hover:bg-gold transition-colors rounded-t cursor-pointer group relative"
+                              style={{ height: `${Math.max(height, 2)}%` }}
+                              title={`${day.date}: ${day.pages} pages, ${day.readers} readers`}
+                            >
+                              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-dark border border-gold/30 rounded px-2 py-1 text-xs text-[#FDFBF7] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                {day.date}: {day.pages} pages
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between text-xs text-[#666] mt-2">
+                        <span>{readingStats.daily_reading[0]?.date}</span>
+                        <span>{readingStats.daily_reading[readingStats.daily_reading.length - 1]?.date}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reading by Category */}
+                  {readingStats.reading_by_category?.length > 0 && (
+                    <div className="glass-card p-6 rounded-xl">
+                      <h3 className="font-serif text-lg text-[#FDFBF7] mb-4">Reading by Category</h3>
+                      <div className="space-y-3">
+                        {readingStats.reading_by_category.map(cat => {
+                          const maxSessions = Math.max(...readingStats.reading_by_category.map(c => c.sessions));
+                          const width = (cat.sessions / maxSessions) * 100;
+                          return (
+                            <div key={cat.category}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="text-[#FDFBF7]">{cat.category}</span>
+                                <span className="text-[#B0C4BF]">{cat.sessions} sessions</span>
+                              </div>
+                              <div className="h-2 bg-[#082E26] rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gold rounded-full transition-all"
+                                  style={{ width: `${width}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="glass-card p-8 rounded-xl text-center">
+                  <BarChart3 className="w-12 h-12 text-gold/30 mx-auto mb-4" />
+                  <p className="text-[#FDFBF7] mb-2">No analytics data available</p>
+                  <p className="text-sm text-[#B0C4BF]">Reading data will appear here as users start reading books.</p>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>

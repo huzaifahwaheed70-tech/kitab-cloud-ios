@@ -3234,6 +3234,128 @@ async def get_admin_stats(user: dict = Depends(get_admin_user)):
     }
 
 
+@api_router.get("/admin/reading-stats")
+async def get_admin_reading_stats(user: dict = Depends(get_admin_user)):
+    """Get comprehensive reading statistics for all users"""
+    
+    # Get date ranges
+    today = datetime.now(timezone.utc).date()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    
+    # Total reading sessions and pages
+    total_sessions = await db.reading_sessions.count_documents({})
+    
+    # Aggregate total pages and time
+    pipeline_totals = [
+        {
+            "$group": {
+                "_id": None,
+                "total_pages": {"$sum": "$pages_read"},
+                "total_minutes": {"$sum": "$reading_time_minutes"},
+                "unique_readers": {"$addToSet": "$user_id"}
+            }
+        }
+    ]
+    totals_result = await db.reading_sessions.aggregate(pipeline_totals).to_list(1)
+    totals = totals_result[0] if totals_result else {"total_pages": 0, "total_minutes": 0, "unique_readers": []}
+    
+    # Active readers today
+    today_readers = await db.reading_sessions.distinct("user_id", {"date": today.isoformat()})
+    
+    # Active readers this week
+    week_readers = await db.reading_sessions.distinct("user_id", {"date": {"$gte": week_start.isoformat()}})
+    
+    # Active readers this month
+    month_readers = await db.reading_sessions.distinct("user_id", {"date": {"$gte": month_start.isoformat()}})
+    
+    # Most read books (by session count)
+    pipeline_popular = [
+        {"$group": {"_id": "$book_id", "sessions": {"$sum": 1}, "total_pages": {"$sum": "$pages_read"}}},
+        {"$sort": {"sessions": -1}},
+        {"$limit": 10}
+    ]
+    popular_books_raw = await db.reading_sessions.aggregate(pipeline_popular).to_list(10)
+    
+    # Enrich with book titles
+    popular_books = []
+    for pb in popular_books_raw:
+        book = await db.books.find_one({"book_id": pb["_id"]}, {"_id": 0, "title": 1, "cover_image": 1})
+        if book:
+            popular_books.append({
+                "book_id": pb["_id"],
+                "title": book.get("title", "Unknown"),
+                "cover_image": book.get("cover_image"),
+                "sessions": pb["sessions"],
+                "pages_read": pb["total_pages"]
+            })
+    
+    # Reading by day (last 30 days)
+    thirty_days_ago = (today - timedelta(days=30)).isoformat()
+    pipeline_daily = [
+        {"$match": {"date": {"$gte": thirty_days_ago}}},
+        {"$group": {
+            "_id": "$date",
+            "sessions": {"$sum": 1},
+            "pages": {"$sum": "$pages_read"},
+            "readers": {"$addToSet": "$user_id"}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    daily_stats = await db.reading_sessions.aggregate(pipeline_daily).to_list(31)
+    daily_reading = [{"date": d["_id"], "sessions": d["sessions"], "pages": d["pages"], "readers": len(d["readers"])} for d in daily_stats]
+    
+    # Users with active streaks
+    pipeline_streaks = [
+        {"$match": {"current_streak": {"$gte": 1}}},
+        {"$sort": {"current_streak": -1}},
+        {"$limit": 10}
+    ]
+    top_streaks_raw = await db.reading_streaks.aggregate(pipeline_streaks).to_list(10)
+    
+    # Enrich with user names
+    top_streaks = []
+    for streak in top_streaks_raw:
+        user_data = await db.users.find_one({"user_id": streak["user_id"]}, {"_id": 0, "name": 1, "email": 1})
+        if user_data:
+            top_streaks.append({
+                "user_id": streak["user_id"],
+                "name": user_data.get("name") or user_data.get("email", "Unknown")[:20],
+                "current_streak": streak["current_streak"],
+                "longest_streak": streak.get("longest_streak", 0),
+                "total_days": streak.get("total_reading_days", 0)
+            })
+    
+    # Reading by category
+    pipeline_category = [
+        {"$group": {"_id": "$category", "sessions": {"$sum": 1}}},
+        {"$match": {"_id": {"$ne": None}}},
+        {"$sort": {"sessions": -1}},
+        {"$limit": 10}
+    ]
+    category_stats = await db.reading_sessions.aggregate(pipeline_category).to_list(10)
+    reading_by_category = [{"category": c["_id"], "sessions": c["sessions"]} for c in category_stats if c["_id"]]
+    
+    return {
+        "overview": {
+            "total_reading_sessions": total_sessions,
+            "total_pages_read": totals.get("total_pages", 0),
+            "total_reading_minutes": totals.get("total_minutes", 0),
+            "total_reading_hours": round(totals.get("total_minutes", 0) / 60, 1),
+            "unique_readers_all_time": len(totals.get("unique_readers", []))
+        },
+        "activity": {
+            "readers_today": len(today_readers),
+            "readers_this_week": len(week_readers),
+            "readers_this_month": len(month_readers)
+        },
+        "popular_books": popular_books,
+        "daily_reading": daily_reading,
+        "top_streaks": top_streaks,
+        "reading_by_category": reading_by_category
+    }
+
+
 @api_router.get("/admin/purchases")
 async def get_admin_purchases(user: dict = Depends(get_admin_user)):
     """Get all PDF purchases with user details"""

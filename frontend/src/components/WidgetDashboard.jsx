@@ -4,17 +4,34 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import { 
   Flame, BookOpen, Heart, Settings, BookMarked, Plus, X, Lock,
-  ChevronRight, Trophy, Star, Clock, Crown, Grip
+  ChevronRight, Trophy, Star, Clock, Crown, GripVertical
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 /**
  * Widget Dashboard Component
- * Customizable widgets that users can show/hide via long press
+ * Customizable widgets with drag-and-drop reordering
  * Widgets: Reading Streak, My Books, Favorites, Settings, Monthly Reading List
  */
 
 const WIDGET_STORAGE_KEY = 'kitab_widget_preferences';
+const WIDGET_ORDER_KEY = 'kitab_widget_order';
 
 const DEFAULT_WIDGETS = {
   streak: true,
@@ -24,23 +41,119 @@ const DEFAULT_WIDGETS = {
   monthlyList: true
 };
 
+const DEFAULT_ORDER = ['streak', 'myBooks', 'favorites', 'monthlyList', 'settings'];
+
+// Sortable Widget Component
+const SortableWidget = ({ widgetId, widget, isLongPressed, onLongPressStart, onLongPressEnd, onRemove, onClick }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: widgetId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : 1,
+    zIndex: isDragging ? 100 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative p-4 rounded-xl border border-gold/20 bg-gradient-to-br ${widget.bgGradient} 
+        hover:border-gold/40 transition-all group ${isDragging ? 'shadow-xl' : ''}`}
+      data-testid={`widget-${widgetId}`}
+    >
+      {/* Drag Handle */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="absolute top-2 right-2 p-1 rounded hover:bg-white/10 cursor-grab active:cursor-grabbing touch-none"
+        data-testid={`widget-drag-${widgetId}`}
+      >
+        <GripVertical className="w-4 h-4 text-[#666]" />
+      </div>
+
+      {/* Widget Content - Clickable */}
+      <Link
+        to={widget.link}
+        className="block"
+        onTouchStart={() => onLongPressStart(widgetId)}
+        onTouchEnd={onLongPressEnd}
+        onMouseDown={() => onLongPressStart(widgetId)}
+        onMouseUp={onLongPressEnd}
+        onMouseLeave={onLongPressEnd}
+        onClick={(e) => {
+          if (isLongPressed) {
+            e.preventDefault();
+          }
+        }}
+      >
+        {widget.render()}
+      </Link>
+      
+      {/* Long press remove overlay */}
+      {isLongPressed && (
+        <div 
+          className="absolute inset-0 z-50 bg-red-500/90 rounded-xl flex items-center justify-center animate-in fade-in duration-200"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(widgetId); }}
+        >
+          <div className="text-center">
+            <X className="w-8 h-8 text-white mx-auto mb-2" />
+            <p className="text-white font-medium">Tap to hide widget</p>
+            <p className="text-white/70 text-xs mt-1">Tap + Add Widget below to restore</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading = [] }) => {
   const { token } = useAuth();
   const [visibleWidgets, setVisibleWidgets] = useState(DEFAULT_WIDGETS);
+  const [widgetOrder, setWidgetOrder] = useState(DEFAULT_ORDER);
   const [streak, setStreak] = useState(null);
   const [longPressTarget, setLongPressTarget] = useState(null);
   const [showAddWidget, setShowAddWidget] = useState(false);
   const longPressTimer = useRef(null);
   const [loadingStreak, setLoadingStreak] = useState(true);
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   // Load preferences from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(WIDGET_STORAGE_KEY);
-    if (saved) {
+    const savedWidgets = localStorage.getItem(WIDGET_STORAGE_KEY);
+    const savedOrder = localStorage.getItem(WIDGET_ORDER_KEY);
+    
+    if (savedWidgets) {
       try {
-        setVisibleWidgets(JSON.parse(saved));
+        setVisibleWidgets(JSON.parse(savedWidgets));
       } catch (e) {
         console.error('Failed to parse widget preferences');
+      }
+    }
+    
+    if (savedOrder) {
+      try {
+        setWidgetOrder(JSON.parse(savedOrder));
+      } catch (e) {
+        console.error('Failed to parse widget order');
       }
     }
   }, []);
@@ -49,6 +162,11 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
   const savePreferences = (prefs) => {
     setVisibleWidgets(prefs);
     localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(prefs));
+  };
+
+  const saveOrder = (order) => {
+    setWidgetOrder(order);
+    localStorage.setItem(WIDGET_ORDER_KEY, JSON.stringify(order));
   };
 
   // Fetch streak data
@@ -75,7 +193,6 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
   const handleTouchStart = (widgetId) => {
     longPressTimer.current = setTimeout(() => {
       setLongPressTarget(widgetId);
-      // Vibrate on mobile if supported
       if (navigator.vibrate) navigator.vibrate(50);
     }, 600);
   };
@@ -100,9 +217,18 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
     toast.success('Widget added!');
   };
 
-  // Check if any widgets are hidden
-  const hasHiddenWidgets = Object.values(visibleWidgets).some(v => !v);
-  const visibleCount = Object.values(visibleWidgets).filter(v => v).length;
+  // Drag end handler
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = widgetOrder.indexOf(active.id);
+      const newIndex = widgetOrder.indexOf(over.id);
+      const newOrder = arrayMove(widgetOrder, oldIndex, newIndex);
+      saveOrder(newOrder);
+      toast.success('Widget order updated');
+    }
+  };
 
   // Widget definitions
   const widgets = {
@@ -114,7 +240,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-orange-500/20 to-orange-500/5',
       link: '/reading-streak',
       render: () => (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pr-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Flame className="w-5 h-5 text-orange-500" />
@@ -146,7 +272,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-emerald-500/20 to-emerald-500/5',
       link: '/bookshelf',
       render: () => (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pr-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <BookOpen className="w-5 h-5 text-emerald-400" />
@@ -171,7 +297,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-rose-500/20 to-rose-500/5',
       link: '/favorites',
       render: () => (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pr-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Heart className="w-5 h-5 text-rose-400" />
@@ -192,7 +318,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       bgGradient: 'from-blue-500/20 to-blue-500/5',
       link: '/settings',
       render: () => (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pr-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Settings className="w-5 h-5 text-blue-400" />
@@ -214,7 +340,7 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
       link: '/bookshelf',
       show: userTier > 0 && userTier < 4,
       render: () => (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pr-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               {bookshelf?.is_locked ? (
@@ -242,9 +368,9 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
   };
 
   // Get ordered visible widgets
-  const orderedWidgets = Object.keys(widgets).filter(id => {
+  const orderedWidgets = widgetOrder.filter(id => {
     const w = widgets[id];
-    return visibleWidgets[id] && (w.show === undefined || w.show);
+    return visibleWidgets[id] && w && (w.show === undefined || w.show);
   });
 
   const hiddenWidgets = Object.keys(widgets).filter(id => {
@@ -254,53 +380,33 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
 
   return (
     <div className="space-y-4 mb-6">
-      {/* Widget Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {orderedWidgets.map(widgetId => {
-          const w = widgets[widgetId];
-          const isLongPressed = longPressTarget === widgetId;
-          
-          const handleClick = (e) => {
-            // If long press overlay is showing, prevent navigation
-            if (isLongPressed) {
-              e.preventDefault();
-              return;
-            }
-          };
-          
-          return (
-            <Link
-              key={widgetId}
-              to={w.link}
-              className={`relative block p-4 rounded-xl border border-gold/20 bg-gradient-to-br ${w.bgGradient} 
-                hover:border-gold/40 transition-all group`}
-              onTouchStart={() => handleTouchStart(widgetId)}
-              onTouchEnd={handleTouchEnd}
-              onMouseDown={() => handleTouchStart(widgetId)}
-              onMouseUp={handleTouchEnd}
-              onMouseLeave={handleTouchEnd}
-              onClick={handleClick}
-              data-testid={`widget-${widgetId}`}
-            >
-              {w.render()}
+      {/* Widget Grid with Drag and Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={orderedWidgets} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {orderedWidgets.map(widgetId => {
+              const w = widgets[widgetId];
+              if (!w) return null;
               
-              {/* Long press remove overlay */}
-              {isLongPressed && (
-                <div 
-                  className="absolute inset-0 z-50 bg-red-500/90 rounded-xl flex items-center justify-center animate-in fade-in duration-200"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveWidget(widgetId); }}
-                >
-                  <div className="text-center">
-                    <X className="w-8 h-8 text-white mx-auto mb-2" />
-                    <p className="text-white font-medium">Tap to hide widget</p>
-                    <p className="text-white/70 text-xs mt-1">Tap + Add Widget below to restore</p>
-                  </div>
-                </div>
-              )}
-            </Link>
-          );
-        })}
-      </div>
+              return (
+                <SortableWidget
+                  key={widgetId}
+                  widgetId={widgetId}
+                  widget={w}
+                  isLongPressed={longPressTarget === widgetId}
+                  onLongPressStart={handleTouchStart}
+                  onLongPressEnd={handleTouchEnd}
+                  onRemove={handleRemoveWidget}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Tier 4 Premium Banner (always visible) */}
       {userTier >= 4 && (
@@ -326,6 +432,13 @@ const WidgetDashboard = ({ bookshelf, userTier, favorites = [], continueReading 
           <Plus className="w-5 h-5" />
           <span>Add Widget ({hiddenWidgets.length} hidden)</span>
         </button>
+      )}
+
+      {/* Drag Hint */}
+      {orderedWidgets.length > 1 && (
+        <p className="text-center text-xs text-[#666]">
+          Drag widgets by the ⋮⋮ handle to reorder • Long press to hide
+        </p>
       )}
 
       {/* Add Widget Modal */}
