@@ -1856,6 +1856,7 @@ const AdminDashboard = () => {
                   variant="outline" 
                   className="border-gold/30 text-gold"
                   disabled={readingStatsLoading}
+                  data-testid="refresh-analytics-btn"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${readingStatsLoading ? 'animate-spin' : ''}`} />
                   Refresh
@@ -1903,14 +1904,23 @@ const AdminDashboard = () => {
                   {/* Activity Section */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="glass-card p-4 rounded-xl text-center">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-2">
+                        <Clock className="w-5 h-5 text-emerald-400" />
+                      </div>
                       <p className="text-3xl font-bold text-emerald-400">{readingStats.activity?.readers_today || 0}</p>
                       <p className="text-[#B0C4BF] text-sm">Active Today</p>
                     </div>
                     <div className="glass-card p-4 rounded-xl text-center">
+                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-2">
+                        <TrendingUp className="w-5 h-5 text-blue-400" />
+                      </div>
                       <p className="text-3xl font-bold text-blue-400">{readingStats.activity?.readers_this_week || 0}</p>
                       <p className="text-[#B0C4BF] text-sm">This Week</p>
                     </div>
                     <div className="glass-card p-4 rounded-xl text-center">
+                      <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center mx-auto mb-2">
+                        <BarChart3 className="w-5 h-5 text-gold" />
+                      </div>
                       <p className="text-3xl font-bold text-gold">{readingStats.activity?.readers_this_month || 0}</p>
                       <p className="text-[#B0C4BF] text-sm">This Month</p>
                     </div>

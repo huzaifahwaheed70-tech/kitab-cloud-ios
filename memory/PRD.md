@@ -57,6 +57,14 @@
 - [x] **Widget Long-Press to Remove** - Hold any widget for 600ms to show remove overlay, tap to hide - July 2026
 - [x] **Widget Add Back** - Click "Add Widget" button to add hidden widgets back to dashboard - July 2026
 - [x] **Widget Preferences Persist** - Widget visibility saved to localStorage - July 2026
+- [x] **Widget Drag-and-Drop Reordering** - Drag widgets by grip handle to reorder, order persists - July 2026
+- [x] **Admin Reading Analytics Dashboard** - Total sessions, pages, hours, unique readers, activity metrics - July 2026
+- [x] **Popular Books Leaderboard** - Admin can see most read books ranked by sessions - July 2026
+- [x] **Top Streaks Leaderboard** - Admin can see users with best reading streaks - July 2026
+- [x] **Daily Reading Chart** - 30-day visual bar chart of community reading activity - July 2026
+- [x] **Reading by Category Stats** - See which categories are most read - July 2026
+- [x] **Backfill Page Count Script** - Script ready at /app/backend/scripts/backfill_page_count.py - July 2026
+- [x] **Backend Routes Directory** - Created /app/backend/routes/ for future modularization - July 2026
 - [x] **Unified Loading Spinners** - Page-level loaders use consistent spinner-gap animation - July 2026
 - [x] **Book Metadata Display** - Page count, file type, category badges on Book Detail page (when available) - July 2026
 - [x] **Google Auth Removed** - Completely stripped out per user request - July 2026
@@ -69,15 +77,9 @@
 - External payment links
 
 ### What's SHOWN on iOS:
-- Subscription prices (via RevenueCat IAP)
-- Subscribe buttons (use RevenueCat, not Stripe)
-- Restore Purchases button
+- Subscription prices (display only - user must subscribe via Apple)
 - All book content and reading features
-
-### RevenueCat Integration:
-- **iOS API Key:** appl_ektcemLtYrefFQBihwgtwStQpKB
-- **Products:** kitab_tier_1_monthly, kitab_tier_2_monthly, kitab_tier_3_monthly, kitab_tier_4_monthly
-- **Entitlements:** tier_1, tier_2, tier_3, tier_4
+- Note: RevenueCat was REMOVED per user request - subscriptions handled via Stripe on web only
 - **Backend Sync:** POST /api/user/sync-subscription
 
 ## Discount Code System (Web/Android Only)
