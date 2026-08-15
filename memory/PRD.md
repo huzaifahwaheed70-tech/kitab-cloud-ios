@@ -12,10 +12,11 @@
 - **Native Wrapper:** Capacitor v7 (iOS & Android)
 - **Payments:** 
   - **Web/Android:** Stripe Checkout
-  - **iOS:** RevenueCat Apple In-App Purchase (IAP)
 - **Emails:** Resend
 - **Storage:** Emergent Object Storage
-- **Push Notifications:** OneSignal (react-onesignal + @onesignal/capacitor-plugin)
+- **Authentication:** 
+  - Email/Password with JWT (1 year expiry)
+- **File System (Native):** @capacitor/filesystem (PDF downloads)
 
 ## Core Features (Implemented)
 - [x] User authentication (email/password)
@@ -23,6 +24,7 @@
 - [x] 5-tier subscription system (0=Pay-per-book, 1-4=Monthly plans)
 - [x] Admin dashboard for book/user management
 - [x] PDF reading in-app
+- [x] **Word Document Support** - Admin upload + reader with text scaling/pinch-zoom - NEW
 - [x] Individual PDF purchases (Web/Android only)
 - [x] Monthly reading limits (configurable by admin)
 - [x] Email verification via Resend
@@ -30,10 +32,42 @@
 - [x] Privacy Policy page
 - [x] ErrorBoundary for crash handling
 - [x] App Transport Security (ATS) configuration
-- [x] **Discount Code System** (Web/Android only - Apple has their own)
+- [x] **Discount Code System** (Web/Android only)
 - [x] **Pre-checkout Discount Popup** (Web/Android only)
-- [x] **Admin Push Notifications via OneSignal**
-- [x] **RevenueCat Apple IAP for iOS Subscriptions** (Dec 2025)
+- [x] **Admin Test Purchases** (for PDFs and subscriptions without payment)
+- [x] **Monthly Reading List Locks** (enforced limits until new month)
+- [x] **Subscription Downgrades** via Settings
+- [x] **PDF Download to Device** (Capacitor Filesystem API for native apps)
+- [x] **Admin Email Dashboard** with targeting and drafts
+- [x] **Safe Area/Notch support** for iOS/Android
+- [x] **Mobile Welcome Screen** (Capacitor-only)
+- [x] **Custom Book Loader Animation** (chasing ring + opening book + dissolve)
+- [x] **Premium Reading Streak System** - Dashboard with current/longest streak, weekly goals, reading stats
+- [x] **Advanced Search** - Search books with category, tier, file type filters and sort options
+- [x] **Admin Audit Log** - Track all admin actions with filters and statistics
+- [x] **Book Card Consistency** - Uniform sizing, skeleton loaders, lazy loading with fade-in
+- [x] **UI/UX Refinements** - Ripple effects, 8px spacing, smooth transitions
+- [x] **Reading Statistics Dashboard** - Total books, pages, time, favorite category
+- [x] **Full Reading Streak Page** - Dedicated /reading-streak page with Overview/History/Goals tabs - July 2026
+- [x] **Goal Setting** - Users can set weekly reading goals (1-7 days) from the Goals tab - July 2026
+- [x] **Multi-Goal Types** - Daily pages goal (1-500 pages) and daily reading time goal (5-480 minutes) in addition to days per week - July 2026
+- [x] **Custom Goal Values** - Users can enter any custom value within valid ranges, not just presets - July 2026
+- [x] **Today's Progress** - Overview shows pages and time progress bars with current/goal values - July 2026
+- [x] **Customizable Widget Dashboard** - Library page shows widgets for Streak, My Books, Favorites, Settings, Reading List - July 2026
+- [x] **Widget Long-Press to Remove** - Hold any widget for 600ms to show remove overlay, tap to hide - July 2026
+- [x] **Widget Add Back** - Click "Add Widget" button to add hidden widgets back to dashboard - July 2026
+- [x] **Widget Preferences Persist** - Widget visibility saved to localStorage - July 2026
+- [x] **Widget Drag-and-Drop Reordering** - Drag widgets by grip handle to reorder, order persists - July 2026
+- [x] **Admin Reading Analytics Dashboard** - Total sessions, pages, hours, unique readers, activity metrics - July 2026
+- [x] **Popular Books Leaderboard** - Admin can see most read books ranked by sessions - July 2026
+- [x] **Top Streaks Leaderboard** - Admin can see users with best reading streaks - July 2026
+- [x] **Daily Reading Chart** - 30-day visual bar chart of community reading activity - July 2026
+- [x] **Reading by Category Stats** - See which categories are most read - July 2026
+- [x] **Backfill Page Count Script** - Script ready at /app/backend/scripts/backfill_page_count.py - July 2026
+- [x] **Backend Routes Directory** - Created /app/backend/routes/ for future modularization - July 2026
+- [x] **Unified Loading Spinners** - Page-level loaders use consistent spinner-gap animation - July 2026
+- [x] **Book Metadata Display** - Page count, file type, category badges on Book Detail page (when available) - July 2026
+- [x] **Google Auth Removed** - Completely stripped out per user request - July 2026
 
 ## iOS App Store Compliance (CRITICAL)
 ### What's HIDDEN on iOS:
@@ -43,15 +77,9 @@
 - External payment links
 
 ### What's SHOWN on iOS:
-- Subscription prices (via RevenueCat IAP)
-- Subscribe buttons (use RevenueCat, not Stripe)
-- Restore Purchases button
+- Subscription prices (display only - user must subscribe via Apple)
 - All book content and reading features
-
-### RevenueCat Integration:
-- **iOS API Key:** appl_ektcemLtYrefFQBihwgtwStQpKB
-- **Products:** kitab_tier_1_monthly, kitab_tier_2_monthly, kitab_tier_3_monthly, kitab_tier_4_monthly
-- **Entitlements:** tier_1, tier_2, tier_3, tier_4
+- Note: RevenueCat was REMOVED per user request - subscriptions handled via Stripe on web only
 - **Backend Sync:** POST /api/user/sync-subscription
 
 ## Discount Code System (Web/Android Only)
@@ -102,11 +130,22 @@
 
 ## Key API Endpoints
 - `/api/auth/login`, `/api/auth/register`
+- `/api/auth/google/session` - Google OAuth session exchange
+- `/api/auth/google/link` - Link Google account to existing user
+- `/api/auth/google/unlink` - Unlink Google account
 - `/api/books/all`, `/api/books/{id}`
+- `/api/books/{id}/upload-pdf` - Upload PDF
+- `/api/books/{id}/upload-docx` - Upload Word Document (NEW)
+- `/api/user/profile` - Returns google_linked, has_password fields
 - `/api/user/cancel-subscription`
-- `/api/user/sync-subscription` (RevenueCat iOS sync)
+- `/api/reading-streak` - Get reading streak data (NEW)
+- `/api/reading-stats` - Get reading statistics (NEW)
+- `/api/reading-session` - Log reading session (NEW)
+- `/api/search/books` - Advanced search with filters (NEW)
+- `/api/search/categories` - Get book categories (NEW)
+- `/api/admin/audit-logs` - Admin action audit logs (NEW)
 - `/api/payments/create-checkout` (supports discount_code parameter)
-- `/api/admin/*` (admin routes including discount and notification management)
+- `/api/admin/*` (admin routes including discount and email management)
 
 ## Production URLs
 - **Web/API:** https://kitab-cloud.emergent.host
@@ -150,8 +189,25 @@
 - **Password:** admin123
 
 ## Backlog (Future Features)
-- [ ] (P2) Reading statistics dashboard
-- [ ] Configure OneSignal dashboard for web push
+- [ ] (P1) Reading Experience Polish - smooth page turns, beautiful book opening animation
+- [ ] (P2) In-book text search (search within PDFs)
+- [ ] (P2) Pop-up Recommendations - diverse book recommendations
+
+## Known Issues / User Verification Required
+### Resend Emails on Production
+- Preview environment is working correctly
+- Production may have missing `RESEND_API_KEY` or unverified domain
+- Admin can check config via: `GET /api/admin/email-config`
+- Admin can test via: `POST /api/admin/test-email?email=test@example.com`
+
+### Codemagic iOS Build
+- Using native `xcode-project` CLI to handle SPM + RevenueCat provisioning
+- User verification pending
+
+### Tier 1 Book Limit Showing 15 Instead of 10 (Production)
+- Preview API correctly returns `limit: 10` for Tier 1
+- If production shows 15, check Admin Dashboard → Tier Settings
+- Custom tier settings may have been saved with different values
 
 ---
-*Last updated: December 2025*
+*Last updated: July 2026*

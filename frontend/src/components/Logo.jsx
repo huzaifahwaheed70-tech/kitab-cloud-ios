@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const Logo = ({ size = 'md', linkTo = '/', showText = true, className = '', testId = 'logo' }) => {
+const Logo = ({ size = 'md', linkTo = '/', showText = true, showTagline = false, className = '', testId = 'logo' }) => {
   const sizeClasses = {
     sm: 'w-8 h-8',
     md: 'w-10 h-10',
@@ -16,6 +16,13 @@ const Logo = ({ size = 'md', linkTo = '/', showText = true, className = '', test
     xl: 'text-3xl'
   };
 
+  const taglineSizes = {
+    sm: 'text-[10px]',
+    md: 'text-xs',
+    lg: 'text-sm',
+    xl: 'text-base'
+  };
+
   const logoContent = (
     <>
       <img 
@@ -24,9 +31,16 @@ const Logo = ({ size = 'md', linkTo = '/', showText = true, className = '', test
         className={`${sizeClasses[size]} rounded-sm object-cover`}
       />
       {showText && (
-        <span className={`font-serif ${textSizes[size]} font-semibold text-[#FDFBF7]`}>
-          Kitab Cloud
-        </span>
+        <div className="flex flex-col">
+          <span className={`font-serif ${textSizes[size]} font-semibold text-[#FDFBF7] leading-tight`}>
+            Kitab Cloud
+          </span>
+          {showTagline && (
+            <span className={`${taglineSizes[size]} text-[#B0C4BF] leading-tight`}>
+              By Dar-Us-Salam.com
+            </span>
+          )}
+        </div>
       )}
     </>
   );

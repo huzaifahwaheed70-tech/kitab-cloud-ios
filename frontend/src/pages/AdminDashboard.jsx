@@ -41,12 +41,10 @@ const AdminDashboard = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userDetails, setUserDetails] = useState(null);
   
-  // Tier Settings State
   const [tierSettings, setTierSettings] = useState({});
   const [tierLoading, setTierLoading] = useState(false);
   const [tierSaving, setTierSaving] = useState(false);
   
-  // Discount Codes State
   const [discountCodes, setDiscountCodes] = useState([]);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -69,18 +67,6 @@ const AdminDashboard = () => {
     badge_text: ''
   });
 
-  // Push Notifications State
-  const [notificationForm, setNotificationForm] = useState({
-    title: '',
-    message: '',
-    target: 'all',
-    url: ''
-  });
-  const [notificationSending, setNotificationSending] = useState(false);
-  const [notificationHistory, setNotificationHistory] = useState([]);
-  const [notificationHistoryLoading, setNotificationHistoryLoading] = useState(false);
-
-  // Book Form State
   const [showBookModal, setShowBookModal] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
   const [bookForm, setBookForm] = useState({
@@ -132,7 +118,6 @@ const AdminDashboard = () => {
     setTierLoading(true);
     try {
       const response = await axios.get(`${API}/admin/tiers`, { headers, withCredentials: true });
-      console.log('Tier settings response:', response.data);
       if (response.data && response.data.tiers) {
         setTierSettings(response.data.tiers);
       }
@@ -187,7 +172,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Discount Code Functions
   const fetchDiscountCodes = async () => {
     const headers = getAuthHeaders();
     setDiscountLoading(true);
@@ -207,62 +191,6 @@ const AdminDashboard = () => {
       fetchDiscountCodes();
     }
   }, [activeTab, token]);
-
-  // Fetch notification history when notifications tab is active
-  useEffect(() => {
-    if (activeTab === 'notifications' && token) {
-      fetchNotificationHistory();
-    }
-  }, [activeTab, token]);
-
-  const fetchNotificationHistory = async () => {
-    const headers = getAuthHeaders();
-    setNotificationHistoryLoading(true);
-    try {
-      const response = await axios.get(`${API}/admin/notifications/history`, { headers, withCredentials: true });
-      setNotificationHistory(response.data.notifications || []);
-    } catch (error) {
-      console.error('Error fetching notification history:', error);
-    } finally {
-      setNotificationHistoryLoading(false);
-    }
-  };
-
-  const handleSendNotification = async (e) => {
-    e.preventDefault();
-    if (!notificationForm.title.trim() || !notificationForm.message.trim()) {
-      toast.error('Please enter both title and message');
-      return;
-    }
-    
-    const headers = getAuthHeaders();
-    setNotificationSending(true);
-    try {
-      const response = await axios.post(
-        `${API}/admin/notifications/send`,
-        {
-          title: notificationForm.title,
-          message: notificationForm.message,
-          target: notificationForm.target,
-          url: notificationForm.url || null
-        },
-        { headers, withCredentials: true }
-      );
-      
-      if (response.data.success) {
-        toast.success(`Notification sent to ${response.data.recipients} devices!`);
-        setNotificationForm({ title: '', message: '', target: 'all', url: '' });
-        fetchNotificationHistory();
-      } else {
-        toast.error(response.data.message || 'Failed to send notification');
-      }
-    } catch (error) {
-      console.error('Error sending notification:', error);
-      toast.error(error.response?.data?.detail || 'Failed to send notification');
-    } finally {
-      setNotificationSending(false);
-    }
-  };
 
   const resetDiscountForm = () => {
     setDiscountForm({
@@ -565,26 +493,14 @@ const AdminDashboard = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6 flex-wrap">
-            <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">
-              Books
-            </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-users">
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="purchases" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-purchases">
-              Purchases
-            </TabsTrigger>
-            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-subscriptions">
-              Subscriptions
-            </TabsTrigger>
+          <TabsList className="bg-surface border border-[rgba(212,175,55,0.2)] mb-6">
+            <TabsTrigger value="books" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-books">Books</TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-users">Users</TabsTrigger>
+            <TabsTrigger value="purchases" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-purchases">Purchases</TabsTrigger>
+            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-subscriptions">Subscriptions</TabsTrigger>
             <TabsTrigger value="discounts" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-discounts">
               <Tag className="w-4 h-4 mr-1" />
               Discounts
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-notifications">
-              <Bell className="w-4 h-4 mr-1" />
-              Notifications
             </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-gold data-[state=active]:text-[#02120F]" data-testid="tab-settings">
               <Settings className="w-4 h-4 mr-1" />
@@ -592,20 +508,17 @@ const AdminDashboard = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Search (hidden on settings, discounts, and notifications tab) */}
-          {activeTab !== 'settings' && activeTab !== 'discounts' && activeTab !== 'notifications' && (
-            <div className="relative mb-6 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
-              <Input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
-                data-testid="admin-search"
-              />
-            </div>
-          )}
+          <div className="relative mb-6 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#B0C4BF]" />
+            <Input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+              data-testid="admin-search"
+            />
+          </div>
 
           <TabsContent value="books">
             <div className="flex items-center justify-between mb-6">
@@ -728,6 +641,479 @@ const AdminDashboard = () => {
               ))}
               {filteredBooks.length === 0 && (
                 <div className="text-center py-12 text-[#B0C4BF]">No books found</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">Users Management</h2>
+            <div className="space-y-4">
+              {filteredUsers.map((user) => (
+                <div key={user.user_id} className="glass-card rounded-sm p-4 flex items-center gap-4" data-testid={`admin-user-${user.user_id}`}>
+                  <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center flex-shrink-0">
+                    {user.picture ? (
+                      <img src={user.picture} alt="" className="w-10 h-10 rounded-full" />
+                    ) : (
+                      <Users className="w-5 h-5 text-gold" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[#FDFBF7] font-medium">{user.name}</h3>
+                      {user.is_admin && (
+                        <span className="px-2 py-0.5 bg-gold/20 text-gold text-xs rounded-sm">Admin</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#B0C4BF] truncate">{user.email}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={() => fetchUserDetails(user.user_id)} className="border-[rgba(212,175,55,0.2)] text-[#B0C4BF] hover:text-gold">
+                      Details
+                    </Button>
+                    <Select value={String(user.subscription_tier)} onValueChange={(v) => handleUpdateUserTier(user.user_id, parseInt(v))}>
+                      <SelectTrigger className="w-24 bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
+                        {[0, 1, 2, 3, 4, 5].map(t => (
+                          <SelectItem key={t} value={String(t)} className="text-[#FDFBF7]">Tier {t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant={user.is_admin ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleToggleAdmin(user.user_id, !user.is_admin)}
+                      className={user.is_admin ? 'bg-gold text-[#02120F]' : 'border-[rgba(212,175,55,0.2)] text-[#B0C4BF]'}
+                    >
+                      {user.is_admin ? 'Admin' : 'Make Admin'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {filteredUsers.length === 0 && (
+                <div className="text-center py-12 text-[#B0C4BF]">No users found</div>
+              )}
+            </div>
+
+            {selectedUser && userDetails && (
+              <Dialog open={!!selectedUser} onOpenChange={() => { setSelectedUser(null); setUserDetails(null); }}>
+                <DialogContent className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="font-serif text-xl">User Details</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Email</p>
+                        <p className="text-[#FDFBF7]">{userDetails.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Name</p>
+                        <p className="text-[#FDFBF7]">{userDetails.name || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Tier</p>
+                        <p className="text-[#FDFBF7]">Tier {userDetails.subscription_tier}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#B0C4BF]">Admin</p>
+                        <p className="text-[#FDFBF7]">{userDetails.is_admin ? 'Yes' : 'No'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#B0C4BF] mb-2">Favorite Books ({userDetails.favorites?.length || 0})</p>
+                      <div className="flex flex-wrap gap-2">
+                        {userDetails.favorites?.map(book => (
+                          <span key={book.book_id} className="px-2 py-1 bg-[#082E26] rounded text-sm">{book.title}</span>
+                        ))}
+                        {(!userDetails.favorites || userDetails.favorites.length === 0) && (
+                          <span className="text-[#B0C4BF] text-sm">No favorites</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[#B0C4BF] mb-2">PDF Purchases ({userDetails.purchases?.length || 0})</p>
+                      {userDetails.purchases?.map((purchase, i) => (
+                        <div key={i} className="flex justify-between items-center py-2 border-b border-[rgba(212,175,55,0.1)]">
+                          <span className="text-sm">{purchase.book_title}</span>
+                          <span className="text-gold text-sm">${purchase.amount}</span>
+                        </div>
+                      ))}
+                      {(!userDetails.purchases || userDetails.purchases.length === 0) && (
+                        <span className="text-[#B0C4BF] text-sm">No purchases</span>
+                      )}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </TabsContent>
+
+          <TabsContent value="purchases">
+            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">PDF Purchases</h2>
+            <div className="space-y-3">
+              {purchases.map((purchase, index) => (
+                <div key={index} className="glass-card rounded-sm p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[#FDFBF7] font-medium">{purchase.book_title}</p>
+                    <p className="text-sm text-[#B0C4BF]">{purchase.user_email}</p>
+                    <p className="text-xs text-[#B0C4BF]">{new Date(purchase.purchased_at).toLocaleDateString()}</p>
+                  </div>
+                  <span className="text-gold font-medium">${purchase.amount}</span>
+                </div>
+              ))}
+              {purchases.length === 0 && (
+                <div className="text-center py-12 text-[#B0C4BF]">No purchases yet</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="subscriptions">
+            <h2 className="font-serif text-2xl text-[#FDFBF7] mb-6">Subscription Payments</h2>
+            <div className="space-y-3">
+              {subscriptions.map((sub, index) => (
+                <div key={index} className="glass-card rounded-sm p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[#FDFBF7] font-medium">{sub.user_email || sub.user_name}</p>
+                    <p className="text-sm text-[#B0C4BF]">Tier {sub.tier} subscription</p>
+                    <p className="text-xs text-[#B0C4BF]">{new Date(sub.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gold font-medium">${sub.amount}</span>
+                    <p className={`text-xs ${sub.payment_status === 'paid' ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {sub.payment_status}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {subscriptions.length === 0 && (
+                <div className="text-center py-12 text-[#B0C4BF]">No subscriptions yet</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="discounts">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-serif text-2xl text-[#FDFBF7]">Discount Codes</h2>
+                  <p className="text-[#B0C4BF] text-sm mt-1">Create and manage promotional codes</p>
+                </div>
+                <Button
+                  onClick={() => { resetDiscountForm(); setShowDiscountModal(true); }}
+                  className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                  data-testid="create-discount-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Discount Code
+                </Button>
+              </div>
+
+              {discountLoading ? (
+                <div className="text-center py-12 text-[#B0C4BF]">Loading discount codes...</div>
+              ) : discountCodes.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-[rgba(212,175,55,0.3)] rounded-lg">
+                  <Tag className="w-12 h-12 mx-auto text-[#B0C4BF] mb-4" />
+                  <p className="text-[#B0C4BF]">No discount codes yet</p>
+                  <p className="text-sm text-[#B0C4BF]/60">Create your first discount code to offer promotions</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {discountCodes.map((discount) => (
+                    <div
+                      key={discount.discount_id}
+                      className={`glass-card p-4 rounded-lg border ${discount.is_active ? 'border-gold/30' : 'border-[rgba(212,175,55,0.1)] opacity-60'}`}
+                      data-testid={`discount-${discount.code}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-mono text-lg text-gold font-bold">{discount.code}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${discount.is_visible ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                              {discount.is_visible ? 'Visible' : 'Secret'}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${discount.is_active ? 'bg-gold/20 text-gold' : 'bg-red-500/20 text-red-400'}`}>
+                              {discount.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <h3 className="text-[#FDFBF7] font-medium">{discount.name}</h3>
+                          <p className="text-sm text-[#B0C4BF] mt-1">
+                            {discount.discount_type === 'percentage' && `${discount.value}% off`}
+                            {discount.discount_type === 'fixed_amount' && `$${discount.value} off`}
+                            {discount.discount_type === 'free_trial' && `${discount.value} day free trial`}
+                            {discount.discount_type === 'buy_x_get_y' && `Buy ${discount.buy_x_value} month, get ${discount.value} month free`}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-[#B0C4BF]/70">
+                            <span>Used: {discount.used_count || 0}{discount.usage_limit ? `/${discount.usage_limit}` : ''}</span>
+                            {discount.valid_until && <span>Expires: {new Date(discount.valid_until).toLocaleDateString()}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleDiscountActive(discount)}
+                            className="text-[#B0C4BF] hover:text-gold"
+                            title={discount.is_active ? 'Deactivate' : 'Activate'}
+                          >
+                            {discount.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditDiscount(discount)}
+                            className="text-[#B0C4BF] hover:text-gold"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDiscount(discount.discount_id)}
+                            className="text-[#B0C4BF] hover:text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Dialog open={showDiscountModal} onOpenChange={(open) => { setShowDiscountModal(open); if (!open) resetDiscountForm(); }}>
+              <DialogContent className="bg-[#02120F] border-gold/30 text-[#FDFBF7] max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-xl">
+                    {editingDiscount ? 'Edit Discount Code' : 'Create Discount Code'}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateDiscount} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Code *</Label>
+                      <Input
+                        value={discountForm.code}
+                        onChange={(e) => setDiscountForm({ ...discountForm, code: e.target.value.toUpperCase() })}
+                        placeholder="e.g., WELCOME20"
+                        className="bg-surface border-gold/30 uppercase"
+                        required
+                        disabled={!!editingDiscount}
+                      />
+                    </div>
+                    <div>
+                      <Label>Name *</Label>
+                      <Input
+                        value={discountForm.name}
+                        onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
+                        placeholder="e.g., Welcome Discount"
+                        className="bg-surface border-gold/30"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Description (Internal)</Label>
+                    <Textarea
+                      value={discountForm.description}
+                      onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
+                      placeholder="Internal notes about this discount"
+                      className="bg-surface border-gold/30"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Discount Type *</Label>
+                      <Select
+                        value={discountForm.discount_type}
+                        onValueChange={(value) => setDiscountForm({ ...discountForm, discount_type: value })}
+                      >
+                        <SelectTrigger className="bg-surface border-gold/30">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#02120F] border-gold/30">
+                          <SelectItem value="percentage">Percentage Off</SelectItem>
+                          <SelectItem value="fixed_amount">Fixed Amount Off</SelectItem>
+                          <SelectItem value="free_trial">Free Trial (Days)</SelectItem>
+                          <SelectItem value="buy_x_get_y">Buy X Get Y Free</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>
+                        {discountForm.discount_type === 'percentage' ? 'Percentage (%)' :
+                         discountForm.discount_type === 'fixed_amount' ? 'Amount ($)' :
+                         discountForm.discount_type === 'free_trial' ? 'Trial Days' :
+                         'Free Months (Y)'} *
+                      </Label>
+                      <Input
+                        type="number"
+                        value={discountForm.value}
+                        onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
+                        placeholder={discountForm.discount_type === 'percentage' ? '20' : '7'}
+                        className="bg-surface border-gold/30"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {discountForm.discount_type === 'buy_x_get_y' && (
+                    <div>
+                      <Label>Paid Months (X) *</Label>
+                      <Input
+                        type="number"
+                        value={discountForm.buy_x_value}
+                        onChange={(e) => setDiscountForm({ ...discountForm, buy_x_value: e.target.value })}
+                        placeholder="1"
+                        className="bg-surface border-gold/30"
+                        required
+                      />
+                      <p className="text-xs text-[#B0C4BF] mt-1">User pays for X months, then gets Y months free</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => { setShowDiscountModal(false); resetDiscountForm(); }}
+                      className="border-gold/30"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-gold text-[#02120F] hover:bg-[#E9C85C]">
+                      {editingDiscount ? 'Update' : 'Create'} Discount Code
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <div className="max-w-4xl">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-serif text-2xl text-[#FDFBF7]">Subscription Tiers & Pricing</h2>
+                  <p className="text-[#B0C4BF] text-sm mt-1">Changes will update across the entire app and website</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={resetTierSettings}
+                    disabled={tierSaving}
+                    className="border-[rgba(212,175,55,0.3)] text-[#B0C4BF] hover:bg-surface"
+                    data-testid="reset-tiers-btn"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset to Defaults
+                  </Button>
+                  <Button
+                    onClick={saveTierSettings}
+                    disabled={tierSaving}
+                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                    data-testid="save-tiers-btn"
+                  >
+                    {tierSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-[#02120F] border-t-transparent rounded-full animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {tierLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : Object.keys(tierSettings).length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-[#B0C4BF] mb-4">No tier settings loaded. Click below to load defaults.</p>
+                  <Button
+                    onClick={fetchTierSettings}
+                    className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Load Tier Settings
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(tierSettings).sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([tierId, tierInfo]) => (
+                    <div 
+                      key={tierId} 
+                      className={`glass-card rounded-sm p-6 border ${parseInt(tierId) === 4 ? 'border-gold' : 'border-[rgba(212,175,55,0.2)]'}`}
+                      data-testid={`tier-setting-${tierId}`}
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className={`w-10 h-10 rounded-sm bg-gold/10 flex items-center justify-center`}>
+                          <DollarSign className="w-5 h-5 text-gold" />
+                        </div>
+                        <div>
+                          <span className={`tier-badge tier-${tierId} text-xs mb-1`}>Tier {tierId}</span>
+                          <p className="text-[#B0C4BF] text-xs">
+                            {parseInt(tierId) === 0 ? 'Pay per book option' : 
+                             parseInt(tierId) === 4 ? 'Premium unlimited plan' : 
+                             'Monthly subscription'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label className="text-[#FDFBF7] text-sm">Tier Name</Label>
+                          <Input
+                            value={tierInfo.name || ''}
+                            onChange={(e) => handleTierChange(tierId, 'name', e.target.value)}
+                            className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
+                            placeholder="e.g. Basic, Premium"
+                            data-testid={`tier-${tierId}-name`}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[#FDFBF7] text-sm">Price (USD/month)</Label>
+                          <div className="relative mt-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0C4BF]">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={tierInfo.price || 0}
+                              onChange={(e) => handleTierChange(tierId, 'price', e.target.value)}
+                              className="pl-7 bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+                              placeholder="0.00"
+                              data-testid={`tier-${tierId}-price`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-[#FDFBF7] text-sm">Monthly Book Limit</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={tierInfo.book_limit ?? ''}
+                            onChange={(e) => handleTierChange(tierId, 'book_limit', e.target.value)}
+                            className="bg-surface border-[rgba(212,175,55,0.2)] text-[#FDFBF7] mt-1"
+                            placeholder="Empty = Unlimited"
+                            data-testid={`tier-${tierId}-limit`}
+                          />
+                          <p className="text-xs text-[#B0C4BF] mt-1">Leave empty for unlimited</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </TabsContent>

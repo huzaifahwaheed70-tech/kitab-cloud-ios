@@ -1,0 +1,53 @@
+{
+  "summary": "Verified PDF viewer bug fix (iteration 14). PDF loading now works correctly for admin user viewing book_873c49aac9ee. Backend: 6/6 pytest cases pass (test_pdf_viewer.py) — /api/files/{pdf} returns 200 with content-type application/pdf and valid %PDF magic bytes; 401/403 when unauthenticated; 404 for missing file. Frontend: Playwright confirmed (a) PDF.js worker loads from jsDelivr version 5.4.296 (console log: '[PDF.js] Worker version: 5.4.296 | Source: //cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs'), (b) worker script downloads with status 200 from jsDelivr, (c) after clicking Read Now the PDF Document loads and Page canvas renders (612x792) with the 'Test Book / Dar-Us-Salam Publications' cover page visible, (d) footer page indicator shows '1/1', (e) Zoom In control works (100% → 125%), (f) no infinite loading spinner, no 'Failed to load PDF' error state. The reported bug 'PDF keeps loading forever' is RESOLVED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/files/{missing_pdf}", "issue": "First cold lookup for a non-existent PDF path was slow (~15s) — likely due to the GCS get_object call taking time before raising an exception. Subsequent calls are fast. Not blocking; consider adding an explicit blob.exists() short-circuit before download."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "BookDetailPage PDF Reader", "issue": "Latent edge case: if the user's saved reading-progress page number exceeds numPages of the currently-loaded PDF (e.g. previous session saved page 5 on a PDF that has since been replaced with a 1-page file), the Page component logs 'Invalid page request' and renders a blank area. Repro: set reading_progress.page=5 in DB for book_873c49aac9ee (which has 1 page), reload → footer shows '5/1' and the page area is empty. Fix: in onDocumentLoadSuccessWithDoc, clamp pageNumber via `if (pageNumber > pdf.numPages) setPageNumber(1)`. Not the reported bug but user-visible.", "selector": ".react-pdf__Page", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pdf_viewer.py",
+    "/app/test_reports/pytest/pdf_viewer.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (medium): In BookDetailPage.jsx onDocumentLoadSuccessWithDoc, clamp pageNumber if it exceeds pdf.numPages to prevent the 'Invalid page request' console warning and blank-page display when saved reading progress > numPages.",
+    "OPTIONAL (low): Backend server.py get_file — for missing PDFs, the GCS lookup can be slow. Consider a blob.exists() precheck to fail fast with 404."
+  ],
+  "critical_code_review_comments": [
+    "BookDetailPage.jsx line 20: pdfjs.GlobalWorkerOptions.workerSrc uses `${pdfjs.version}` so the worker URL will always match the installed pdfjs-dist (5.4.296). jsDelivr responds 200 for this version — verified via curl. Good defensive coding.",
+    "BookDetailPage.jsx line 23: console.log of worker version aids debugging — matches what E1 asked to verify.",
+    "BookDetailPage.jsx lines 764-767: onLoadError handler correctly logs error and shows toast — this prevents silent hang.",
+    "BookDetailPage.jsx lines 774-789: error UI with a 'Refresh Page' button is a solid UX fallback when Document fails.",
+    "BookDetailPage.jsx line 130-162 loadPdf: uses withCredentials + Authorization Bearer + responseType blob correctly. URL.createObjectURL blob URL fed to <Document file={pdfUrl}> — works.",
+    "server.py /api/files/{path} line 1386-1433: PDF access-control logic is correct (admin bypass, per-book pdf_purchases lookup, bookshelf check for subscribed users). No _id leak — returns raw Response(content=data, media_type).",
+    "server.py get_file: uses `data, content_type = get_object(path)` then returns Response — no MongoDB ObjectId issues since binary bytes returned directly.",
+    "Minor: BookDetailPage.jsx has grown to 1358 lines — could be split into a PdfReader subcomponent and a BookDetailInfo subcomponent for maintainability.",
+    "Minor: In loadReadingProgress (line 229-243), if response.data.page > actual numPages of PDF, the user sees a blank page. Should clamp or reset once numPages is known."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pdf_viewer.py (new — 6 pytest cases for PDF viewer)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 pytest cases pass)",
+    "frontend": "100% (PDF worker init verified, Document loads, canvas renders 612x792 with actual PDF content visible, page navigation footer works, zoom controls work, no infinite spinner)"
+  },
+  "test_credentials": {
+    "admin_email": "huzaifahwaheed70@gmail.com",
+    "admin_password": "admin123",
+    "admin_tier": "4 (Premium)",
+    "test_book_id": "book_873c49aac9ee"
+  },
+  "seed_data_creation": "Reset reading progress for admin+book_873c49aac9ee to page 1 via POST /api/reading-progress to normalize state for the render verification. No new users or books created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "PDF viewer bug is FIXED. Worker source is `//cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs` (BookDetailPage.jsx line 20) and pdfjs.version resolves to 5.4.296 (matches installed react-pdf@10.4.1's pdfjs-dist). Verified worker script downloads 200 from jsDelivr, Document component fires onLoadSuccess, Page renders a canvas. Backend /api/files/{path} returns 200 with content-type application/pdf and %PDF magic bytes. Latent edge case remaining: if saved reading_progress.page > pdf.numPages, Page component throws 'Invalid page request' and shows blank — recommend clamping pageNumber in onDocumentLoadSuccessWithDoc. Test file: /app/backend/tests/test_pdf_viewer.py (6 tests).",
+  "rca of the issue": "Original bug 'PDF keeps loading forever' was caused by the PDF.js worker script failing to load — most likely the previous unpkg CDN was returning stale/mismatched worker versions or 404 for the specific pdfjs-dist version, so react-pdf's Document never resolved onLoadSuccess and stayed in loading state indefinitely. FIX (already applied by E1): (a) switched workerSrc to jsDelivr `cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs` which properly hosts every published pdfjs-dist version including 5.4.296, (b) added onLoadError handler on <Document> so errors are surfaced instead of silently hanging, (c) added error UI with Refresh button. VERIFICATION: console log confirms worker version 5.4.296 loaded from jsDelivr with HTTP 200; Document.onLoadSuccess fires (numPages populated); canvas element renders with PDF content (612x792 px, visible=true); no stuck spinner. The fix is working end-to-end for admin (tier 4) accessing book_873c49aac9ee."
+}

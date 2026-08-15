@@ -4,7 +4,7 @@ import { useAuth, API } from '../App';
 import axios from 'axios';
 import {
   User, ArrowLeft, Mail, Lock, CreditCard, AlertTriangle,
-  CheckCircle, XCircle, Calendar, Library, Crown, Trash2
+  CheckCircle, XCircle, Calendar, Library, Crown, Trash2, ChevronDown
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 
 const SettingsPage = () => {
   const { user, token, loading: authLoading, logout } = useAuth();
@@ -25,11 +32,6 @@ const SettingsPage = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
-  const [hidePrices, setHidePrices] = useState(false);
-
-  useEffect(() => {
-    setHidePrices(shouldHidePrices());
-  }, []);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -46,6 +48,11 @@ const SettingsPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Tier change state
+  const [showTierChangeDialog, setShowTierChangeDialog] = useState(false);
+  const [selectedNewTier, setSelectedNewTier] = useState(null);
+  const [changingTier, setChangingTier] = useState(false);
 
   const getAuthHeaders = () => {
     const storedToken = localStorage.getItem('auth_token') || token;
@@ -82,6 +89,11 @@ const SettingsPage = () => {
   }, [token, authLoading]);
 
   const loading = authLoading || profileLoading;
+
+  const getTierName = (tier) => {
+    const names = { 0: 'Free', 1: 'Basic', 2: 'Standard', 3: 'Advanced', 4: 'Premium' };
+    return names[tier] || `Tier ${tier}`;
+  };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -142,6 +154,27 @@ const SettingsPage = () => {
       fetchProfile();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to reactivate subscription');
+    }
+  };
+
+  const handleChangeTier = async () => {
+    if (!selectedNewTier && selectedNewTier !== 0) return;
+    
+    setChangingTier(true);
+    try {
+      const response = await axios.post(
+        `${API}/user/change-tier?new_tier=${selectedNewTier}`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      toast.success(response.data.message);
+      setShowTierChangeDialog(false);
+      setSelectedNewTier(null);
+      fetchProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to change tier');
+    } finally {
+      setChangingTier(false);
     }
   };
 
@@ -348,6 +381,42 @@ const SettingsPage = () => {
                   </>
                 )}
               </div>
+
+              {/* Tier Downgrade Section */}
+              {profile?.subscription_tier > 0 && !profile?.cancellation_pending && (
+                <div className="mt-6 pt-6 border-t border-[rgba(212,175,55,0.2)]">
+                  <h3 className="text-[#FDFBF7] font-medium mb-3">Downgrade Your Plan</h3>
+                  <p className="text-sm text-[#B0C4BF] mb-3">
+                    You can downgrade to a lower tier at any time. The change takes effect immediately.
+                  </p>
+                  <Select
+                    value={selectedNewTier?.toString() || ''}
+                    onValueChange={(v) => setSelectedNewTier(parseInt(v))}
+                  >
+                    <SelectTrigger className="w-full bg-[#082E26] border-[rgba(212,175,55,0.2)] text-[#FDFBF7]">
+                      <SelectValue placeholder="Select a lower tier to downgrade" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-surface border-[rgba(212,175,55,0.2)]">
+                      {[0, 1, 2, 3].map(t => (
+                        t < (profile?.subscription_tier || 0) && (
+                          <SelectItem key={t} value={t.toString()} className="text-[#FDFBF7]">
+                            {getTierName(t)}
+                          </SelectItem>
+                        )
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedNewTier !== null && (
+                    <Button
+                      onClick={() => setShowTierChangeDialog(true)}
+                      className="mt-3 bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+                      data-testid="confirm-downgrade-btn"
+                    >
+                      Downgrade to {getTierName(selectedNewTier)}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
 
             {profile?.cancellation_pending && (
@@ -504,6 +573,48 @@ const SettingsPage = () => {
               data-testid="confirm-delete-btn"
             >
               {deleting ? 'Deleting...' : 'Delete My Account'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tier Change Dialog */}
+      <Dialog open={showTierChangeDialog} onOpenChange={setShowTierChangeDialog}>
+        <DialogContent className="bg-surface border-gold/30 text-[#FDFBF7]">
+          <DialogHeader>
+            <DialogTitle className="text-[#FDFBF7] font-serif">Change Your Plan</DialogTitle>
+            <DialogDescription className="text-[#B0C4BF]">
+              You are about to downgrade from {getTierName(profile?.subscription_tier)} to {getTierName(selectedNewTier)}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="my-4 p-4 bg-[#082E26] rounded-sm">
+            <h4 className="text-[#FDFBF7] font-medium mb-2">What changes:</h4>
+            <ul className="text-sm text-[#B0C4BF] space-y-1">
+              <li>• Your monthly book limit will be reduced</li>
+              <li>• The change takes effect immediately</li>
+              <li>• You can upgrade again anytime from the pricing page</li>
+            </ul>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowTierChangeDialog(false);
+                setSelectedNewTier(null);
+              }}
+              className="border-[rgba(212,175,55,0.2)] text-[#FDFBF7]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleChangeTier}
+              disabled={changingTier}
+              className="bg-gold text-[#02120F] hover:bg-[#E9C85C]"
+              data-testid="confirm-tier-change-btn"
+            >
+              {changingTier ? 'Changing...' : `Downgrade to ${getTierName(selectedNewTier)}`}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -61,7 +61,7 @@ const FavoritesPage = () => {
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+            <div className="spinner-gap spinner-gap-lg"></div>
           </div>
         ) : favorites.length === 0 ? (
           <div className="text-center py-20">

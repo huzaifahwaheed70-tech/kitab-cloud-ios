@@ -49,7 +49,7 @@ const BookDetailPage = () => {
   const [showWebsitePopup, setShowWebsitePopup] = useState(false);
   const [popupType, setPopupType] = useState('pdf');
 
-  const isIOSApp = shouldHidePrices() || shouldDisablePurchases();
+  const isIOSApp = shouldHideExternalPurchases();
 
   const userTier = user?.subscription_tier || 0;
   const canSearch = userTier >= 3;

@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 17 - Frontend testing of the new WidgetDashboard + custom goal features on Kitab Cloud. Tested via Playwright as Tier 4 admin (huzaifahwaheed70@gmail.com). PASSING: (1) Library page renders WidgetDashboard with 3 default visible widgets (widget-streak, widget-myBooks, widget-favorites) - the monthlyList widget is correctly hidden for Tier 4 (per `show: userTier > 0 && userTier < 4`). (2) Tier 4 'Premium Unlimited Access' banner is visible below the widgets. (3) Add Widget button shows '(1 hidden)' and opens the Add Widget bottom-sheet/modal listing 'Quick Settings' as the hidden option; clicking it adds widget-settings to the dashboard. (4) Clicking widget-streak navigates to /reading-streak. (5) Reading Streak > Goals tab shows all 3 goal cards (Days Per Week, Daily Pages Goal, Daily Reading Time). (6) Each goal card has a 'Custom' button next to the presets; clicking it swaps to a number input with correct placeholder/min/max. (7) Custom pages input accepts 175 and PUT /api/reading-streak/goal?goal_pages=175 returns 200; display updates to '175 pages'. Custom minutes flow works similarly. (8) Frontend validation triggers toast 'Pages must be between 1 and 500' for out-of-range values (tested 700 pages, 2 minutes). (9) Long-press (600ms mousedown) DOES render the red 'Tap to hide widget' overlay. CRITICAL BUG: (10) Long-press remove overlay is UNREACHABLE - clicking on it does NOT remove the widget. Root cause: the full-screen cancel overlay <div className='fixed inset-0 z-40'> (WidgetDashboard.jsx lines 375-380) is rendered on top of the per-widget remove overlay (<div className='absolute inset-0 ...'> lines 278-288) which has default z-index 'auto'. document.elementFromPoint at the widget centre after long-press returns the DIV.fixed.inset-0.z-40 - so any click sets longPressTarget=null instead of calling handleRemoveWidget. The 'remove widget' feature is completely broken on desktop and any pointer-based interaction.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "WidgetDashboard",
+        "issue": "Long-press remove overlay is unclickable: full-screen cancel-overlay (fixed inset-0 z-40) is stacked ABOVE the per-widget remove overlay (absolute inset-0, z-index auto). Clicking 'Tap to hide widget' actually hits the cancel overlay first, dismissing the long-press state without removing the widget. Verified via document.elementFromPoint which returns 'DIV.fixed inset-0 z-40' at the widget centre while overlay is showing.",
+        "selector": "[data-testid='widget-favorites'] div.bg-red-500\\/90 (blocked by .fixed.inset-0.z-40)",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "WidgetDashboard - Add Widget modal on desktop",
+        "issues": [
+          "Modal container uses items-end md:items-center - on desktop it centres, OK. But on desktop the modal 'Add Widget' button (Add Widget (1 hidden)) is a full-width dashed bar which visually looks like a widget row - acceptable but a small '+ Add widget' pill in the header would be more consistent with typical dashboards.",
+          "Hint text after removing a widget says 'Widget hidden. Hold empty area to add it back.' - but there is no empty-area long-press handler; the actual UX is 'tap the Add Widget button below the widget grid'. The toast is misleading.",
+          "'Reading List' widget is hidden for Tier 4 (correct per requirement) BUT it also does not appear in the Add Widget modal because the show filter excludes it. This is consistent but the user might expect to see it locked/greyed. Not blocking - matches requirement note."
+        ]
+      }
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_17.json"],
+  "action_items": [
+    "CRITICAL FIX: In /app/frontend/src/components/WidgetDashboard.jsx, either (a) add `z-50` (or any z above 40) to the per-widget remove overlay div at lines 278-288, OR (b) lower the cancel overlay z-index to z-30 and give the remove overlay z-40, OR (c) restructure so the cancel overlay uses pointer-events-none while the remove overlay handles both its click AND outside-click dismissal. Recommended minimal patch: add `z-50` class to the red remove-overlay div, so clicks land on it instead of the cancel scrim.",
+    "OPTIONAL: Update the toast text in handleRemoveWidget from 'Hold empty area to add it back' to 'Tap the + Add Widget button below to add it back' - clearer for the actual UX.",
+    "OPTIONAL: Consider showing Reading List widget in Add Widget modal even for Tier 4 (greyed as 'Included in Premium'), or removing the reference entirely from the modal-list filter comment to avoid confusion during future edits."
+  ],
+  "critical_code_review_comments": [
+    "WidgetDashboard.jsx line 375-380: Full-screen cancel scrim `<div className='fixed inset-0 z-40' onClick={() => setLongPressTarget(null)} />` blocks pointer events on the per-widget remove overlay. This is the root cause of the widget-remove being broken. Fix by giving the per-widget remove overlay `z-50` (higher than the scrim) OR reversing the z-order.",
+    "WidgetDashboard.jsx line 96-101: handleAddWidget closes the modal AND toasts on success but does not verify the write. Since this is a localStorage-only write it's fine, but a try/catch around JSON.stringify + localStorage.setItem in savePreferences() would be more robust (Safari private mode etc).",
+    "WidgetDashboard.jsx line 267-273: onMouseDown/onMouseUp/onMouseLeave are attached to the <Link> - on a slow click (e.g., 500ms hold then release), the timer runs to 600ms and fires setLongPressTarget AFTER the click has already navigated. This causes a race where users may briefly see the remove overlay on the next page. Consider clearing the timer in a click handler as well.",
+    "WidgetDashboard.jsx line 311-316: the Add Widget button ALSO has a 600ms long-press handler that opens the modal (duplicate of the onClick). This means desktop users see the modal open immediately on click, and mobile users see it open after 600ms - inconsistent. Suggest removing the onTouchStart timer since onClick already handles both.",
+    "ReadingStreakPage.jsx line 60-101: `updateGoal` handles days/pages/minutes with three branches. Clean but the toast for out-of-range pages triggers even before hitting backend; good client-side guard. Backend also validates. Consistent.",
+    "ReadingStreakPage.jsx: The Custom input does not clamp value on blur - a user can enter e.g. 500000 and see error only on Save. Consider `onBlur` clamp or disable Save while out of range."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend only)",
+    "frontend": "5/6 features PASS. Widget grid, navigation, Add Widget modal, Premium banner, Custom goal inputs & validation all work. Widget remove via long-press is BROKEN due to z-index issue."
+  },
+  "test_credentials": {
+    "admin_email": "huzaifahwaheed70@gmail.com",
+    "admin_password": "admin123"
+  },
+  "seed_data_creation": "Modified goal_pages to 175 then restored to 20 via PUT /api/reading-streak/goal. localStorage kitab_widget_preferences was toggled and cleaned up at end of test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The WidgetDashboard is in /app/frontend/src/components/WidgetDashboard.jsx. Key data-testids: widget-streak, widget-myBooks, widget-favorites, widget-monthlyList (hidden for Tier 4), widget-settings (hidden by default), add-widget-btn. localStorage key: 'kitab_widget_preferences'. Long-press triggers at 600ms (both onTouchStart and onMouseDown). CRITICAL: the remove-via-long-press flow is broken due to a z-index stacking bug on the cancel scrim. After main agent applies the z-50 fix on the remove overlay, retest by: 1) mouseDown on any widget for >600ms, 2) verify red overlay appears, 3) mouseUp, 4) click on 'Tap to hide widget', 5) widget should disappear AND localStorage kitab_widget_preferences should reflect the change. Custom goals work fine and validated at server side (400 if out of range).",
+  "rca of the issue": "BUG: Widget cannot be removed via long-press.\nREPRODUCTION: 1) Login as any user. 2) Go to /library. 3) Hold mouse-down on any widget (e.g., Favorites) for >600ms. 4) Red 'Tap to hide widget' overlay appears. 5) Release mouse. 6) Click on the overlay. EXPECTED: widget disappears from dashboard. ACTUAL: overlay disappears but widget remains; localStorage unchanged.\nROOT CAUSE: WidgetDashboard.jsx renders TWO overlays when longPressTarget is set: (a) per-widget red remove overlay INSIDE the <Link> at absolute inset-0 with default z-index 'auto', and (b) full-screen cancel scrim at lines 375-380 with `fixed inset-0 z-40`. Because 'fixed' positioned elements with an explicit z-index create their own stacking context outside the Link's normal flow, the cancel scrim is painted ABOVE the red remove overlay. document.elementFromPoint(widgetCenter) confirmed the top element is the .fixed.inset-0.z-40 cancel scrim. Any click on the visible red overlay actually hits the invisible cancel scrim, invoking setLongPressTarget(null) instead of handleRemoveWidget.\nMITIGATION: Add `z-50` (or any z > 40) to the red remove overlay div at WidgetDashboard.jsx line 279, e.g.: `<div className='absolute inset-0 z-50 bg-red-500/90 ...'`. Also add `z-40` to the outer transparent cancel div OR set the cancel div to `pointer-events-none` and let the remove overlay handle its own click+outside-click via a stopPropagation on the child and an onClick on the Link itself."
+}

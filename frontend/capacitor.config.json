@@ -20,9 +20,6 @@
     "captureInput": true,
     "webContentsDebuggingEnabled": false
   },
-  "android": {
-    "backgroundColor": "#02120F"
-  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 2000,
@@ -31,10 +28,8 @@
     },
     "StatusBar": {
       "style": "DARK",
-      "backgroundColor": "#02120F"
-    },
-    "OneSignal": {
-      "appId": "31bf8b91-fdf9-427b-8908-9e52914d6d11"
+      "backgroundColor": "#02120F",
+      "overlaysWebView": false
     }
   }
 }
